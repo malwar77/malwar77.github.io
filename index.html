@@ -4869,6 +4869,82 @@ public:
          this is a static site, posts land when the site updates.
       ============================================================ */
       var POSTS = [
+        { id: "tv-debloat-factcheck", date: "Oct 23, 2026", mins: 11,
+          title: "Fact-Checked: 'Hacking' Your Own TV to Delete the Ads — the Full How-To",
+          excerpt: "A viral TikTok says people are pointing AI coding tools at their own smart TVs to strip the junk apps and kill the home-screen ads. We checked the claims, the business model behind them, and the method itself — then wrote down the full verified how-to.",
+          body: `
+<p>A TikTok by Zack Shutt (<a class="gh-link" style="margin-top:0" href="https://www.tiktok.com/@zackshutt/video/7699919564452252958" target="_blank" rel="noopener">@zackshutt</a>, "People Are Hacking Their Own TVs") has been spreading fast this week, and the pitch sounds like a wind-up: people are aiming AI coding tools at their own televisions and coming away with a clean, ad-free home screen. We went through the claims one by one, checked them against independent guides and industry reporting, and then wrote the whole method out properly. Here is what holds up — and the one limit the headline leaves out.</p>
+<h3>What the video claims</h3>
+<p>The recipe, as the video tells it: point an AI coding tool — Claude Code is the one on screen — at your own smart TV. The AI connects to the TV over your home Wi-Fi, removes more than 20 pre-installed junk apps most owners never asked for, and sets up a tidy home screen with no ads on it. To the video's credit, it carries its own warnings rather than selling a miracle: this is tinkerers' territory, things can break, system updates push back against the changes, and your warranty may not love any of it.</p>
+<div class="watch"><b>The verdict — real</b>The method is genuine, and it is not really "hacking" at all: everything below uses Android's own standard developer tooling, the same kit app developers use every day. The approach is documented by many independent guides published this month, and one open-source project born from exactly the same idea — CleanYourTV, started in mid-October 2026 after its author used Claude Code to clean up a parents' TV — spread within days and was covered by major tech press. The business-model claim checks out too: industry analysts Omdia report TV brands selling sets at hardware margins of roughly -3% to -7%, profiting from ads and viewing data instead — Walmart bought Vizio largely for its advertising business. The honest limit, stated plainly: this removes home-screen sponsored rows, recommendation ads and bloatware. It does <b>not</b> remove ads inside streaming apps — YouTube will still serve YouTube ads.</div>
+<h3>Why your TV shows ads in the first place</h3>
+<p>Once you see the margins above, the home screen stops looking like a design choice and starts looking like the product. If a manufacturer sells you the television itself at roughly break-even — or below cost — the money has to come from somewhere, and it comes from what the screen shows you afterwards: sponsored rows and promoted titles on the home screen, and data about what you watch. The hardware is the hook; the advertising is the business. That is also why these rows are baked in so stubbornly, and why a system update can quietly switch things back on: from the manufacturer's side, your debloated TV is inventory that stopped earning.</p>
+<h3>What you need</h3>
+<ul><li><b>A TV or streaming box running Android TV or Google TV.</b> This is a hard scope limit, so it goes first: Samsung TVs run Tizen and LG TVs run webOS, and neither supports this method at all.</li><li><b>A computer — or a phone — on the same Wi-Fi network</b> as the TV. It runs one tool, ADB, and sends the commands.</li><li><b>Optionally, an AI coding tool</b> to drive the session the way the video shows. Claude Code requires a paid Claude plan — the free plan does not include it. But the AI is optional: every step below works by hand with plain ADB, and doing it manually means you see every change before it happens.</li></ul>
+<h3>The how-to</h3>
+<p>The tool underneath everything is <b>ADB</b> (Android Debug Bridge), Google's own command-line bridge to Android devices. Nothing here roots the TV, unlocks a bootloader, or flashes anything — you are using the front door Android leaves open for developers, which is exactly why the changes are reversible.</p>
+<h3>Step 1 — Unlock Developer options on the TV</h3>
+<p>On the TV, open <b>Settings → System → About</b> and tap <b>Build</b> seven times. The TV will count you down and then confirm developer mode is on. A new Developer options entry appears in the settings.</p>
+<h3>Step 2 — Turn on debugging, and find the TV's IP address</h3>
+<p>Open Developer options and switch on debugging: on older TVs it is labelled <b>USB debugging</b> or <b>Network debugging</b>; on Android 11 and newer you will use <b>Wireless debugging</b> instead. Then find the TV's address on your network under <b>Settings → Network</b> — write the IP down, because every connection command below needs it.</p>
+<h3>Step 3 — Install ADB</h3>
+<p>Pick your route — you only need one of these:</p>
+<div class="setup-block"><p class="setup-label">Bash (Linux / macOS)</p><pre class="code"><code># Debian / Ubuntu
+sudo apt install adb
+
+# macOS (Homebrew)
+brew install android-platform-tools</code></pre></div>
+<div class="setup-block"><p class="setup-label">Windows</p><p class="setup-note">Download Google's "SDK Platform-Tools for Windows", unzip the folder, then open PowerShell inside that folder. Every command below runs from that PowerShell window, exactly as written.</p></div>
+<div class="setup-block"><p class="setup-label">Termux (Android phone)</p><p class="setup-note">No computer needed: with Termux installed, the phone itself becomes the ADB host.</p><pre class="code"><code>pkg install android-tools</code></pre></div>
+<h3>Step 4 — Connect to the TV</h3>
+<p>The commands are identical in Bash, PowerShell and Termux — only how you got ADB differs. Older TVs with network debugging connect directly on port 5555. Newer TVs using wireless debugging pair first: on the TV, choose "Pair device with pairing code", and use the two ports the TV shows you.</p>
+<pre class="code"><code># older TVs — network debugging
+adb connect TV-IP:5555
+
+# newer TVs — wireless debugging (ports shown on the TV)
+adb pair TV-IP:PAIRING-PORT
+adb connect TV-IP:CONNECT-PORT
+
+# confirm the TV is connected
+adb devices</code></pre>
+<p>Whichever route you took, the TV will ask <b>"Allow USB debugging?"</b> — accept it on the TV screen. If <code class="inline">adb devices</code> lists your TV, you are in.</p>
+<h3>Step 5 — Back up first, change nothing yet</h3>
+<p>Before disabling a single thing, save a full inventory of the TV as it is right now:</p>
+<pre class="code"><code>adb shell pm list packages &gt; packages.txt
+adb shell getprop &gt; getprop.txt</code></pre>
+<p>Then start a <b>restore list</b> — a simple note where every package you later disable gets written down, in the order you disabled it. If anything misbehaves, that list is your way back, package by package.</p>
+<h3>Step 6 — Sort the packages before touching anything</h3>
+<p>Work through the package list and sort everything into four groups first: <b>ads and sponsored content</b>, <b>tracking and analytics</b>, <b>preinstalled extras</b> you never use, and <b>core system</b> packages the TV needs to function. The first three groups are candidates; the fourth is untouchable. If an AI agent is helping you, give it the working rules in your own words before it runs anything: back up first; only ever disable, never uninstall; group the packages and wait for your approval; work in small batches.</p>
+<h3>Step 7 — Disable in small batches</h3>
+<p>Disable a few packages at a time — ten at most — then reboot the TV and test the remote, the inputs and your usual apps before continuing. Disabling (not uninstalling) is the whole safety model: the app stays on the TV, switched off, and can be switched back on in one command.</p>
+<pre class="code"><code># disable one package
+adb shell pm disable-user --user 0 PACKAGE.NAME
+
+# bring it back
+adb shell pm enable PACKAGE.NAME</code></pre>
+<h3>Step 8 — The never-disable list</h3>
+<p>Some packages are load-bearing. Never disable: <b>System UI and Settings</b>, <b>TV inputs and HDMI switching</b>, <b>Bluetooth and remote pairing</b>, <b>the package installer and the Play Store</b>, <b>Play Services</b> — and <b>the current launcher</b>, until a replacement is installed and working (that is the next step). And stay on this path entirely: no root, no bootloader unlock, no flashing. That route can drop the TV's Widevine DRM from L1 to L3, which cuts Netflix and friends down to SD quality — a permanent downgrade in exchange for nothing this guide needs.</p>
+<h3>Step 9 — Replace the home screen</h3>
+<p>Install <b>Projectivy Launcher</b> — free, on the Play Store, and ad-free — or <b>FLauncher</b>, and set it as the default home screen. Live with it for a while first. Only once the replacement is working should you even consider disabling the stock launcher, and treat that step as delicate: if the TV ever loses its home screen, a restart usually restores it.</p>
+<h3>Step 10 (optional) — Turn the tracking down further with Private DNS</h3>
+<p>One more lever lives in Android's settings. Pointing the TV at a filtering DNS resolver blocks many tracking and ad domains before anything loads:</p>
+<pre class="code"><code>adb shell settings put global private_dns_mode hostname
+adb shell settings put global private_dns_specifier dns.adguard-dns.com</code></pre>
+<p>The honest limit, again: this blocks a lot of phoning-home and domain-level ads, but it cannot remove ads that are served from inside a streaming video — those travel with the picture itself.</p>
+<h3>Undoing everything</h3>
+<p>Nothing in this guide is one-way. Re-enable any package with <code class="inline">pm enable</code> (your restore list from Step 5 tells you which ones), re-enable apps from <b>Settings → Apps</b> on the TV, or factory-reset the TV and every change is gone at once. One last housekeeping step, and it matters: when you are finished, go back into Developer options and <b>turn debugging off</b>, so nothing else on your network can connect to the TV the way you just did.</p>
+<div class="watch"><b>Safety, before you start</b>Only do this on <b>your own TV</b>. The video's warning that "updates fight back" is accurate: a system update can re-enable apps or change behaviour, so expect occasional maintenance rather than a one-time fix. Disabling the wrong package can break inputs or the remote — that is precisely what the backup, the restore list and the small batches in Steps 5–7 are for. Warranty impact varies by brand; for what it is worth, nothing here roots or flashes the TV, so you are never in modified-firmware territory.</div>
+<h3>Sources</h3>
+<ul>
+<li><a class="gh-link" style="margin-top:2px" href="https://www.tiktok.com/@zackshutt/video/7699919564452252958" target="_blank" rel="noopener">The original TikTok — Zack Shutt, "People Are Hacking Their Own TVs" ↗</a></li>
+<li><a class="gh-link" style="margin-top:2px" href="https://victorhugosolis.com/posts/cleanyourtv-debloat-android-tv-apple-tv-style-launcher/" target="_blank" rel="noopener">CleanYourTV — the write-up behind the open-source project ↗</a></li>
+<li><a class="gh-link" style="margin-top:2px" href="https://softreviewed.com/remove-bloatware-from-android-tv-claude-code/" target="_blank" rel="noopener">Step-by-step guide to removing Android TV bloatware with Claude Code ↗</a></li>
+<li><a class="gh-link" style="margin-top:2px" href="https://tv.cobanov.dev/" target="_blank" rel="noopener">The open TV cleanup prompt project ↗</a></li>
+<li><a class="gh-link" style="margin-top:2px" href="https://www.flatpanelshd.com/news.php?subaction=showfull&amp;id=1732193211" target="_blank" rel="noopener">Omdia, via FlatpanelsHD — TV makers selling sets below cost ↗</a></li>
+<li><a class="gh-link" style="margin-top:2px" href="https://www.xda-developers.com/replacing-google-tv-home-screen-with-projectivy-launcher/" target="_blank" rel="noopener">XDA — replacing the Google TV home screen with Projectivy Launcher ↗</a></li>
+</ul>
+<p>All claims above were checked on 23 Oct 2026.</p>` },
+
         { id: "first-app-ads", date: "Oct 23, 2026", mins: 5,
           title: "I published my first web app with ads — what I learned in a day",
           excerpt: "The app is the C++ catalogue on this site. Day one taught me more about shipping than a month of planning — and none of the lessons were about code.",
