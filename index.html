@@ -1019,6 +1019,24 @@
       .lrn-lang-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
       .lrn-lang-pick .tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
+      /* ---------- Front-End course (gated stages) ---------- */
+      .lrn-row.locked { cursor: default; color: var(--ink-faint); }
+      .lrn-row.locked:hover { background: none; }
+      .lrn-lock {
+        flex: none; width: 22px; height: 22px; border-radius: 50%;
+        border: 1.5px solid var(--line); display: inline-flex; align-items: center; justify-content: center;
+        font: 700 10px var(--mono); color: var(--ink-faint);
+      }
+      .fe-stage-note { margin: 0 0 12px; padding: 0 10px 4px; color: var(--ink-faint); font-size: 14px; }
+      .fe-lab-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 14px 0 6px; }
+      .fe-lab-row a.btn { text-decoration: none; }
+      .fe-sources-list { list-style: none; margin: 6px 0 4px; padding: 0; }
+      .fe-sources-list li { padding: 9px 0; border-top: 1px solid var(--line-soft); color: var(--ink-dim); font-size: 14.5px; }
+      .fe-sources-list li:first-child { border-top: none; }
+      .fe-sources-list a { color: var(--accent); font-weight: 600; text-decoration: none; border-bottom: 1px dashed rgba(255, 210, 31, .45); }
+      .fe-sources-list a:hover { border-bottom-style: solid; }
+      [data-theme="light"] .fe-sources-list a { border-bottom-color: rgba(156, 109, 0, .5); }
+
       /* ---------- Phase 1: focus rings, card motion, drawer, panels, progress ---------- */
       :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       .card:focus-visible, .dash-tile:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 0 1px var(--accent), 0 14px 34px -16px var(--glow); }
@@ -5332,7 +5350,8 @@ public:
           { label: "Projects", items: [] },
           { label: "Blog", items: [] },
           { label: "GitHub Repos", items: [] },
-          { label: "Live headlines", items: [] }
+          { label: "Live headlines", items: [] },
+          { label: "Learn", items: [] }
         ];
         PROJECTS.forEach(function (p) {
           if ((p.title + " " + p.summary + " " + p.tags.join(" ")).toLowerCase().indexOf(q) !== -1)
@@ -5361,6 +5380,14 @@ public:
         addRepos(MYREPOS, openMyRepo);
         addRepos(REPOS, openRepo);
         addRepos(SIGNALS, openSignal);
+        if (typeof FE_STAGES !== "undefined" && typeof FE_COURSE !== "undefined") {
+          if ((FE_COURSE.name + " " + FE_COURSE.blurb + " " + FE_COURSE.intro).toLowerCase().indexOf(q) !== -1)
+            groups[4].items.push({ title: FE_COURSE.name, sub: FE_COURSE.blurb, open: function () { showSection("learn"); lv.page = "fecourse"; renderLearn(); window.scrollTo(0, 0); } });
+          FE_STAGES.forEach(function (st, si) {
+            if (st.t.toLowerCase().indexOf(q) !== -1)
+              groups[4].items.push({ title: st.t, sub: "Front-End Development · Stage " + (si + 1), open: function () { showSection("learn"); if (feUnlocked(si)) { lv.feStage = si; lv.page = "festage"; } else { lv.page = "fecourse"; } renderLearn(); window.scrollTo(0, 0); } });
+          });
+        }
         return groups;
       }
       function gsearchRender() {
@@ -9888,8 +9915,135 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
         return t;
       }
 
+      /* ============================================================
+         FRONT-END DEVELOPMENT — a gated course that sits alongside
+         the 14 courses above but keeps its OWN progress store
+         (FE_KEY below), so existing LEARN progress is never touched.
+         Each of the 8 stages is one lesson plus exactly 3 checks:
+         2 knowledge questions (instant feedback, retry until right)
+         and 1 practical task the learner runs in a lab (CodePen,
+         StackBlitz or the JavaScript playground) and self-marks.
+         A stage is complete only when both knowledge answers are
+         correct AND the practical is marked done; completing a
+         stage unlocks the next. XP mirrors the main LEARN rates:
+         lesson read 10, correct knowledge answer 4, practical 5.
+         All lesson text is original to this site; the two books are
+         linked in the course's Sources block, never copied.
+      ============================================================ */
+      var FE_COURSE = { id: "frontend", name: "Front-End Development", blurb: "From JavaScript foundations to real web design, with CodePen and StackBlitz labs.", intro: "You will finish able to: write real JavaScript programs, change pages with the DOM, fetch live data, and design pages with type, colour and grids — then ship a small site." };
+      var FE_STAGES = [
+        { t: "JavaScript foundations: values, types, operators and control flow",
+          b: "Every program you will ever write is built from values. A value is a piece of data: a number like 42, a piece of text like \"hello\", or a true/false answer. JavaScript sorts values into types, and the type decides what you can sensibly do with the value — you can add two numbers, but adding a number and a piece of text does something quite different.\n\nThe types you will meet first are number (42, 3.14), string (text in quotes), boolean (true or false), null (deliberately nothing) and undefined (nothing assigned yet). When you are not sure what you are holding, ask the language: the typeof operator reports a value's type as a string, so typeof \"42\" is \"string\" — the quotes make it text, even though the characters are digits.\n\nOperators act on values. Arithmetic operators (+, -, *, /, %) do maths, and comparison operators (===, !==, >, <) compare values and produce a boolean. That boolean is what control flow feeds on: an if/else statement chooses which block of code runs, and loops — while and for — repeat a block while a condition holds or for a counted number of rounds.\n\nThe example below uses all three ideas at once: values stored in variables, a for loop repeating, and += adding each number into a running total. Read it slowly and predict the result before you run it — predicting output is the fastest way to build real understanding.",
+          c: "let total = 0;\nfor (let n = 1; n <= 10; n++) {\n  total += n;\n}\nconsole.log(total); // 55",
+          k: "Programs are values plus decisions (if) plus repetition (loops).",
+          q: [
+            { q: "What does typeof \"42\" give?", o: ["number", "string", "boolean", "undefined"], a: 1, w: "The quotes make it text, even when the characters are digits — so typeof reports \"string\"." },
+            { q: "Predict the output — what gets logged?", c: "let x = 5;\nif (x > 3) { x = x * 2; } else { x = 0; }\nconsole.log(x);", o: ["0", "5", "10", "15"], a: 2, w: "5 > 3 is true, so x becomes 5 × 2 = 10; the else branch never runs." }
+          ],
+          p: { text: "In CodePen (or this site's JavaScript playground), write a program that prints the numbers 1 to 20, and prints the word 'even' next to each even number. Run it, check the output, then mark this task done.", lab: "CodePen", url: "https://codepen.io", playground: true } },
+        { t: "Functions, scope, objects and arrays",
+          b: "As programs grow, you stop writing the same steps over and over and start packaging them. A function is a reusable block of code: you define it once, then call it whenever you need it. Values go in as parameters, the function does its work, and a return statement sends one value back out. If a function reaches its end without returning, it hands back undefined.\n\nWhere a variable lives matters. Variables declared with let or const inside a block — the part between { and } — belong to that block alone; this is block scope, and it keeps names from leaking into the rest of the program and colliding. Prefer const for values that should not be reassigned, and let for the ones that change.\n\nTwo shapes hold almost all real data. An array is an ordered list: items sit at numbered positions called indexes, starting at 0, length tells you how many there are, push adds to the end, and a for...of loop visits each item in turn. An object is labelled data: named properties like title or pages, read with dot notation. Arrays answer \"what is the third one?\"; objects answer \"what is it called?\".\n\nThe example builds a small price list as an array, then a function that walks the list and returns the total. Notice the shape — data in, answer out — because you will use it in almost every program from here on.",
+          c: "const prices = [1200, 800, 450];\nfunction total(list) {\n  let sum = 0;\n  for (const p of list) sum += p;\n  return sum;\n}\nconsole.log(total(prices)); // 2450",
+          k: "Functions package reusable logic; arrays hold lists; objects hold labelled data.",
+          q: [
+            { q: "What does a function return when it has no return statement?", o: ["0", "undefined", "null", "false"], a: 1, w: "A function with no return statement hands back undefined — JavaScript's value for \"nothing was produced\"." },
+            { q: "Predict the output — what gets logged?", c: "const a = [1, 2, 3];\na.push(4);\nconsole.log(a.length);", o: ["3", "4", "5", "An error"], a: 1, w: "push adds one item, so length goes from 3 to 4. And note: const protects the binding, not the contents — the variable cannot be pointed at a different array, but the array itself can still change, so pushing into a const array is allowed." }
+          ],
+          p: { text: "Create an object for a book (title, author, pages) and a function that returns one sentence about it — for example 'Dune by Frank Herbert, 412 pages.' Run it in CodePen or the playground, check the sentence, and mark done.", lab: "CodePen", url: "https://codepen.io", playground: true } },
+        { t: "Higher-order functions and classes",
+          b: "Functions are values too, and JavaScript lets you pass them around like any other value. A function that takes another function as input, or returns one, is called a higher-order function. This sounds abstract until you meet the three array methods built on the idea, which you will use constantly.\n\nmap calls your function on every item and collects the results into a new array of the same length. filter calls your function on every item and keeps only the items where it returns true, giving a new, shorter-or-equal array. reduce walks the list carrying a running value — an accumulator — and combines everything into a single result, like a total or a longest word. None of the three changes the original array.\n\nPlain objects work well for one-off data, but when you need many similar objects — fifty products, a shelf of books — writing each one by hand stops scaling. A class is a template for objects: it describes the properties they share and the methods they carry, and each object built from it gets its own copy of the data with the same behaviour attached.",
+          c: "const nums = [1, 2, 3, 4];\nconst doubled = nums.map(n => n * 2);\nconsole.log(doubled); // [2, 4, 6, 8]",
+          k: "map transforms every item; filter keeps some; reduce combines them into one value.",
+          q: [
+            { q: "What does filter return?", o: ["The first matching item", "A new array with only the matching items", "The count of matches", "true or false"], a: 1, w: "filter tests every item and returns a new array holding only the ones that passed — not the first match, and not a count." },
+            { q: "Predict the output — what gets logged?", c: "const words = [\"hi\", \"hello\", \"hey\"];\nconsole.log(words.filter(w => w.length > 3));", o: ["[\"hi\", \"hello\", \"hey\"]", "[\"hello\"]", "[\"hi\", \"hey\"]", "\"hello\""], a: 1, w: "Only \"hello\" has a length over 3 — \"hi\" is 2 and \"hey\" is exactly 3 — so the new array holds just \"hello\"." }
+          ],
+          p: { text: "Start from an array of test scores, for example [42, 67, 88, 35, 91]. Use filter to keep the scores of 50 and above, then map them to messages like 'Score 67: pass'. Run it in CodePen or the playground and mark done.", lab: "CodePen", url: "https://codepen.io", playground: true } },
+        { t: "Errors, modules and asynchronous JavaScript",
+          b: "Things go wrong: networks fail, files are missing, users type nonsense. If nothing handles an error, the program stops dead. A try/catch block changes that deal — code inside try runs normally, but if it throws an error, control jumps straight to catch, which decides what to do instead of the whole program crashing.\n\nReal programs are also split across files. Modules are how JavaScript organises that: a file can export the functions and values it offers, and other files import exactly the pieces they need. Splitting code this way keeps each file small and about one job.\n\nThe last piece is time. JavaScript on a page runs one piece of code at a time, and while it runs, nothing else can — a slow job would freeze the page. So slow work is handed off: timers, network requests and similar jobs wait in a queue, and their follow-up code runs only when the current code finishes. Promises represent a result that is not ready yet, and async/await lets you write that waiting in a straight line: await pauses only the function it sits in, never the whole page.\n\nfetch is how a page asks a server for data over the network. In the example, fetch asks a free practice API — JSONPlaceholder, which needs no account or key — for one to-do item, and await pauses until the answer arrives. The data comes back as JSON, ready to use.",
+          c: "async function getData() {\n  const res = await fetch(\"https://jsonplaceholder.typicode.com/todos/1\");\n  const data = await res.json();\n  console.log(data);\n}",
+          k: "await pauses only that function, not the whole page.",
+          q: [
+            { q: "When code inside try throws an error, what happens?", o: ["The program crashes", "Control jumps to catch", "The error is silently ignored", "The try block runs again"], a: 1, w: "When code in try throws, control jumps straight to the catch block, which handles the problem instead of the program crashing." },
+            { q: "Predict the output — in what order do the letters log?", c: "console.log(\"a\");\nsetTimeout(() => console.log(\"b\"), 0);\nconsole.log(\"c\");", o: ["a, b, c", "a, c, b", "c, a, b", "b, a, c"], a: 1, w: "setTimeout waits in the task queue even with a 0 millisecond delay, so the current code finishes first: \"a\", then \"c\", then \"b\" when the timer runs." }
+          ],
+          p: { text: "In CodePen, fetch https://jsonplaceholder.typicode.com/todos/1 and show its title on the page itself — not just in the console. Run it, see the title appear, and mark done.", lab: "CodePen", url: "https://codepen.io", playground: false } },
+        { t: "The DOM: changing pages with JavaScript",
+          b: "Everything you have done so far happened in the console. The DOM is how JavaScript reaches the page itself. When a browser loads HTML, it builds the Document Object Model: the page as a tree of objects, one per element, which your code can find, read and change while someone is looking at it.\n\nFinding elements is the first skill. document.querySelector takes a CSS selector — the same selectors stylesheets use — and returns the first matching element; querySelectorAll returns all of them. Once you hold an element, its textContent property reads or replaces its text, and its style property changes individual CSS properties directly.\n\nPages also react. addEventListener tells an element to run your function whenever something happens — a click, a key press, a form submit. And your code is not limited to the elements the HTML started with: createElement builds a brand-new element and appendChild attaches it to the tree, so lists, messages and whole sections can appear in response to what the visitor does.\n\nThe example wires the three skills together: find a button and a message area, then wait for a click and change the text when it lands.",
+          c: "const btn = document.querySelector(\"#greet\");\nconst msg = document.querySelector(\"#msg\");\nbtn.addEventListener(\"click\", () => {\n  msg.textContent = \"Hello, front-end developer!\";\n});",
+          k: "JavaScript changes the page by finding elements, then reading or changing their content, style, or children.",
+          q: [
+            { q: "Which method returns the first element matching a CSS selector?", o: ["getElementById", "querySelector", "getElementsByClassName", "querySelectorAll"], a: 1, w: "querySelector returns the first match. Its partner querySelectorAll returns all of them — that is the difference to remember." },
+            { q: "The page contains <p id=\"x\">old</p> and the script below runs. What does the paragraph show?", c: "document.querySelector(\"#x\").textContent = \"new\";", o: ["\"old\"", "\"new\"", "Nothing — the code errors", "Both \"old\" and \"new\""], a: 1, w: "Assigning to textContent replaces the element's text, so the paragraph that said \"old\" now shows \"new\"." }
+          ],
+          p: { text: "In CodePen, build a button and a number on the page. Each click adds 1 to the number. Run it, click a few times to watch it count, and mark done.", lab: "CodePen", url: "https://codepen.io", playground: false } },
+        { t: "Design: typography",
+          b: "Open a well-designed page and the first thing doing the work is not colour or imagery — it is type. Typography is the design: it decides what gets read first, what gets read at all, and whether reading feels easy or tiring. Readers form a judgement in seconds, and most of that judgement is hierarchy — the clear order that tells the eye where to start and what matters most.\n\nTypefaces fall into broad families. Serif faces carry small finishing strokes — little feet — on their letters, and have a traditional, printed feel. Sans-serif faces drop those strokes for a plainer, more direct look. Neither is better in the abstract; what matters is choosing deliberately and consistently, and using at most two font families on one page — one is often enough.\n\nHierarchy is built from size, weight and space. A heading is read first because it is larger, bolder, or given room around it — not because it is a different colour. Colour can support that order, but leaning on colour alone leaves readers guessing. Body text has its own quiet requirement: line-height, the vertical space between lines of text, needs to be generous — around 1.5 to 1.6 times the font size — so lines do not crowd each other and the eye can find the start of the next line.\n\nThe CSS below sets a readable body and a clear top-level heading: one system font stack doing all the work, a comfortable line-height for reading, and a tighter one for the big heading, where short lines look better packed closer.",
+          c: "body { font-family: system-ui, sans-serif; line-height: 1.6; }\nh1 { font-size: 2.5rem; line-height: 1.2; }",
+          k: "Hierarchy comes from size, weight and space — colour is the last resort, not the first.",
+          q: [
+            { q: "What creates visual hierarchy on a page?", o: ["Colour alone", "Size, weight and spacing", "Underlining everything", "Using more fonts"], a: 1, w: "Readers see order through bigger, bolder, better-spaced type. Colour alone cannot build that order." },
+            { q: "Which line-height is generally most readable for body text?", o: ["1.0", "1.6", "2.5"], a: 1, w: "Around 1.6 gives lines room to breathe: 1.0 crams lines together until they are hard to separate, and 2.5 spreads them so far apart that the eye loses the thread." }
+          ],
+          p: { text: "In CodePen, style an article page with a clear hierarchy: one large H1, smaller subheads, readable body text, and no more than two font families. Mark done when it reads top-to-bottom in order.", lab: "CodePen", url: "https://codepen.io", playground: false } },
+        { t: "Design: colour and grids",
+          b: "Colour feels instant, but it has parts you can reason about. Every colour has a hue — which colour it is, red or blue or green — a saturation, how strong or greyed-out it is, and a brightness, how light or dark it sits. Changing one part at a time is how you adjust a palette on purpose instead of by luck.\n\nColour also sets a mood, which is exactly why it is dangerous to start with it. Get contrast and hierarchy working first: a design must still read in black and white, with headings obviously headings and text obviously text, because if it fails in greyscale, colour will not save it — it will only decorate the problem.\n\nGrids are the other half of visual order. A grid divides the page into columns separated by gaps called gutters, and content lined up to the same edges across the whole page. That shared alignment is what makes a page feel calm and intentional rather than scattered. Once a grid is working, you may break it deliberately — one element stepping out of line to earn attention. Break the grid deliberately, never accidentally: breaking it by accident is just misalignment, while breaking it on purpose is emphasis.\n\nThe CSS below is the grid from this lesson in its smallest useful form: two columns sharing space in a 1-to-2 ratio, with a consistent gap between them.",
+          c: ".layout {\n  display: grid;\n  grid-template-columns: 1fr 2fr;\n  gap: 24px;\n}",
+          k: "If it doesn't work in black and white, colour won't save it. Grids keep pages aligned; break them on purpose.",
+          q: [
+            { q: "What should be working before you add colour to a design?", o: ["Animations", "Contrast and hierarchy", "Images", "Fonts"], a: 1, w: "A page must read through contrast and hierarchy — ideally even in black and white — before colour is added on top." },
+            { q: "In grid-template-columns: 1fr 2fr, how wide is the second column compared with the first?", o: ["The same width", "Half as wide", "Twice as wide"], a: 2, w: "fr units share space proportionally: 1fr takes one share and 2fr takes two, so the second column is twice as wide." }
+          ],
+          p: { text: "In CodePen, lay out a page with CSS grid: a header across the top, then a sidebar and main content below it. Then remove all colour (or view it in greyscale) and check the hierarchy still reads. Mark done.", lab: "CodePen", url: "https://codepen.io", playground: false } },
+        { t: "Capstone: build and ship a small site",
+          b: "The capstone puts it together in order — the order professionals build in. Content first: what the page actually says, decided before any code is touched, because a page with nothing to say cannot be designed into having something to say. Structure next: semantic HTML, with a header for the top of the page, main for the primary content, section for grouped parts, and a footer at the end.\n\nPresentation styles that structure with what you practised in Stages 6 and 7: type with a clear hierarchy, colour that survives the greyscale test, and a grid holding the layout in line. Behaviour comes last: one JavaScript interaction from Stages 4 and 5 — a button that responds, a counter, or data fetched and shown on the page.\n\nThen test like a visitor, not like the author: resize the page from phone width to desktop width, click everything, read everything top to bottom. When it holds up, ship it. StackBlitz runs a full Vite project entirely in the browser — files, a dev server and a preview — through WebContainers, with nothing to install: create a project, edit it, preview it, and share the link. That shareable, working site is the finish line of this course.\n\nThe skeleton below is the shape your capstone starts from: landmarks first, content inside them, and your type, grid and interaction layered on top.",
+          c: "<header>\n  <h1>Your name</h1>\n  <nav>…</nav>\n</header>\n<main>\n  <section>…</section>\n</main>\n<footer>…</footer>",
+          k: "Content, then structure, then style, then behaviour — in that order.",
+          q: [
+            { q: "What comes first when building a page?", o: ["JavaScript", "CSS animations", "Content and structure", "The colour scheme"], a: 2, w: "Content and structure come first — what the page says and how it is organised. Style and behaviour are built on top of that, not before it." },
+            { q: "Which tool runs a full Node/Vite project entirely in your browser, with nothing to install?", o: ["CodePen", "StackBlitz WebContainer", "Docker", "Postman"], a: 1, w: "StackBlitz runs real Node/Vite projects in the browser through WebContainers, with nothing installed. CodePen is for single-file HTML/CSS/JS pens, Docker runs containers on your own machine, and Postman tests APIs." }
+          ],
+          p: { text: "In StackBlitz (or CodePen), build a personal landing page with: semantic header/main/footer, a clear type hierarchy, one CSS grid section, and one working JavaScript interaction (button, counter, or form). Run it end to end and mark done. This completes the course.", lab: "StackBlitz", url: "https://stackblitz.com", playground: false } }
+      ];
+
+      /* ---------- Front-End course: progress store (this browser only, separate key) ---------- */
+      var FE_KEY = "kelick-tech-hub-frontend-progress-v1";
+      var feProg = { read: {}, answers: {}, practical: {} };
+      try {
+        var feSaved = JSON.parse(localStorage.getItem(FE_KEY) || "null");
+        if (feSaved && typeof feSaved === "object") {
+          if (feSaved.read) feProg.read = feSaved.read;
+          if (feSaved.answers) feProg.answers = feSaved.answers;
+          if (feSaved.practical) feProg.practical = feSaved.practical;
+        }
+      } catch (e) { /* storage unavailable or corrupt — start fresh */ }
+      function feSave() {
+        try { localStorage.setItem(FE_KEY, JSON.stringify(feProg)); } catch (e) { /* storage unavailable — progress lasts this visit only */ }
+      }
+      var feWrong = {};   // last wrong pick per knowledge question, this visit only: "stage/q" -> option index
+      var FE_XP_READ = 10, FE_XP_QUESTION = 4, FE_XP_PRACTICAL = 5;
+      function feStageDone(si) {
+        var st = FE_STAGES[si];
+        if (!st) return false;
+        for (var qi = 0; qi < st.q.length; qi++) {
+          if (feProg.answers[si + "/" + qi] !== st.q[qi].a) return false;
+        }
+        return !!feProg.practical[si];
+      }
+      function feUnlocked(si) { return si <= 0 || feStageDone(si - 1); }
+      function feStats() {
+        var read = 0, correct = 0, prac = 0, stages = 0;
+        FE_STAGES.forEach(function (st, si) {
+          if (feProg.read[si]) read++;
+          st.q.forEach(function (q, qi) { if (feProg.answers[si + "/" + qi] === q.a) correct++; });
+          if (feProg.practical[si]) prac++;
+          if (feStageDone(si)) stages++;
+        });
+        return { read: read, correct: correct, prac: prac, stagesDone: stages, xp: read * FE_XP_READ + correct * FE_XP_QUESTION + prac * FE_XP_PRACTICAL };
+      }
+
       /* ---------- Learn: view state ---------- */
-      var lv = { page: "home", course: null, mod: 0, lesson: 0, blankLang: "all", blank: 0 };
+      var lv = { page: "home", course: null, mod: 0, lesson: 0, blankLang: "all", blank: 0, feStage: 0 };
       var quizState = null;   // { cid, mi, answers: {qi: choice}, from: "course"|"trainer" }
 
       function lrnBar(pct, alt) {
@@ -9899,6 +10053,8 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
         var el = $("view-learn");
         if (!el) return;
         if (lv.page === "course") el.innerHTML = lrnCourseHtml();
+        else if (lv.page === "fecourse") el.innerHTML = feCourseHtml();
+        else if (lv.page === "festage") el.innerHTML = feStageHtml();
         else if (lv.page === "lesson") el.innerHTML = lrnLessonHtml();
         else if (lv.page === "quiz") el.innerHTML = lrnQuizHtml();
         else if (lv.page === "tools") el.innerHTML = lrnToolsHtml();
@@ -9934,6 +10090,16 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
             '<div class="lrn-stats"><span>Lessons <b>' + s.lessonsDone + '/' + s.lessonsTotal + '</b></span><span>Quizzes <b>' + s.quizzesDone + '/' + s.quizzesTotal + '</b></span></div>' +
             '<div class="go">' + (s.lessonsDone ? "Continue the course →" : "Start the course →") + '</div></article>';
         });
+        (function () {
+          var fs = feStats();
+          var fpct = FE_STAGES.length ? (fs.stagesDone / FE_STAGES.length) * 100 : 0;
+          html += '<article class="card lrn-course-card" data-lact="fecourse" tabindex="0" role="button" aria-label="Open the Front-End Development course">' +
+            '<div class="meta-line"><span>' + FE_STAGES.length + ' stages</span><span class="dot">•</span><span>' + FE_STAGES.length + ' lessons</span><span class="dot">•</span><span>' + fs.xp + ' XP earned</span></div>' +
+            '<h3>' + esc(FE_COURSE.name) + '</h3><p>' + esc(FE_COURSE.blurb) + '</p>' +
+            lrnBar(fpct, true) +
+            '<div class="lrn-stats"><span>Stages <b>' + fs.stagesDone + '/' + FE_STAGES.length + '</b></span><span>Stage checks <b>' + (fs.correct + fs.prac) + '/' + (FE_STAGES.length * 3) + '</b></span></div>' +
+            '<div class="go">' + ((fs.stagesDone || fs.read || fs.correct || fs.prac) ? "Continue the course →" : "Start the course →") + '</div></article>';
+        })();
         html += '</div>';
         return html;
       }
@@ -10034,6 +10200,129 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
           if (isAnswered) html += '<p class="lrn-why"><b class="' + (chosen === q.a ? "ok" : "no") + '">' + (chosen === q.a ? "Correct" : "Not quite") + '</b> · ' + esc(q.w) + '</p>';
           html += '</div>';
         });
+        return html;
+      }
+
+      function feCourseHtml() {
+        var fs = feStats();
+        var html = '<button class="lrn-crumb" type="button" data-lact="home">← All courses</button>' +
+          '<div class="sec-head"><h2>' + esc(FE_COURSE.name) + '</h2><p class="sec-sub">' + esc(FE_COURSE.blurb) + '</p>' +
+          '<p class="sec-sub">' + esc(FE_COURSE.intro) + '</p>' +
+          '<p class="sec-sub">Progress: <b style="color:var(--ink)">' + fs.stagesDone + ' / ' + FE_STAGES.length + ' stages complete</b> · <b style="color:var(--ink)">' + fs.xp + ' XP</b> from this course (' + fs.read + ' lessons read · ' + fs.correct + ' knowledge answers · ' + fs.prac + ' practical tasks).</p></div>';
+        html += '<div class="lrn-note"><b>How this course works:</b> stages unlock in order. Each stage is one lesson plus 3 checks — 2 knowledge questions with instant feedback, and 1 practical task you run yourself in a lab (CodePen, StackBlitz or the JavaScript playground) and then mark done. Finish all 3 checks in a stage to unlock the next one. XP: lesson read +' + FE_XP_READ + ' · correct answer +' + FE_XP_QUESTION + ' · practical done +' + FE_XP_PRACTICAL + '. Progress for this course is saved in this browser only, under its own key, separate from the other courses.</div>';
+        FE_STAGES.forEach(function (st, si) {
+          var unlocked = feUnlocked(si);
+          var done = feStageDone(si);
+          html += '<div class="lrn-mod"><div class="lrn-mod-head"><span class="m-num">STAGE ' + (si + 1) + '</span><h3>' + esc(st.t) + '</h3>' +
+            '<span class="m-prog">' + (done ? 'Complete ✓' : unlocked ? 'Unlocked' : 'Locked') + '</span></div>';
+          if (unlocked) {
+            var checks = 0;
+            st.q.forEach(function (q, qi) { if (feProg.answers[si + "/" + qi] === q.a) checks++; });
+            if (feProg.practical[si]) checks++;
+            html += '<button class="lrn-row" type="button" data-lact="festage" data-s="' + si + '">' +
+              '<span class="lrn-check' + (done ? " done" : "") + '">✓</span>' +
+              '<span class="r-title">' + (feProg.read[si] ? 'Lesson read' : 'Read the lesson') + ' · ' + checks + '/3 checks done</span>' +
+              '<span class="r-kind">' + (done ? 'Stage complete' : 'Open stage →') + '</span></button>';
+          } else {
+            html += '<div class="lrn-row locked"><span class="lrn-lock" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>' +
+              '<span class="r-title">' + esc(st.t) + '</span><span class="r-kind">Locked</span></div>' +
+              '<p class="fe-stage-note">Complete the previous stage to unlock.</p>';
+          }
+          html += '</div>';
+        });
+        if (fs.stagesDone === FE_STAGES.length) {
+          html += '<div class="lrn-quiz-done"><div class="big">Course complete ✓</div><p style="margin:8px 0 0;color:var(--ink-dim)">You finished all ' + FE_STAGES.length + ' stages of Front-End Development and earned ' + fs.xp + ' XP. The best next step is to build more — head to Projects and pick something to make your own.</p></div>';
+        }
+        html += '<div class="lrn-build"><p><b>Now build it.</b> Lessons stick when you build with them — the Projects section holds 60 C++ projects with full step-by-step lectures, starter code and watch-it-run sessions.</p>' +
+          '<button class="btn primary" type="button" data-lact="build">Now build it → Projects</button></div>';
+        html += '<div class="lrn-mod" style="padding-top:14px"><div class="lrn-mod-head" style="margin-top:0"><h3>Sources</h3></div>' +
+          '<p style="margin:0 0 6px;color:var(--ink-dim);font-size:14.5px">This course teaches in its own words and points you to the originals for depth. These are the only outside sources it uses — the authors\' own free editions and the two lab tools:</p>' +
+          '<ul class="fe-sources-list">' +
+          '<li><a href="https://eloquentjavascript.net/" target="_blank" rel="noopener">Eloquent JavaScript, 3rd Edition</a> — Marijn Haverbeke. The author\'s official free web version (CC BY-NC): the deep JavaScript reference behind Stages 1–5.</li>' +
+          '<li><a href="https://markboulton.co.uk/journal/designing-for-the-web-on-the-web/" target="_blank" rel="noopener">Designing for the Web</a> — Mark Boulton. The author\'s own free online release: the design reading behind Stages 6–7.</li>' +
+          '<li><a href="https://codepen.io" target="_blank" rel="noopener">CodePen</a> — codepen.io. Browser HTML/CSS/JS sandbox used for most of the practical tasks.</li>' +
+          '<li><a href="https://stackblitz.com" target="_blank" rel="noopener">StackBlitz</a> — stackblitz.com. Browser Node/Vite projects via WebContainers, used for the Stage 8 capstone.</li>' +
+          '</ul></div>';
+        return html;
+      }
+
+      function feStageHtml() {
+        var si = lv.feStage;
+        var st = FE_STAGES[si];
+        if (!st) { lv.page = "fecourse"; return feCourseHtml(); }
+        if (!feUnlocked(si)) {
+          return '<button class="lrn-crumb" type="button" data-lact="fecourse">← Front-End Development course</button>' +
+            '<div class="sec-head"><h2>Stage ' + (si + 1) + ': ' + esc(st.t) + '</h2>' +
+            '<p class="sec-sub">This stage is locked. Complete the previous stage to unlock — finish its 2 knowledge questions and its practical task first.</p></div>' +
+            '<button class="btn primary" type="button" data-lact="fecourse">Back to the course →</button>';
+        }
+        var read = !!feProg.read[si];
+        var done = feStageDone(si);
+        var html = '<button class="lrn-crumb" type="button" data-lact="fecourse">← Front-End Development course</button>' +
+          '<div class="sec-head"><h2>Stage ' + (si + 1) + ': ' + esc(st.t) + '</h2>' +
+          '<p class="sec-sub">Front-End Development · Stage ' + (si + 1) + ' of ' + FE_STAGES.length + ' · One lesson, then 3 checks: 2 knowledge questions and 1 practical task. All 3 unlock the next stage.</p></div>' +
+          '<div class="lrn-lesson-body">';
+        st.b.split("\n\n").forEach(function (para) { html += '<p>' + esc(para) + '</p>'; });
+        html += '</div>';
+        if (st.c) {
+          html += '<div style="max-width:760px"><div class="code-wrap"><button class="copy-btn" type="button" data-lact="fe-copy" data-s="' + si + '">Copy</button>' +
+            '<pre class="code"><code>' + esc(st.c) + '</code></pre></div>' +
+            '<p style="font:12.5px var(--mono);color:var(--ink-faint);margin:8px 0 0">Read it, copy it, and try it yourself in ' + (st.p.lab === "StackBlitz" ? "StackBlitz or CodePen" : "CodePen or the JavaScript playground") + ' — then answer the stage check below.</p></div>';
+        }
+        html += '<div class="lrn-take"><b>Key takeaway</b>' + esc(st.k) + '</div>' +
+          '<div class="lrn-lesson-nav" style="margin-top:6px">' +
+          '<button class="btn' + (read ? "" : " primary") + '" type="button" data-lact="fe-read" data-s="' + si + '">' + (read ? "✓ Lesson read — tap to undo" : "Mark lesson as read · +" + FE_XP_READ + " XP") + '</button></div>';
+        html += '<h3 style="font-size:20px;margin:28px 0 6px">Stage check — 3 questions</h3>' +
+          '<p class="sec-sub" style="margin:0 0 18px">Answer both knowledge questions correctly and mark the practical task done to complete this stage' + (si < FE_STAGES.length - 1 ? ' and unlock Stage ' + (si + 2) : '') + '.</p>';
+        st.q.forEach(function (q, qi) {
+          var key = si + "/" + qi;
+          var saved = feProg.answers[key];
+          var isRight = saved === q.a;
+          var wrongPick = (!isRight && typeof feWrong[key] === "number") ? feWrong[key] : null;
+          html += '<div class="lrn-quiz-q"><div class="q-num">Question ' + (qi + 1) + ' of 3 · Knowledge · +' + FE_XP_QUESTION + ' XP</div>' +
+            '<p class="q-text">' + esc(q.q) + '</p>';
+          if (q.c) html += '<pre class="code"><code>' + esc(q.c) + '</code></pre>';
+          html += '<div class="lrn-opts">';
+          q.o.forEach(function (opt, oi) {
+            var cls = "";
+            if (isRight) { if (oi === q.a) cls = " right"; }
+            else if (wrongPick !== null && oi === wrongPick) cls = " wrong";
+            html += '<button class="lrn-opt' + cls + '" type="button" data-lact="fe-opt" data-s="' + si + '" data-q="' + qi + '" data-o="' + oi + '"' + (isRight ? " disabled" : "") + '>' + esc(opt) + '</button>';
+          });
+          html += '</div>';
+          if (isRight) html += '<p class="lrn-why"><b class="ok">Correct</b> · ' + esc(q.w) + '</p>';
+          else if (wrongPick !== null) html += '<p class="lrn-why"><b class="no">Not quite</b> · ' + esc(q.w) + ' Try another answer.</p>';
+          html += '</div>';
+        });
+        var pracDone = !!feProg.practical[si];
+        html += '<div class="lrn-quiz-q"><div class="q-num">Question 3 of 3 · Practical task · +' + FE_XP_PRACTICAL + ' XP</div>' +
+          '<p class="q-text">' + esc(st.p.text) + '</p>' +
+          '<div class="fe-lab-row">' +
+          '<a class="btn primary" href="' + st.p.url + '" target="_blank" rel="noopener">Open ' + esc(st.p.lab) + ' ↗</a>' +
+          (st.p.playground ? '<button class="btn" type="button" data-lact="fe-lab-js">Open the JavaScript playground</button>' : '') +
+          '</div>' +
+          '<p class="lrn-why">Self-marked: this button is your word that you actually ran the task and checked the result. Nobody grades it for you — the learning is in the running.</p>' +
+          '<div style="margin-top:14px"><button class="btn' + (pracDone ? "" : " primary") + '" type="button" data-lact="fe-practical" data-s="' + si + '">' + (pracDone ? "✓ Marked done — tap to undo" : "Mark as done · +" + FE_XP_PRACTICAL + " XP") + '</button></div></div>';
+        if (done) {
+          html += '<div class="lrn-quiz-done"><div class="big">' + (si === FE_STAGES.length - 1 ? "Course complete ✓" : "Stage complete ✓") + '</div>' +
+            '<p style="margin:8px 0 0;color:var(--ink-dim)">' + (si === FE_STAGES.length - 1
+              ? "That was the final stage — you have finished the Front-End Development course. Take the last step and build something of your own in Projects."
+              : "All 3 checks are done, so Stage " + (si + 2) + " is now unlocked.") + '</p>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">' +
+            (si < FE_STAGES.length - 1
+              ? '<button class="btn primary" type="button" data-lact="festage" data-s="' + (si + 1) + '">Continue to Stage ' + (si + 2) + ' →</button>'
+              : '<button class="btn primary" type="button" data-lact="build">Now build it → Projects</button>') +
+            '<button class="btn" type="button" data-lact="fecourse">Back to the course</button></div></div>';
+        }
+        html += '<div class="lrn-lesson-nav">' +
+          (si > 0 ? '<button class="btn" type="button" data-lact="festage" data-s="' + (si - 1) + '">← Previous stage</button>' : '') +
+          '<span style="flex:1"></span>' +
+          (si < FE_STAGES.length - 1
+            ? (done
+              ? '<button class="btn" type="button" data-lact="festage" data-s="' + (si + 1) + '">Next stage →</button>'
+              : '<span class="r-kind" style="font:11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint)">Next stage unlocks when this one is complete</span>')
+            : '') +
+          '</div>';
         return html;
       }
 
@@ -10226,6 +10515,43 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
         }
         else if (act === "run-js") { lrnRunJs(); }
         else if (act === "clear-js") { var f = $("lrn-js-frame"); if (f) f.srcdoc = ""; }
+        else if (act === "fecourse") { lv.page = "fecourse"; renderLearn(); window.scrollTo(0, 0); }
+        else if (act === "festage") {
+          var fsi = parseInt(t.getAttribute("data-s"), 10);
+          if (feUnlocked(fsi)) { lv.feStage = fsi; lv.page = "festage"; }
+          else lv.page = "fecourse";
+          renderLearn(); window.scrollTo(0, 0);
+        }
+        else if (act === "fe-read") {
+          var rsi = t.getAttribute("data-s");
+          if (feProg.read[rsi]) delete feProg.read[rsi]; else feProg.read[rsi] = true;
+          feSave(); renderLearn();
+        }
+        else if (act === "fe-opt") {
+          var osi = parseInt(t.getAttribute("data-s"), 10), oqi = parseInt(t.getAttribute("data-q"), 10), ooi = parseInt(t.getAttribute("data-o"), 10);
+          var ost = FE_STAGES[osi];
+          if (!ost || !feUnlocked(osi)) return;
+          var okey = osi + "/" + oqi;
+          if (feProg.answers[okey] === ost.q[oqi].a) return;
+          if (ooi === ost.q[oqi].a) { feProg.answers[okey] = ooi; delete feWrong[okey]; feSave(); }
+          else feWrong[okey] = ooi;
+          renderLearn();
+        }
+        else if (act === "fe-practical") {
+          var psi = t.getAttribute("data-s");
+          if (feProg.practical[psi]) delete feProg.practical[psi]; else feProg.practical[psi] = true;
+          feSave(); renderLearn();
+        }
+        else if (act === "fe-copy") {
+          var fst = FE_STAGES[parseInt(t.getAttribute("data-s"), 10)];
+          if (!fst) return;
+          var ftext = fst.c;
+          var fbtn = t;
+          function fdone() { fbtn.textContent = "Copied ✓"; fbtn.classList.add("copied"); setTimeout(function () { fbtn.textContent = "Copy"; fbtn.classList.remove("copied"); }, 1600); }
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ftext).then(fdone, function () { fallbackCopy(ftext); fdone(); });
+          else { fallbackCopy(ftext); fdone(); }
+        }
+        else if (act === "fe-lab-js") { lv.page = "tooljs"; renderLearn(); window.scrollTo(0, 0); }
         else if (act === "build") { showSection("projects"); }
       });
       $("view-learn").addEventListener("keydown", function (e) {
