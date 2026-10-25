@@ -5388,6 +5388,16 @@ public:
               groups[4].items.push({ title: st.t, sub: "Front-End Development · Stage " + (si + 1), open: function () { showSection("learn"); if (feUnlocked(si)) { lv.feStage = si; lv.page = "festage"; } else { lv.page = "fecourse"; } renderLearn(); window.scrollTo(0, 0); } });
           });
         }
+        if (typeof GC_COURSES !== "undefined" && typeof gcUnlocked !== "undefined") {
+          GC_COURSES.forEach(function (gc) {
+            if ((gc.name + " " + gc.blurb + " " + gc.intro).toLowerCase().indexOf(q) !== -1)
+              groups[4].items.push({ title: gc.name, sub: gc.blurb, open: function () { showSection("learn"); lv.gc = gc.id; lv.page = "gccourse"; renderLearn(); window.scrollTo(0, 0); } });
+            gc.stages.forEach(function (st, si) {
+              if (st.t.toLowerCase().indexOf(q) !== -1)
+                groups[4].items.push({ title: st.t, sub: gc.name + " · Stage " + (si + 1), open: function () { showSection("learn"); lv.gc = gc.id; if (gcUnlocked(gc, si)) { lv.gcStage = si; lv.page = "gcstage"; } else { lv.page = "gccourse"; } renderLearn(); window.scrollTo(0, 0); } });
+            });
+          });
+        }
         return groups;
       }
       function gsearchRender() {
@@ -10042,8 +10052,439 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
         return { read: read, correct: correct, prac: prac, stagesDone: stages, xp: read * FE_XP_READ + correct * FE_XP_QUESTION + prac * FE_XP_PRACTICAL };
       }
 
+      /* ============================================================
+         THREE MORE GATED COURSES — Back-End Development, AI & LLM
+         Agent Engineering, and Ethical Hacking & Offensive
+         Security. Same format as Front-End Development above: 8
+         stages each, one lesson plus exactly 3 checks per stage
+         (2 knowledge questions with instant feedback + 1 self-marked
+         practical task), stages unlocking in order, and the same XP
+         rates (read 10, correct answer 4, practical 5). Each course
+         keeps its OWN progress key, so no existing progress — the
+         14 courses or Front-End — is ever touched. All lesson text
+         is original to this site; outside sources are linked in
+         each course's Sources block, never copied.
+      ============================================================ */
+      var BE_COURSE = { id: "backend", key: "kelick-tech-hub-backend-progress-v1", name: "Back-End Development", blurb: "From database design to clean, testable APIs, with Docker and Postman labs.", intro: "You will finish able to: design a database that stays consistent, write SQL with confidence, structure a back end around ports, repositories and a unit of work — then build and prove a small API." };
+      var BE_STAGES = [
+        { t: "How databases work",
+          b: "A database is a program whose whole job is storing data so it can be found again quickly and safely. It organises data into tables: a table is a grid where each row is one record — one student, one order, one book — and each column is one field, one fact about that record, like a name or an email address.\n\nWhy not just use a spreadsheet? Because real systems have many people and programs reading and writing at the same time. A database enforces rules so two writers cannot corrupt each other's work, keeps the data consistent when something fails halfway, and answers questions — queries — across millions of rows in moments. A spreadsheet does none of that reliably.\n\nKeys are what make tables work. A primary key identifies each row: it is never repeated and never empty, so every row can be pointed at exactly. A foreign key is a column in one table that points at the primary key of another, which is how tables connect. The systems you will meet most are PostgreSQL, MySQL and SQLite.",
+          c: "CREATE TABLE students (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL,\n  email TEXT UNIQUE\n);",
+          k: "Tables hold facts; keys connect them; rules keep them true.",
+          q: [
+            { q: "What does a primary key do?", o: ["Speeds up queries only", "Uniquely identifies each row", "Stores images", "Links to the internet"], a: 1, w: "A primary key's job is identity: one value, one row — never repeated and never empty." },
+            { q: "A table users has ids 1, 2, 3. You insert id 2 again. What happens?", o: ["The old row is overwritten", "The insert is rejected — primary keys cannot repeat", "A second row with id 2 is created", "The database quietly picks a different id"], a: 1, w: "Primary keys cannot repeat, so the database refuses the insert instead of letting two rows share one identity." }
+          ],
+          p: { text: "In Docker, run a PostgreSQL container (the postgres image), connect to it, and create the students table above. Mark done when the table exists.", lab: "Docker", url: "https://www.docker.com" } },
+        { t: "Data modelling with ER diagrams",
+          b: "Good databases are designed before they are built, and the design tool is the entity-relationship diagram. You start by naming the entities — the things your system keeps facts about, like Student, Course and Book. Each entity has attributes, the facts themselves: a student has a name and an email; a course has a title.\n\nThen you connect the entities with relationships, and you must say how many on each side. One-to-one: one person, one passport. One-to-many: one course, many lessons. Many-to-many: students and courses — a student enrols in many courses, and each course has many students. On the diagram you draw boxes for entities and lines for relationships, with the counts written on the lines.\n\nA many-to-many relationship cannot live inside either table, so it gets a table of its own — a middle or junction table, here called enrolments — holding one foreign key to each side. Its primary key is the pair together, which also stops the same student enrolling in the same course twice.",
+          c: "CREATE TABLE enrolments (\n  student_id INTEGER REFERENCES students(id),\n  course_id INTEGER REFERENCES courses(id),\n  PRIMARY KEY (student_id, course_id)\n);",
+          k: "Draw the model first; the tables follow the drawing.",
+          q: [
+            { q: "A student takes many courses and a course has many students. What relationship is that?", o: ["One-to-one", "One-to-many", "Many-to-many", "None"], a: 2, w: "Many on both sides — many students per course and many courses per student — is exactly what many-to-many means." },
+            { q: "How do you store a many-to-many relationship in tables?", o: ["Add a courses column to the students table", "Store the course ids as a comma-separated list", "Use a middle (junction) table holding both keys", "It cannot be stored in a relational database"], a: 2, w: "A junction table holds one row per pairing, with a foreign key to each side — that is how many-to-many is stored." }
+          ],
+          p: { text: "Draw an ER diagram (paper or any free diagram tool) for a small library: Books, Members, Loans, with every relationship labelled. Mark done when the drawing is complete.", lab: "Database Design (free book)", url: "https://opentextbc.ca/dbdesign01/" } },
+        { t: "Integrity rules and normalisation",
+          b: "A database only stays trustworthy if it refuses bad data. Integrity rules are that refusal, written into the schema. Entity integrity says a primary key is never empty — a row with no identity cannot be told apart from anything. Referential integrity says a foreign key must point at a row that really exists — no enrolment for a student who is not there. Domain rules cover the values themselves: the right type, NOT NULL where a value is required, UNIQUE where repeats make no sense.\n\nNormalisation is the discipline of removing repetition, one rule at a time. First normal form (1NF): one value per cell, and no repeating groups — a cell holding two values breaks it. Second normal form (2NF): every fact depends on the whole primary key, not just part of it. Third normal form (3NF): facts depend only on the key, never on other non-key facts. Underneath all three sits one idea, the functional dependency: X determines Y means knowing X tells you Y.\n\nA concrete case: an orders table that repeats customer_name and customer_city on every order stores the customer's city in dozens of places. Change it in some rows and not others and the database disagrees with itself. The fix is to split it — a customers table holding each city once, and orders pointing at it, as in the example.",
+          c: "CREATE TABLE customers (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL,\n  city TEXT\n);\nCREATE TABLE orders (\n  id INTEGER PRIMARY KEY,\n  customer_id INTEGER REFERENCES customers(id)\n);",
+          k: "One fact in one place; everything else points at it.",
+          q: [
+            { q: "Which normal form forbids a cell holding two values?", o: ["1NF", "2NF", "3NF", "None of them"], a: 0, w: "1NF is the one-value-per-cell rule: no repeating groups and no cell holding two values." },
+            { q: "A table stores order_id, customer_name, customer_city for every order, repeating the city. What problem is that?", o: ["A missing backup", "An update anomaly — change the city in one row and the data disagrees with itself", "A slow query", "A broken foreign key"], a: 1, w: "Repeating the same fact in many rows invites an update anomaly: update some copies and not others, and the rows contradict each other." }
+          ],
+          p: { text: "Take a messy spreadsheet-style table (orders with repeated customer details) and split it into 3NF tables, on paper or in SQL. Mark done when no fact is repeated.", lab: "Database Design (free book)", url: "https://opentextbc.ca/dbdesign01/" } },
+        { t: "SQL",
+          b: "SQL is the language you use to ask a relational database questions and to change what it holds. SELECT reads: name the columns you want, the table in FROM, and a WHERE clause to filter rows. JOIN combines tables by matching keys — usually a foreign key on one side against the primary key it points at — so facts stored apart can be read together.\n\nThe writing verbs are INSERT (add a row), UPDATE (change rows) and DELETE (remove rows). They are powerful and unforgiving: there is no undo. The professional habit is to test first — run the same WHERE clause inside a SELECT to see exactly which rows you are about to touch, or wrap the change in a transaction you can roll back.\n\nThe query below reads across three tables: enrolments in the middle, joined to students and courses on their keys, filtered to one course title.",
+          c: "SELECT students.name, courses.title\nFROM enrolments\nJOIN students ON enrolments.student_id = students.id\nJOIN courses ON enrolments.course_id = courses.id\nWHERE courses.title = 'Databases';",
+          k: "SELECT reads, JOIN connects, and always check before you UPDATE or DELETE.",
+          q: [
+            { q: "Which clause filters rows?", o: ["SELECT", "WHERE", "JOIN", "ORDER BY"], a: 1, w: "WHERE filters rows. SELECT names the columns, JOIN connects tables, and ORDER BY only sorts what is left." },
+            { q: "Predict the output — students holds (1, Ada), (2, Grace), (3, Linus). What does SELECT name FROM students WHERE id = 2; return?", o: ["Ada", "Grace", "Linus", "No rows"], a: 1, w: "The WHERE clause keeps only the row with id 2, and that row's name is Grace." }
+          ],
+          p: { text: "Using your Docker PostgreSQL from Stage 1, insert 3 students and 2 courses, enrol one student in both, and run the JOIN query above (adapted to your data). Mark done when it returns rows.", lab: "Docker", url: "https://www.docker.com" } },
+        { t: "Clean architecture and dependency inversion",
+          b: "As a back end grows, the danger is everything tangling into everything: business rules mixed with SQL, web code reaching into tables. Layering fights the tangle by putting the business rules in the middle and pushing tools — the database, the web framework — to the edges, where they can be replaced.\n\nThe rule that makes layering work is dependency inversion: high-level code should depend on abstractions, not on concrete tools. In practice that means your core code talks to an interface — called a port — that describes what it needs ('get a user by id') without naming any database. An adapter is the concrete code that fulfils a port for one real tool: a PostgreSQL adapter, a web adapter, a command-line adapter.\n\nThis arrangement is called hexagonal architecture, or ports-and-adapters. The application core sits in the middle speaking only through ports; adapters plug the outside world in. Because the core never names a tool, you can swap the database, or plug in a fake for testing, without rewriting a single rule. The example shows a port in Python and a small in-memory adapter implementing it.",
+          c: "from abc import ABC, abstractmethod\nclass UserStore(ABC):\n    @abstractmethod\n    def get(self, user_id): ...\nclass InMemoryUserStore(UserStore):\n    def __init__(self): self.users = {1: \"Ada\"}\n    def get(self, user_id): return self.users.get(user_id)",
+          k: "Depend on what something does, not on which tool does it.",
+          q: [
+            { q: "In ports-and-adapters, what is an adapter?", o: ["The business rules", "The code that connects a tool (database, web) to a port", "The test suite", "The database itself"], a: 1, w: "An adapter is the plug: it connects one concrete tool — a database, the web — to a port the core understands." },
+            { q: "Why depend on an abstraction instead of a concrete database class?", o: ["It makes every query faster", "You can swap the tool, or use a fake in tests, without rewriting the business rules", "It removes the need for a database", "It hides errors from users"], a: 1, w: "Depending on the abstraction means the tool behind it can change — real database today, fake in tests, different database tomorrow — while the rules stay untouched." }
+          ],
+          p: { text: "Write a tiny Python port plus two adapters (in-memory and another dict-backed one) and a test that runs the same logic against both. Mark done when both pass.", lab: "Architecture Patterns (free book)", url: "https://opentechbook.com/book/architecture-patterns-with-python/" } },
+        { t: "Domain modelling: entities, value objects, aggregates",
+          b: "Domain-Driven Design starts from a simple sorting question: what makes two things 'the same'? An entity is something whose identity matters over time. A user is still the same user after they change their email address — the identity stays, the details move. Entities are tracked by that identity.\n\nA value object is the opposite: it has no identity, only values. Money(10, \"USD\") is nothing but an amount and a currency, so any other Money(10, \"USD\") is exactly equal to it. Because they are pure values, value objects should be immutable — you never edit one, you replace it with a new one, which is what the frozen dataclass in the example enforces.\n\nAn aggregate is a cluster of objects that must change together, treated as one unit with a single entry point: the aggregate root. An Order together with its OrderLines is the classic case. Outside code never edits a line directly; it asks the Order, and the Order enforces its own rules — which is how rules like 'no negative quantities' can be guaranteed instead of hoped for.",
+          c: "from dataclasses import dataclass\n@dataclass(frozen=True)\nclass Money:\n    amount: int\n    currency: str",
+          k: "Entities are tracked by identity; value objects by their values; aggregates guard their own rules.",
+          q: [
+            { q: "Which one is a value object?", o: ["A User account", "Money(10, \"USD\")", "An Order", "A Customer"], a: 1, w: "Money(10, \"USD\") has no identity of its own — it is defined purely by its values, which is exactly what a value object is." },
+            { q: "Are two Money(10, \"USD\") objects equal?", o: ["No — every object is unique", "Yes — value objects compare by value", "Only if they were created in the same second", "Only when the amounts match, whatever the currency"], a: 1, w: "Two Money objects with the same amount and currency are equal, because a value object is its values and nothing else." }
+          ],
+          p: { text: "Model a tiny shop domain on paper or in Python: an Order aggregate with lines, a rule (no negative quantities), and a Money value object. Mark done when the rule is enforced by the aggregate root.", lab: "Architecture Patterns (free book)", url: "https://opentechbook.com/book/architecture-patterns-with-python/" } },
+        { t: "Repository, unit of work, and the message bus",
+          b: "Three patterns keep the storage side of a clean back end tidy. A repository is a collection-like interface for storing and loading aggregates — add, get, list — that hides the SQL behind it. The rest of the code asks the repository for an Order as if it were a shelf; how the Order is actually stored is the repository's private business.\n\nA unit of work looks after one business operation's changes as a single transaction. It tracks what changed and commits it all at once — or, if anything fails, rolls everything back. That all-or-nothing promise is what stops half-saved states, like an order saved without its payment. The sketch shows the shape: commit explicitly, or the unit of work rolls back on exit.\n\nThe message bus moves intentions and news around the system. A command asks for something to happen — PlaceOrder — and goes to exactly one handler. An event announces something that already happened — OrderPlaced — and any number of listeners can react. One related idea, CQRS, splits the model in two: use one model for writing and a simpler one for reading when they need different shapes.",
+          c: "class UnitOfWork:\n    def __init__(self, repo): self.repo = repo; self.committed = False\n    def __enter__(self): return self\n    def __exit__(self, *a):\n        if self.committed: print(\"committed\")\n        else: print(\"rolled back\")",
+          k: "Repository hides storage; unit of work makes saves all-or-nothing; the bus carries events and commands.",
+          q: [
+            { q: "What does a unit of work guarantee?", o: ["Faster queries", "All changes commit together or roll back", "Free backups", "No bugs"], a: 1, w: "A unit of work wraps one operation's changes in a single transaction: everything commits together, or everything rolls back." },
+            { q: "How do a command and an event differ?", o: ["They are two names for the same thing", "A command asks for something to happen (one handler); an event announces something already happened (many listeners can react)", "A command is only for reading data", "An event is sent by the database only"], a: 1, w: "Commands are requests aimed at one handler; events are announcements about the past that many listeners can react to." }
+          ],
+          p: { text: "Extend your Stage 5 code: add a repository plus a unit of work so a failed save rolls back. Write a test proving the rollback. Mark done when the test passes.", lab: "Architecture Patterns (free book)", url: "https://opentechbook.com/book/architecture-patterns-with-python/" } },
+        { t: "Capstone: build and test a small API",
+          b: "The capstone assembles every stage into one small, real back end. Docker runs PostgreSQL, so the database is a container you can start, stop and throw away. On top of it, a small Python service manages one aggregate — Books is a good size — behind a repository plus a unit of work, exactly as Stages 5 to 7 described.\n\nThe API itself needs only three endpoints to prove the shape: create a book, list the books, and get one book by id. Each one crosses every layer: the web adapter receives the request, the core applies the rules, and the repository stores through the unit of work.\n\nThen prove it in Postman. Send each request and check more than that it 'worked': the status codes, the response bodies, and the error cases — a create with a missing field, a get for an id that does not exist. Save the Postman collection: it becomes living documentation of what your API promises.",
+          c: "# The three capstone endpoints (any small Python web framework):\n# POST /books       -> create a book\n# GET  /books       -> list books\n# GET  /books/<id>  -> get one book, or 404",
+          k: "A real back end is: model, rules, storage, API, tests — in that order.",
+          q: [
+            { q: "What should you test in Postman besides the happy path?", o: ["Only that responses are fast", "Error cases (missing fields, unknown ids, bad input) and status codes", "Only the create endpoint", "Nothing — if it runs, it works"], a: 1, w: "Real testing includes the unhappy paths: bad input and unknown ids should produce the right errors and status codes, not crashes or wrong data." },
+            { q: "Your API returns 404 for GET /books/999 when no such book exists. Is that right?", o: ["No — a missing book should return 200 with an empty body", "Yes — 404 means the resource was not found", "No — it should return 500", "Only when the request was a POST"], a: 1, w: "404 is precisely 'the resource was not found', so GET /books/999 with no such book returning 404 is correct behaviour." }
+          ],
+          p: { text: "Run PostgreSQL in Docker, build the Books API with repository plus unit of work, and prove every endpoint in Postman (create, list, get, plus one error case). Save the Postman collection. Mark done. This completes the course.", lab: "Postman", url: "https://www.postman.com" } }
+      ];
+      var BE_SOURCES = [
+        { u: "https://opentextbc.ca/dbdesign01/", t: "Database Design, 2nd Edition", d: "Adrienne Watt & Nelson Eng (CC BY 4.0). The database reading behind Stages 1–4." },
+        { u: "https://opentechbook.com/book/architecture-patterns-with-python/", t: "Architecture Patterns with Python", d: "Harry Percival & Bob Gregory. The free book behind Stages 5–8: ports and adapters, DDD, repository and unit of work." },
+        { u: "https://www.docker.com", t: "Docker", d: "docker.com / Docker Hub. Runs the PostgreSQL containers used in the labs." },
+        { u: "https://www.postman.com", t: "Postman", d: "postman.com. The API workbench used to test the capstone API." }
+      ];
+
+      var AI_COURSE = { id: "ai", key: "kelick-tech-hub-ai-progress-v1", name: "AI & LLM Agent Engineering", blurb: "From numbers to neural networks to agents that use tools, with Jupyter and Ollama labs.", intro: "You will finish able to: think in vectors and matrices, explain how models learn, follow attention from scores to transformers, tokenize and embed text — then wire a local model into an agent loop with tools you control." };
+      var AI_STAGES = [
+        { t: "Python and numbers for AI",
+          b: "Underneath every AI headline is arithmetic. Models work on numbers arranged in shapes: a vector is a list of numbers, a matrix is a grid of them, and NumPy is the Python library that holds these shapes and computes with them fast.\n\nOne operation matters more than any other: the dot product. Take two vectors of the same length, multiply them in pairs, and add the results into a single number. That multiply-and-add is the core computation inside neural networks — it happens billions of times in a single model run.\n\nShapes are where beginners trip. A vector of shape (3,) is a flat list of three numbers; a column of shape (3,1) is three rows of one. They hold the same numbers but behave differently when combined, so checking shapes becomes a daily habit in AI work.",
+          c: "import numpy as np\na = np.array([1, 2, 3])\nb = np.array([4, 5, 6])\nprint(a @ b)  # 32",
+          k: "Vectors, matrices and dot products are the alphabet of AI.",
+          q: [
+            { q: "What is [1, 2, 3] dot [4, 5, 6]?", o: ["32", "21", "[4, 10, 18]", "15"], a: 0, w: "Multiply in pairs and add: 1×4 + 2×5 + 3×6 = 4 + 10 + 18 = 32." },
+            { q: "Predict the output — np.array([2, 3]) @ np.array([10, 10]) gives what?", o: ["20", "25", "50", "[20, 30]"], a: 2, w: "2×10 + 3×10 = 20 + 30 = 50." }
+          ],
+          p: { text: "In JupyterLab, create two arrays, compute their dot product, and reshape one into a column. Mark done when both run.", lab: "JupyterLab", url: "https://jupyter.org" } },
+        { t: "How learning works",
+          b: "A model is best pictured as a program full of knobs. The knobs are its parameters — numbers inside the model that decide what it outputs. At the start they are set at random, so the first outputs are guesses. Training is the process of turning the knobs until the guesses get good.\n\nWhat guides the turning is loss: a number that measures how wrong the model's predictions are on data where the right answer is known. The training loop is always the same three steps — predict with the current knobs, measure the loss, update the knobs a little in the direction that lowers it — repeated many times. That loop, predict → loss → update, is all of learning.\n\nOne trap waits at the end. A model can ace its training data by memorising it instead of learning the underlying pattern; that is overfitting, and it shows up as great training scores and poor results on new data. The defences are more data, a simpler model, and always judging on a hold-out test set the model never trained on. The sketch below is the loop in plain Python, with no framework.",
+          c: "# predict -> loss -> update, repeated\nfor step in range(100):\n    pred = w * x + b\n    loss = (pred - y) ** 2\n    w -= 0.01 * 2 * (pred - y) * x",
+          k: "Learning is just: guess, measure the error, adjust, repeat.",
+          q: [
+            { q: "What does loss measure?", o: ["The size of the model on disk", "How wrong the model's predictions are", "How long training takes", "The number of layers"], a: 1, w: "Loss is the error signal: a single number saying how far the predictions are from the right answers." },
+            { q: "Training loss falls to zero but test loss stays high. What happened?", o: ["The model is too small", "Overfitting — it memorised the training data instead of learning the pattern", "The test set must be broken", "Training just needs more steps"], a: 1, w: "Zero training loss with high test loss is the fingerprint of overfitting: memorisation, not learning." }
+          ],
+          p: { text: "In JupyterLab, run a tiny training loop (like the sketch) that fits a line to 5 points, and print the loss falling. Mark done when you can see it fall.", lab: "JupyterLab", url: "https://jupyter.org" } },
+        { t: "Multilayer perceptrons",
+          b: "A perceptron is the simplest neuron: it multiplies each input by a weight, adds the results, and passes the sum through an activation function — a small bend in the line. The bend matters: without it, any stack of layers collapses into one straight-line calculation. ReLU is the bend you will meet most: negative values become 0, positive values pass through unchanged.\n\nA multilayer perceptron stacks these neurons in layers. Inputs enter the first layer, hidden layers transform them in the middle, and the output layer produces the answer. Each layer re-represents the data a little more usefully than the last — depth lets a network build features out of features.\n\nTraining this stack needs a way to blame each weight for its share of the error. That is backpropagation: the error is shared backwards through the layers, and each weight is adjusted in proportion to how much it contributed. Forward to predict, backward to learn. The sketch builds a tiny two-layer network in PyTorch.",
+          c: "import torch, torch.nn as nn\nmodel = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 2))",
+          k: "Layers turn numbers into features, and features into decisions.",
+          q: [
+            { q: "What does ReLU do to -3?", o: ["-3", "0", "3", "1"], a: 1, w: "ReLU keeps positives and zeroes negatives, so ReLU(-3) is 0." },
+            { q: "Backpropagation does what?", o: ["Adds more layers during training", "Sends the error backwards so each weight can be adjusted by its contribution", "Deletes the worst weights", "Shuffles the training data"], a: 1, w: "Backpropagation shares the error backwards layer by layer, so every weight learns how much of the mistake was its fault." }
+          ],
+          p: { text: "In JupyterLab, build the tiny PyTorch MLP above, feed it 4 random numbers, and print the output shape. Mark done when it runs.", lab: "JupyterLab", url: "https://jupyter.org" } },
+        { t: "Seeing shapes and sequences: convolution and recurrence",
+          b: "Different kinds of data need different wiring. Images are spatial: a pixel means something together with its neighbours, and a feature like an edge is the same feature wherever it appears in the picture. Convolutions match that structure — a small window slides across the image, the same weights are reused at every position, and each output summarises one small patch.\n\nSequences are the opposite problem: in text or speech, order is the meaning, and what came earlier changes what comes next. Recurrent networks handle this by carrying a memory state forward step by step, updating it with each new input.\n\nBut plain recurrence has a weakness: over long sequences the early signal fades, and the network effectively forgets the beginning by the time it reaches the end. That forgetting is exactly the problem that attention — the next stage — was invented to solve. The sketch is a convolution in miniature: each output is the sum of a window of 3 neighbours.",
+          c: "x = [1, 2, 3, 4]\nprint([x[i]+x[i+1]+x[i+2] for i in range(2)])  # [6, 9]",
+          k: "Match the wiring to the data: windows for images, memory for sequences.",
+          q: [
+            { q: "Why do convolutions reuse the same weights across an image?", o: ["To use less disk space", "A feature (like an edge) means the same thing wherever it appears", "Because images are always small", "To make training slower"], a: 1, w: "Weight sharing works because an edge detector is useful everywhere in the picture, not just in one corner." },
+            { q: "What problem hits plain recurrent nets on long text?", o: ["They run too fast", "Forgetting early inputs — the signal fades over many steps", "They cannot accept text input", "They use too little memory"], a: 1, w: "Over long sequences the carried state washes out the early inputs, so plain recurrent nets forget beginnings." }
+          ],
+          p: { text: "In JupyterLab, run the window-sum sketch, then change the window to a weighted one (for example [1, 2, 1]) and print the new outputs. Mark done when both run.", lab: "JupyterLab", url: "https://jupyter.org" } },
+        { t: "Attention and transformers",
+          b: "Attention solves the forgetting problem by refusing to rely on memory. When the model produces each output, it looks at all the inputs at once, scores how relevant each one is to this step, and takes a weighted average — focusing on the inputs that matter. The scores become weights through softmax, which turns any list of numbers into positive weights that sum to 1.\n\nSelf-attention applies that idea inside a single sequence: every word attends to every other word in the same sentence, so the meaning of a word like 'it' can be resolved by looking directly at the word it refers to, however far back it sits.\n\nA transformer is a stack of blocks, each combining self-attention with a small feed-forward network, repeated in layers, with position information added — because attention on its own has no sense of order. This architecture is the engine inside modern LLMs. The sketch computes softmax weights with NumPy.",
+          c: "scores = np.array([1.0, 2.0, 3.0])\nweights = np.exp(scores) / np.exp(scores).sum()\nprint(weights)  # softmax: bigger scores get bigger weights",
+          k: "Attention lets every position look at every other position and decide what matters.",
+          q: [
+            { q: "What does softmax turn scores into?", o: ["A sorted list", "Positive weights that sum to 1", "Doubled scores", "A single winner"], a: 1, w: "Softmax exponentiates and normalises, so the outputs are positive and add up to exactly 1 — usable as weights." },
+            { q: "In self-attention, what does each word attend to?", o: ["Only the word before it", "Every other word in the same input", "Words from the training set", "Only words of the same type"], a: 1, w: "In self-attention each position looks at every position in the same sequence — that is what the 'self' means." }
+          ],
+          p: { text: "In JupyterLab, run the softmax sketch, then change the scores and watch the weights shift. Mark done when you have seen the shift.", lab: "JupyterLab", url: "https://jupyter.org" } },
+        { t: "Language basics: tokenization, n-grams, embeddings",
+          b: "Before a model can work with language, text has to become numbers. The first step is tokenization: splitting text into pieces — tokens — that the model can count and process. Tokens are often words, but subwords are common too: 'unhappiness' might split into 'un' and 'happiness', so rare words can still be built from familiar parts.\n\nThe oldest language models are n-gram models: predict the next word from the few words before it. A trigram (3-gram) looks back exactly 2 words. These models are simple and sometimes useful, but blind beyond their small window — they cannot connect a word to anything further away.\n\nThe modern answer is embeddings. Each word becomes a vector — a list of numbers, learned from the contexts the word appears in — arranged so that words with similar meanings end up near each other. The classic demonstration of this vector semantics: king minus man plus woman lands near queen. Meaning, it turns out, can be geometry.",
+          c: "text = \"the cat sat\"\nprint(text.split())  # ['the', 'cat', 'sat']",
+          k: "First turn text into numbers; then similar meanings get similar numbers.",
+          q: [
+            { q: "What is tokenization?", o: ["Translating text between languages", "Splitting text into pieces (tokens) a model can process", "Encrypting text", "Removing punctuation only"], a: 1, w: "Tokenization is the splitting step: text becomes a sequence of tokens the model can count, embed and predict." },
+            { q: "A trigram (3-gram) predicts the next word from how many previous words?", o: ["0", "1", "2", "3"], a: 2, w: "An n-gram model uses n words in total, so a trigram predicts from the 2 words before the one being predicted." }
+          ],
+          p: { text: "In JupyterLab, tokenize a paragraph with a simple splitter, count word frequencies, and list the 5 most common words. Mark done when the list prints.", lab: "JupyterLab", url: "https://jupyter.org" } },
+        { t: "Neural language models and LLMs",
+          b: "A neural language model learns one skill from enormous amounts of text: given the words so far, how likely is each possible next word? Pretraining is that learning at scale, and it teaches general language — grammar, facts, styles — before the model is aimed at any particular job. Fine-tuning then adapts a pretrained model to a task.\n\nHow the model picks each word is called decoding, and it is a real choice. Greedy decoding always takes the single most probable next word: safe but dull. Sampling picks words by their probabilities, and temperature changes the variety — a higher temperature makes output more random and creative, a lower one makes it more predictable.\n\nPrompting is the steering wheel: the input — instructions, examples, context — shapes everything the model produces. And one warning that never expires: a hallucination is fluent text that is not true, so verify anything that matters. The sketch contrasts the two decoding styles on one set of probabilities.",
+          c: "probs = [0.7, 0.2, 0.1]  # next-word probabilities\n# greedy decoding picks index 0 every time;\n# sampling with a high temperature picks 0.2 and 0.1 far more often.",
+          k: "Pretraining teaches language; decoding choices shape the answer; always verify what matters.",
+          q: [
+            { q: "What does raising sampling temperature do?", o: ["It makes the model larger", "It makes output more random and varied", "It makes answers always shorter", "It turns sampling off"], a: 1, w: "Higher temperature flattens the probability distribution, so less-likely words get chosen more often — output becomes more random and varied." },
+            { q: "Greedy decoding always picks what?", o: ["A random word", "The single most probable next word at each step", "The longest known word", "The word the user typed last"], a: 1, w: "Greedy means greedy: at every step it takes the top-probability word and never looks back." }
+          ],
+          p: { text: "In Ollama (or any chat model you can access), ask the same question twice with different phrasings and compare how the answers change. Note one difference. Mark done when you have your note.", lab: "Ollama", url: "https://ollama.com" } },
+        { t: "Capstone: build a local agent",
+          b: "An agent is a large language model plus tools plus a loop: read the task, decide the next step, call a tool, read the result, repeat until done. The model supplies the decisions; everything else is ordinary code that you write and control.\n\nLocally, Ollama serves an open-weight model on your own machine, answering API calls at http://localhost:11434. Your Python code sends prompts, parses the model's reply, and runs the tools itself — the model never touches your files directly; your code does. That separation is what keeps an agent safe to operate.\n\nGive it one safe tool first: a calculator, or a file search over a folder you own. And build the guardrails in from the first version: limit the steps, log every tool call, and never let the model run shell commands. The sketch makes one local model call with the requests library, using llama3.2 — a small open model available through Ollama.",
+          c: "import requests\nr = requests.post(\"http://localhost:11434/api/generate\",\n    json={\"model\": \"llama3.2\", \"prompt\": \"What is 17 + 25? Answer with just the number.\", \"stream\": False})\nprint(r.json()[\"response\"])",
+          k: "An agent is a loop: the model decides, your code acts, the result feeds back in.",
+          q: [
+            { q: "In a local agent, who actually runs the tool?", o: ["The model directly", "Your code, after the model chooses", "The operating system alone", "Nobody — tools run themselves"], a: 1, w: "The model only chooses; your code performs the call and feeds the result back. That separation is what makes agents controllable." },
+            { q: "Why limit the agent's steps?", o: ["To make answers shorter", "So a confused loop cannot run forever or take endless actions", "Because local models charge per step", "To save disk space"], a: 1, w: "Without a step limit, a stuck agent can loop indefinitely, calling tools and taking actions the whole time." }
+          ],
+          p: { text: "Run an Ollama model locally, then write a Python loop that asks the model a question, lets it request the calculator tool with numbers, computes the answer in your code, and returns it. Log each step. Mark done. This completes the course.", lab: "Ollama", url: "https://ollama.com" } }
+      ];
+      var AI_SOURCES = [
+        { u: "https://d2l.smola.org/index.html", t: "Dive into Deep Learning", d: "Aston Zhang, Zack C. Lipton, Mu Li & Alexander J. Smola. The open textbook behind Stages 1–5." },
+        { u: "https://web.stanford.edu/~jurafsky/slp3/", t: "Speech and Language Processing, 3rd edition draft", d: "Dan Jurafsky & James H. Martin. The language reading behind Stages 6–7." },
+        { u: "https://jupyter.org", t: "JupyterLab", d: "jupyter.org. The notebook environment used for the labs." },
+        { u: "https://ollama.com", t: "Ollama", d: "ollama.com. Runs open-weight models locally, with an API at http://localhost:11434." }
+      ];
+
+      var SEC_COURSE = { id: "security", key: "kelick-tech-hub-security-progress-v1", name: "Ethical Hacking & Offensive Security", blurb: "From Linux fundamentals to finding and fixing real web vulnerabilities — safely, and only where you have permission.", intro: "You will finish able to: work confidently in Linux, explain how the web really talks, and find, prove and fix the classic web vulnerabilities — on targets you are allowed to test.", warn: "Only test systems you own or have written permission to test. The practice targets in this course are PortSwigger Academy labs and your own local Juice Shop instance. Never test real sites without permission — unauthorised access is a crime in most countries, including under Nigeria's Cybercrimes Act, and it can end a career. Permission is the whole difference between ethical hacking and a crime." };
+      var SEC_STAGES = [
+        { t: "Linux fundamentals",
+          b: "Every security tool you will ever run sits on an operating system, and for this work that system is Linux. Its world is a filesystem tree: / is the root, /home holds users' personal files, /etc holds system-wide configuration, and /var holds data that changes as the system runs — logs, caches, spools.\n\nAccess is controlled by permissions. Every file has an owner, a group, and everyone else ('others'), and each can be allowed to read, write or execute. Permissions are often written as three numbers: each digit adds 4 for read, 2 for write and 1 for execute, so 755 means the owner can do everything while the group and others can read and execute. Users and sudo decide who may act as administrator; processes are the running programs, watched with ps and stopped with kill.\n\nNetworking basics complete the ground: machines have IP addresses, services listen on numbered ports, and ss shows what is listening on your machine right now. The daily commands — ls, cd, cat, grep, find, ssh — become muscle memory. Practise all of it on your own machine or a virtual machine, never on someone else's box.",
+          c: "ls -la\nchmod 755 script.sh\nss -tlnp",
+          k: "Know the ground before you test anything on it.",
+          q: [
+            { q: "What does chmod 755 mean?", o: ["Owner read/write/execute; group and others read/execute", "Everyone has full access", "Owner only — nobody else can do anything", "No permissions for anyone"], a: 0, w: "7 = read+write+execute for the owner; 5 = read+execute for the group, and 5 again for others." },
+            { q: "Which directory holds system-wide configuration?", o: ["/home", "/etc", "/var", "/tmp"], a: 1, w: "/etc is where system-wide configuration lives. /home is personal files, /var is changing data, /tmp is temporary files." }
+          ],
+          p: { text: "On your own machine or VM: create a file, change its permissions with chmod, list processes with ps, and show listening ports with ss. Mark done when all four have run.", lab: "Linux Fundamentals (official site)", url: "https://linux-training.be/" } },
+        { t: "How the web works (for testers)",
+          b: "Web testing is mostly reading traffic carefully. An HTTP request carries a method, a path, headers and sometimes a body; the response answers with a status code, its own headers, and a body. GET is the method meant for reading data; POST is for sending data to be processed.\n\nBrowsers are stateless by nature, so sites fake memory with cookies: the server hands the browser a cookie, the browser returns it with every request, and a session ties those requests together as one logged-in user. Whoever holds the session is treated as that user.\n\nThe insight everything else builds on: the server trusts what the browser sends, but the browser works for whoever controls it. Headers, cookies, hidden form fields — all of it can be viewed and changed by the person testing. In this course you watch that traffic with the Academy's built-in browser tools, on lab targets only. The curl example below is for a lab target, never a real site you have no permission to test.",
+          c: "curl -i https://example-lab-target/\n# -i shows the response headers and status",
+          k: "Everything the browser sends can be changed — that is where testing starts.",
+          q: [
+            { q: "Which HTTP method is meant for reading data?", o: ["POST", "GET", "DELETE", "PUT"], a: 1, w: "GET is the read method: it asks for a resource without changing state on the server." },
+            { q: "A response status 302 means what?", o: ["A server error", "A redirect to another location", "Page not found", "Login failed"], a: 1, w: "3xx codes are redirects, and 302 sends the browser on to a different location." }
+          ],
+          p: { text: "In a PortSwigger Academy lab, open the built-in browser view, make a request, and identify the method, one request header, and the response status. Mark done when you have all three.", lab: "PortSwigger Academy", url: "https://portswigger.net/web-security" } },
+        { t: "SQL injection",
+          b: "SQL injection happens when user input is glued straight into a query string. Picture a lookup built as \"... WHERE id = '\" + input + \"' ...\": the input lands inside quotes, so input containing a quote of its own can break out and change the shape of the query. The classic probe, ' OR '1'='1, turns the condition into one that is always true.\n\nFinding it in a lab is methodical: put a single quote into a field and watch for errors or changed behaviour — both are signals that input is reaching the query unfiltered.\n\nThe fix is not filtering harder; it is changing how queries are built. Parameterised queries pass the input separately, as data with placeholders, so the database can never mistake it for SQL code — and a least-privilege database user limits the damage if anything slips through. The example shows the vulnerable pattern and its parameterised fix side by side.",
+          c: "# Vulnerable (never do this):\nquery = \"SELECT * FROM users WHERE id = '\" + user_input + \"'\"\n# Fixed (parameterised):\ncursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_input,))",
+          k: "Never build SQL from user input — use parameters, always.",
+          q: [
+            { q: "What input classically tests for SQL injection?", o: ["A semicolon ;", "A single quote '", "A percent sign %", "A hash #"], a: 1, w: "The single quote is the classic probe: it breaks out of the string the input was placed in, revealing whether input reaches the query raw." },
+            { q: "Why do parameterised queries fix it?", o: ["The queries run faster", "Input is treated as data, never as SQL code", "The database gets encrypted", "Users are blocked from typing quotes"], a: 1, w: "With parameters, the query structure is fixed first and the input is only ever a value — it cannot rewrite the SQL." }
+          ],
+          p: { text: "In a PortSwigger SQL injection lab, exploit the lab vulnerability to retrieve the hidden data (lab target only), then write the fixed parameterised version. Mark done when both are complete.", lab: "PortSwigger Academy", url: "https://portswigger.net/web-security" } },
+        { t: "Cross-site scripting (XSS)",
+          b: "Cross-site scripting flips the direction of attack: instead of attacking the server, the attacker's script runs in other users' browsers, wearing the site's trust. It comes in three shapes. Reflected XSS rides in a URL and bounces off a single response. Stored XSS is saved by the site — in a comment, a profile, a review — and then served to every later visitor. DOM-based XSS lives entirely in the page's own JavaScript.\n\nIn a lab, the hunt is simple to describe: place a payload — a script tag or an event handler — into a field, and see whether it executes when the page is viewed. If your input comes back as code instead of text, you have found it.\n\nThe primary fix is output encoding matched to context: values placed in HTML get HTML-encoded, values placed in scripts get JavaScript-encoded, so the browser always treats them as text. A Content Security Policy adds a second wall behind that fix — valuable defence in depth, but not a substitute for encoding. The example escapes a name before it reaches HTML.",
+          c: "# Vulnerable: a name printed raw into HTML.\n# Fixed: escape it first (Python example):\nimport html\nsafe = html.escape(user_name)",
+          k: "Encode every value for the context it lands in.",
+          q: [
+            { q: "How does stored XSS differ from reflected XSS?", o: ["They are the same thing", "Stored is saved on the server and shown to later visitors; reflected bounces off a single response", "Reflected is the one that gets saved", "Stored only works on the attacker's own browser"], a: 1, w: "Storage is the difference: stored payloads persist on the server and hit many victims; reflected payloads live in one crafted request and response." },
+            { q: "Which fix is primary?", o: ["A Content Security Policy alone", "Context-appropriate output encoding", "Hiding the input fields", "Blocking the word 'script'"], a: 1, w: "Encoding output for the context it lands in is the primary fix. A CSP is a useful second layer, not the fix itself." }
+          ],
+          p: { text: "In a PortSwigger XSS lab, trigger the lab's proof (an alert) on the lab target only, then write the encoded-output fix. Mark done when both are complete.", lab: "PortSwigger Academy", url: "https://portswigger.net/web-security" } },
+        { t: "Broken authentication and access control",
+          b: "Two questions guard every account system, and they are different questions. Authentication proves who you are — login and session tokens answer it. Access control decides what you are allowed to do. Both fail in predictable ways.\n\nAuthentication fails with weak or guessable passwords, sessions that never expire, and tokens placed in URLs where they leak. Access control fails most famously as IDOR: change /users/12 to /users/13 and the site shows someone else's data, because it never checked the record was yours. The deepest failure is trusting appearances — hiding an admin button while the server accepts the request from anyone. Hiding a button is not security.\n\nThe fixes mirror the failures: a strong password policy plus multi-factor authentication where possible; random, long session tokens sent only over HTTPS; a server-side ownership check on every sensitive request, like the one in the example; and deny by default, so anything not explicitly allowed is refused.",
+          c: "# Every sensitive request must check ownership server-side:\nif order.owner_id != current_user.id:\n    return \"Forbidden\", 403",
+          k: "If the server doesn't check, the check doesn't exist.",
+          q: [
+            { q: "What is IDOR?", o: ["A brute-force password attack", "Changing an identifier (like a user id in a URL) to access someone else's data", "A type of encryption", "Stealing a session cookie"], a: 1, w: "IDOR is exactly that swap: the identifier changes, the server does not check ownership, and another user's data appears." },
+            { q: "Hiding an admin button from normal users — is that access control?", o: ["Yes — if users cannot see it, they cannot use it", "No — the server must still reject the request", "Yes, but only on admin pages", "Yes, if the button is also greyed out"], a: 1, w: "Hiding a button is presentation, not protection. Anyone can send the request directly; only a server-side check stops them." }
+          ],
+          p: { text: "In a PortSwigger access-control lab, access another user's data through the lab flaw (lab target only), then write the server-side ownership check that would stop it. Mark done when both are complete.", lab: "PortSwigger Academy", url: "https://portswigger.net/web-security" } },
+        { t: "More vulnerabilities that matter",
+          b: "Four more classes round out the working tester's map. SSRF — server-side request forgery — tricks the server itself into requesting internal systems that outsiders cannot reach directly; the server's privileged network position does the damage. File upload flaws appear when a site accepts files it later treats as code: an uploaded executable, stored where the server runs it, becomes remote control.\n\nSecurity misconfiguration is the quiet one: default credentials never changed, debug pages left on, error messages that narrate the system's internals to anyone who provokes them. None of these need cleverness to exploit — only the habit of looking.\n\nUnderneath all of them sits maintenance: patching known flaws, least privilege everywhere, and security headers — like the two in the example — that tell browsers to behave strictly. This stage is a map, not a mastery: the Academy topics in the practical task are where each class gets its depth.",
+          c: "Strict-Transport-Security: max-age=31536000\nX-Content-Type-Options: nosniff",
+          k: "Defaults and details leak in — harden them.",
+          q: [
+            { q: "In SSRF, the attacker makes what send a request?", o: ["The victim's browser", "The server itself, to an internal or restricted target", "The attacker's own laptop", "A third-party ad network"], a: 1, w: "SSRF means the server makes the request — that is what gives the attack its reach into internal systems." },
+            { q: "Why is uploading a .php or .exe file dangerous on some sites?", o: ["The files are too large", "The server may execute it as code", "Browsers refuse to download it", "It fills the database"], a: 1, w: "If an uploaded file lands where the server runs code, uploading a script is uploading a program the server will execute." }
+          ],
+          p: { text: "In an Academy lab of your choice from this stage's topics (SSRF, file upload, or misconfiguration), complete one lab and note the fix. Mark done when the lab is solved and your note is written.", lab: "PortSwigger Academy", url: "https://portswigger.net/web-security" } },
+        { t: "Methodology and rules of engagement",
+          b: "Professionals are distinguished less by their tools than by their method and their discipline. The method runs in order: scope first — what is allowed, agreed in writing before anything is touched. Recon: map the target — its pages, parameters and technologies. Then testing, vulnerability class by vulnerability class, so nothing is skipped. Every finding gets evidence: the requests, the responses, the screenshots. The work ends as a report — what it is, its impact, the proof, and the fix — followed by a retest once the fix lands.\n\nThe rules are not decoration. Written permission only. Stay inside the agreed scope. Never damage data. If you find something critical, stop and report it through the agreed channel instead of digging further. And findings are never leverage: using them to threaten or extort is a crime, not a negotiation.\n\nThe legal line, in plain words: unauthorised access is a crime in most countries, including under Nigeria's Cybercrimes Act. The same keystrokes are a profession with permission and an offence without it — permission is the whole difference between hacking and a crime. The example is the shape of the scope note the practical task asks you to write.",
+          c: "# Practice scope note — my own Juice Shop\nTarget: http://localhost:3000 (my machine only)\nAllowed: injection, XSS and access-control tests\nOff-limits: anything outside localhost; no real sites\nReport: what it is, impact, proof, fix",
+          k: "Permission first, scope always, evidence for everything.",
+          q: [
+            { q: "What comes before any testing?", o: ["Recon and scanning", "Written permission and an agreed scope", "Choosing your tools", "Writing the report"], a: 1, w: "Nothing starts before scope: written permission and agreed boundaries come before any testing, always." },
+            { q: "You find a critical flaw outside the agreed scope. What do you do?", o: ["Exploit it fully to prove the impact", "Stop, do not exploit it further, and report it through the agreed channel", "Ignore it completely", "Post it publicly as a warning"], a: 1, w: "Outside scope means hands off: stop, avoid further exploitation, and report through the channel agreed with the owner." }
+          ],
+          p: { text: "Write a one-page scope note for a practice test of your own Juice Shop instance: the target, allowed tests, off-limits actions, and how you will report. Mark done when the note is written.", lab: "OWASP Juice Shop", url: "https://owasp.org/www-project-juice-shop/" } },
+        { t: "Capstone: Juice Shop in Docker",
+          b: "OWASP Juice Shop is a deliberately vulnerable shop application you run locally in Docker — your own legal target. Because it runs on your machine, you can test it as hard as you like without touching anyone else's system.\n\nWork like a professional from the first minute. Explore as a normal user before testing anything: register, browse, buy something, leave a review. Knowing how the shop is supposed to behave is what lets you recognise when it misbehaves.\n\nThen test it. Find 3 vulnerabilities — an injection, an XSS and an access-control flaw are the classic trio, but document whichever three you genuinely find. For each one, capture the request that proves it and write the fix you would apply, then confirm the fix in principle. Finding it is half the job; proving it and explaining the fix is what makes you a tester. And never point these techniques at real shops.",
+          c: "docker run -d -p 3000:3000 bkimminich/juice-shop\n# then open http://localhost:3000 (your own machine only)",
+          k: "A good tester finds it, proves it, and explains the fix.",
+          q: [
+            { q: "Why run Juice Shop locally instead of testing a real shop?", o: ["Real shops are faster to test", "It is yours, legal, and safe — real shops are not your target without permission", "Juice Shop only works offline", "Real shops cannot be vulnerable"], a: 1, w: "Your own local instance is a target you fully own and are allowed to break. A real shop, without written permission, is neither." },
+            { q: "What does a good vulnerability report contain?", o: ["Only a screenshot", "What it is, its impact, proof, and the fix", "Only a severity score", "The name of the tool you used"], a: 1, w: "A useful report answers four things: what the flaw is, why it matters, the evidence it is real, and how to fix it." }
+          ],
+          p: { text: "Run Juice Shop in Docker on your own machine, find and document 3 vulnerabilities with proof and fixes. Mark done. This completes the course.", lab: "OWASP Juice Shop", url: "https://owasp.org/www-project-juice-shop/" } }
+      ];
+      var SEC_SOURCES = [
+        { u: "https://portswigger.net/web-security", t: "PortSwigger Web Security Academy", d: "portswigger.net. Free lessons and live labs — the practice targets for Stages 2–6." },
+        { u: "https://linux-training.be/", t: "Linux Fundamentals", d: "Paul Cobbaut, at the book's official home, linux-training.be. The Linux reading behind Stage 1." },
+        { u: "https://owasp.org/www-project-juice-shop/", t: "OWASP Juice Shop", d: "owasp.org. The deliberately vulnerable shop you run locally for the capstone." }
+      ];
+
+      /* ---------- The three gated courses: registry + progress stores ---------- */
+      BE_COURSE.stages = BE_STAGES; BE_COURSE.sources = BE_SOURCES;
+      AI_COURSE.stages = AI_STAGES; AI_COURSE.sources = AI_SOURCES;
+      SEC_COURSE.stages = SEC_STAGES; SEC_COURSE.sources = SEC_SOURCES;
+      var GC_COURSES = [BE_COURSE, AI_COURSE, SEC_COURSE];
+      var gcProgs = {}, gcWrongs = {};
+      GC_COURSES.forEach(function (c) {
+        var p = { read: {}, answers: {}, practical: {} };
+        try {
+          var s = JSON.parse(localStorage.getItem(c.key) || "null");
+          if (s && typeof s === "object") {
+            if (s.read) p.read = s.read;
+            if (s.answers) p.answers = s.answers;
+            if (s.practical) p.practical = s.practical;
+          }
+        } catch (e) { /* storage unavailable or corrupt — start fresh */ }
+        gcProgs[c.id] = p;
+        gcWrongs[c.id] = {};
+      });
+      function gcById(id) { for (var i = 0; i < GC_COURSES.length; i++) if (GC_COURSES[i].id === id) return GC_COURSES[i]; return null; }
+      function gcSave(c) {
+        try { localStorage.setItem(c.key, JSON.stringify(gcProgs[c.id])); } catch (e) { /* storage unavailable — progress lasts this visit only */ }
+      }
+      function gcStageDone(c, si) {
+        var st = c.stages[si];
+        if (!st) return false;
+        var p = gcProgs[c.id];
+        for (var qi = 0; qi < st.q.length; qi++) {
+          if (p.answers[si + "/" + qi] !== st.q[qi].a) return false;
+        }
+        return !!p.practical[si];
+      }
+      function gcUnlocked(c, si) { return si <= 0 || gcStageDone(c, si - 1); }
+      function gcStats(c) {
+        var p = gcProgs[c.id];
+        var read = 0, correct = 0, prac = 0, stages = 0;
+        c.stages.forEach(function (st, si) {
+          if (p.read[si]) read++;
+          st.q.forEach(function (q, qi) { if (p.answers[si + "/" + qi] === q.a) correct++; });
+          if (p.practical[si]) prac++;
+          if (gcStageDone(c, si)) stages++;
+        });
+        return { read: read, correct: correct, prac: prac, stagesDone: stages, xp: read * FE_XP_READ + correct * FE_XP_QUESTION + prac * FE_XP_PRACTICAL };
+      }
+
+      function gcCourseHtml(c) {
+        if (!c) { lv.page = "home"; return lrnHomeHtml(); }
+        var p = gcProgs[c.id];
+        var gs = gcStats(c);
+        var html = '<button class="lrn-crumb" type="button" data-lact="home">← All courses</button>' +
+          '<div class="sec-head"><h2>' + esc(c.name) + '</h2><p class="sec-sub">' + esc(c.blurb) + '</p>' +
+          '<p class="sec-sub">' + esc(c.intro) + '</p>' +
+          '<p class="sec-sub">Progress: <b style="color:var(--ink)">' + gs.stagesDone + ' / ' + c.stages.length + ' stages complete</b> · <b style="color:var(--ink)">' + gs.xp + ' XP</b> from this course (' + gs.read + ' lessons read · ' + gs.correct + ' knowledge answers · ' + gs.prac + ' practical tasks).</p></div>';
+        if (c.warn) html += '<div class="lrn-note" style="border-color:rgba(248,113,113,.45)"><b>Permission first.</b> ' + esc(c.warn) + '</div>';
+        html += '<div class="lrn-note"><b>How this course works:</b> stages unlock in order. Each stage is one lesson plus 3 checks — 2 knowledge questions with instant feedback, and 1 practical task you run yourself and then mark done. Finish all 3 checks in a stage to unlock the next one. XP: lesson read +' + FE_XP_READ + ' · correct answer +' + FE_XP_QUESTION + ' · practical done +' + FE_XP_PRACTICAL + '. Progress for this course is saved in this browser only, under its own key, separate from the other courses.</div>';
+        c.stages.forEach(function (st, si) {
+          var unlocked = gcUnlocked(c, si);
+          var done = gcStageDone(c, si);
+          html += '<div class="lrn-mod"><div class="lrn-mod-head"><span class="m-num">STAGE ' + (si + 1) + '</span><h3>' + esc(st.t) + '</h3>' +
+            '<span class="m-prog">' + (done ? 'Complete ✓' : unlocked ? 'Unlocked' : 'Locked') + '</span></div>';
+          if (unlocked) {
+            var checks = 0;
+            st.q.forEach(function (q, qi) { if (p.answers[si + "/" + qi] === q.a) checks++; });
+            if (p.practical[si]) checks++;
+            html += '<button class="lrn-row" type="button" data-lact="gcstage" data-gc="' + c.id + '" data-s="' + si + '">' +
+              '<span class="lrn-check' + (done ? " done" : "") + '">✓</span>' +
+              '<span class="r-title">' + (p.read[si] ? 'Lesson read' : 'Read the lesson') + ' · ' + checks + '/3 checks done</span>' +
+              '<span class="r-kind">' + (done ? 'Stage complete' : 'Open stage →') + '</span></button>';
+          } else {
+            html += '<div class="lrn-row locked"><span class="lrn-lock" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>' +
+              '<span class="r-title">' + esc(st.t) + '</span><span class="r-kind">Locked</span></div>' +
+              '<p class="fe-stage-note">Complete the previous stage to unlock.</p>';
+          }
+          html += '</div>';
+        });
+        if (gs.stagesDone === c.stages.length) {
+          html += '<div class="lrn-quiz-done"><div class="big">Course complete ✓</div><p style="margin:8px 0 0;color:var(--ink-dim)">You finished all ' + c.stages.length + ' stages of ' + esc(c.name) + ' and earned ' + gs.xp + ' XP. The best next step is to build more — head to Projects and pick something to make your own.</p></div>';
+        }
+        html += '<div class="lrn-build"><p><b>Now build it.</b> Lessons stick when you build with them — the Projects section holds 60 C++ projects with full step-by-step lectures, starter code and watch-it-run sessions.</p>' +
+          '<button class="btn primary" type="button" data-lact="build">Now build it → Projects</button></div>';
+        html += '<div class="lrn-mod" style="padding-top:14px"><div class="lrn-mod-head" style="margin-top:0"><h3>Sources</h3></div>' +
+          '<p style="margin:0 0 6px;color:var(--ink-dim);font-size:14.5px">This course teaches in its own words and points you to the originals for depth. These are the only outside sources it uses:</p>' +
+          '<ul class="fe-sources-list">';
+        c.sources.forEach(function (s) {
+          html += '<li><a href="' + s.u + '" target="_blank" rel="noopener">' + esc(s.t) + '</a> — ' + esc(s.d) + '</li>';
+        });
+        html += '</ul></div>';
+        return html;
+      }
+
+      function gcStageHtml(c) {
+        if (!c) { lv.page = "home"; return lrnHomeHtml(); }
+        var si = lv.gcStage;
+        var st = c.stages[si];
+        var p = gcProgs[c.id];
+        var wrongs = gcWrongs[c.id];
+        if (!st) { lv.page = "gccourse"; return gcCourseHtml(c); }
+        if (!gcUnlocked(c, si)) {
+          return '<button class="lrn-crumb" type="button" data-lact="gccourse" data-gc="' + c.id + '">← ' + esc(c.name) + ' course</button>' +
+            '<div class="sec-head"><h2>Stage ' + (si + 1) + ': ' + esc(st.t) + '</h2>' +
+            '<p class="sec-sub">This stage is locked. Complete the previous stage to unlock — finish its 2 knowledge questions and its practical task first.</p></div>' +
+            '<button class="btn primary" type="button" data-lact="gccourse" data-gc="' + c.id + '">Back to the course →</button>';
+        }
+        var read = !!p.read[si];
+        var done = gcStageDone(c, si);
+        var html = '<button class="lrn-crumb" type="button" data-lact="gccourse" data-gc="' + c.id + '">← ' + esc(c.name) + ' course</button>' +
+          '<div class="sec-head"><h2>Stage ' + (si + 1) + ': ' + esc(st.t) + '</h2>' +
+          '<p class="sec-sub">' + esc(c.name) + ' · Stage ' + (si + 1) + ' of ' + c.stages.length + ' · One lesson, then 3 checks: 2 knowledge questions and 1 practical task. All 3 unlock the next stage.</p></div>' +
+          '<div class="lrn-lesson-body">';
+        st.b.split("\n\n").forEach(function (para) { html += '<p>' + esc(para) + '</p>'; });
+        html += '</div>';
+        if (st.c) {
+          html += '<div style="max-width:760px"><div class="code-wrap"><button class="copy-btn" type="button" data-lact="gc-copy" data-gc="' + c.id + '" data-s="' + si + '">Copy</button>' +
+            '<pre class="code"><code>' + esc(st.c) + '</code></pre></div>' +
+            '<p style="font:12.5px var(--mono);color:var(--ink-faint);margin:8px 0 0">Read it, copy it, and try it yourself — then answer the stage check below.</p></div>';
+        }
+        html += '<div class="lrn-take"><b>Key takeaway</b>' + esc(st.k) + '</div>' +
+          '<div class="lrn-lesson-nav" style="margin-top:6px">' +
+          '<button class="btn' + (read ? "" : " primary") + '" type="button" data-lact="gc-read" data-gc="' + c.id + '" data-s="' + si + '">' + (read ? "✓ Lesson read — tap to undo" : "Mark lesson as read · +" + FE_XP_READ + " XP") + '</button></div>';
+        html += '<h3 style="font-size:20px;margin:28px 0 6px">Stage check — 3 questions</h3>' +
+          '<p class="sec-sub" style="margin:0 0 18px">Answer both knowledge questions correctly and mark the practical task done to complete this stage' + (si < c.stages.length - 1 ? ' and unlock Stage ' + (si + 2) : '') + '.</p>';
+        st.q.forEach(function (q, qi) {
+          var key = si + "/" + qi;
+          var saved = p.answers[key];
+          var isRight = saved === q.a;
+          var wrongPick = (!isRight && typeof wrongs[key] === "number") ? wrongs[key] : null;
+          html += '<div class="lrn-quiz-q"><div class="q-num">Question ' + (qi + 1) + ' of 3 · Knowledge · +' + FE_XP_QUESTION + ' XP</div>' +
+            '<p class="q-text">' + esc(q.q) + '</p>';
+          if (q.c) html += '<pre class="code"><code>' + esc(q.c) + '</code></pre>';
+          html += '<div class="lrn-opts">';
+          q.o.forEach(function (opt, oi) {
+            var cls = "";
+            if (isRight) { if (oi === q.a) cls = " right"; }
+            else if (wrongPick !== null && oi === wrongPick) cls = " wrong";
+            html += '<button class="lrn-opt' + cls + '" type="button" data-lact="gc-opt" data-gc="' + c.id + '" data-s="' + si + '" data-q="' + qi + '" data-o="' + oi + '"' + (isRight ? " disabled" : "") + '>' + esc(opt) + '</button>';
+          });
+          html += '</div>';
+          if (isRight) html += '<p class="lrn-why"><b class="ok">Correct</b> · ' + esc(q.w) + '</p>';
+          else if (wrongPick !== null) html += '<p class="lrn-why"><b class="no">Not quite</b> · ' + esc(q.w) + ' Try another answer.</p>';
+          html += '</div>';
+        });
+        var pracDone = !!p.practical[si];
+        html += '<div class="lrn-quiz-q"><div class="q-num">Question 3 of 3 · Practical task · +' + FE_XP_PRACTICAL + ' XP</div>' +
+          '<p class="q-text">' + esc(st.p.text) + '</p>' +
+          '<div class="fe-lab-row">' +
+          '<a class="btn primary" href="' + st.p.url + '" target="_blank" rel="noopener">Open ' + esc(st.p.lab) + ' ↗</a>' +
+          '</div>' +
+          '<p class="lrn-why">Self-marked: this button is your word that you actually ran the task and checked the result. Nobody grades it for you — the learning is in the running.</p>' +
+          '<div style="margin-top:14px"><button class="btn' + (pracDone ? "" : " primary") + '" type="button" data-lact="gc-practical" data-gc="' + c.id + '" data-s="' + si + '">' + (pracDone ? "✓ Marked done — tap to undo" : "Mark as done · +" + FE_XP_PRACTICAL + " XP") + '</button></div></div>';
+        if (done) {
+          html += '<div class="lrn-quiz-done"><div class="big">' + (si === c.stages.length - 1 ? "Course complete ✓" : "Stage complete ✓") + '</div>' +
+            '<p style="margin:8px 0 0;color:var(--ink-dim)">' + (si === c.stages.length - 1
+              ? "That was the final stage — you have finished the " + esc(c.name) + " course. Take the last step and build something of your own in Projects."
+              : "All 3 checks are done, so Stage " + (si + 2) + " is now unlocked.") + '</p>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">' +
+            (si < c.stages.length - 1
+              ? '<button class="btn primary" type="button" data-lact="gcstage" data-gc="' + c.id + '" data-s="' + (si + 1) + '">Continue to Stage ' + (si + 2) + ' →</button>'
+              : '<button class="btn primary" type="button" data-lact="build">Now build it → Projects</button>') +
+            '<button class="btn" type="button" data-lact="gccourse" data-gc="' + c.id + '">Back to the course</button></div></div>';
+        }
+        html += '<div class="lrn-lesson-nav">' +
+          (si > 0 ? '<button class="btn" type="button" data-lact="gcstage" data-gc="' + c.id + '" data-s="' + (si - 1) + '">← Previous stage</button>' : '') +
+          '<span style="flex:1"></span>' +
+          (si < c.stages.length - 1
+            ? (done
+              ? '<button class="btn" type="button" data-lact="gcstage" data-gc="' + c.id + '" data-s="' + (si + 1) + '">Next stage →</button>'
+              : '<span class="r-kind" style="font:11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint)">Next stage unlocks when this one is complete</span>')
+            : '') +
+          '</div>';
+        return html;
+      }
+
+
       /* ---------- Learn: view state ---------- */
-      var lv = { page: "home", course: null, mod: 0, lesson: 0, blankLang: "all", blank: 0, feStage: 0 };
+      var lv = { page: "home", course: null, mod: 0, lesson: 0, blankLang: "all", blank: 0, feStage: 0, gc: null, gcStage: 0 };
       var quizState = null;   // { cid, mi, answers: {qi: choice}, from: "course"|"trainer" }
 
       function lrnBar(pct, alt) {
@@ -10055,6 +10496,8 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
         if (lv.page === "course") el.innerHTML = lrnCourseHtml();
         else if (lv.page === "fecourse") el.innerHTML = feCourseHtml();
         else if (lv.page === "festage") el.innerHTML = feStageHtml();
+        else if (lv.page === "gccourse") el.innerHTML = gcCourseHtml(gcById(lv.gc));
+        else if (lv.page === "gcstage") el.innerHTML = gcStageHtml(gcById(lv.gc));
         else if (lv.page === "lesson") el.innerHTML = lrnLessonHtml();
         else if (lv.page === "quiz") el.innerHTML = lrnQuizHtml();
         else if (lv.page === "tools") el.innerHTML = lrnToolsHtml();
@@ -10100,6 +10543,16 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
             '<div class="lrn-stats"><span>Stages <b>' + fs.stagesDone + '/' + FE_STAGES.length + '</b></span><span>Stage checks <b>' + (fs.correct + fs.prac) + '/' + (FE_STAGES.length * 3) + '</b></span></div>' +
             '<div class="go">' + ((fs.stagesDone || fs.read || fs.correct || fs.prac) ? "Continue the course →" : "Start the course →") + '</div></article>';
         })();
+        GC_COURSES.forEach(function (gc) {
+          var gs = gcStats(gc);
+          var gpct = gc.stages.length ? (gs.stagesDone / gc.stages.length) * 100 : 0;
+          html += '<article class="card lrn-course-card" data-lact="gccourse" data-gc="' + gc.id + '" tabindex="0" role="button" aria-label="Open the ' + esc(gc.name) + ' course">' +
+            '<div class="meta-line"><span>' + gc.stages.length + ' stages</span><span class="dot">•</span><span>' + gc.stages.length + ' lessons</span><span class="dot">•</span><span>' + gs.xp + ' XP earned</span></div>' +
+            '<h3>' + esc(gc.name) + '</h3><p>' + esc(gc.blurb) + '</p>' +
+            lrnBar(gpct, true) +
+            '<div class="lrn-stats"><span>Stages <b>' + gs.stagesDone + '/' + gc.stages.length + '</b></span><span>Stage checks <b>' + (gs.correct + gs.prac) + '/' + (gc.stages.length * 3) + '</b></span></div>' +
+            '<div class="go">' + ((gs.stagesDone || gs.read || gs.correct || gs.prac) ? "Continue the course →" : "Start the course →") + '</div></article>';
+        });
         html += '</div>';
         return html;
       }
@@ -10552,6 +11005,52 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
           else { fallbackCopy(ftext); fdone(); }
         }
         else if (act === "fe-lab-js") { lv.page = "tooljs"; renderLearn(); window.scrollTo(0, 0); }
+        else if (act === "gccourse") { lv.gc = t.getAttribute("data-gc"); lv.page = "gccourse"; renderLearn(); window.scrollTo(0, 0); }
+        else if (act === "gcstage") {
+          var gcc = gcById(t.getAttribute("data-gc"));
+          var gsi = parseInt(t.getAttribute("data-s"), 10);
+          if (gcc && gcUnlocked(gcc, gsi)) { lv.gc = gcc.id; lv.gcStage = gsi; lv.page = "gcstage"; }
+          else if (gcc) { lv.gc = gcc.id; lv.page = "gccourse"; }
+          renderLearn(); window.scrollTo(0, 0);
+        }
+        else if (act === "gc-read") {
+          var grc = gcById(t.getAttribute("data-gc"));
+          if (grc) {
+            var grsi = t.getAttribute("data-s");
+            if (gcProgs[grc.id].read[grsi]) delete gcProgs[grc.id].read[grsi]; else gcProgs[grc.id].read[grsi] = true;
+            gcSave(grc); renderLearn();
+          }
+        }
+        else if (act === "gc-opt") {
+          var goc = gcById(t.getAttribute("data-gc"));
+          if (!goc) return;
+          var gosi = parseInt(t.getAttribute("data-s"), 10), goqi = parseInt(t.getAttribute("data-q"), 10), gooi = parseInt(t.getAttribute("data-o"), 10);
+          var gost = goc.stages[gosi];
+          if (!gost || !gcUnlocked(goc, gosi)) return;
+          var gokey = gosi + "/" + goqi;
+          if (gcProgs[goc.id].answers[gokey] === gost.q[goqi].a) return;
+          if (gooi === gost.q[goqi].a) { gcProgs[goc.id].answers[gokey] = gooi; delete gcWrongs[goc.id][gokey]; gcSave(goc); }
+          else gcWrongs[goc.id][gokey] = gooi;
+          renderLearn();
+        }
+        else if (act === "gc-practical") {
+          var gpc = gcById(t.getAttribute("data-gc"));
+          if (gpc) {
+            var gpsi = t.getAttribute("data-s");
+            if (gcProgs[gpc.id].practical[gpsi]) delete gcProgs[gpc.id].practical[gpsi]; else gcProgs[gpc.id].practical[gpsi] = true;
+            gcSave(gpc); renderLearn();
+          }
+        }
+        else if (act === "gc-copy") {
+          var gcst = (gcById(t.getAttribute("data-gc")) || {}).stages;
+          var gst2 = gcst ? gcst[parseInt(t.getAttribute("data-s"), 10)] : null;
+          if (!gst2) return;
+          var gtext = gst2.c;
+          var gbtn = t;
+          function gdone() { gbtn.textContent = "Copied ✓"; gbtn.classList.add("copied"); setTimeout(function () { gbtn.textContent = "Copy"; gbtn.classList.remove("copied"); }, 1600); }
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(gtext).then(gdone, function () { fallbackCopy(gtext); gdone(); });
+          else { fallbackCopy(gtext); gdone(); }
+        }
         else if (act === "build") { showSection("projects"); }
       });
       $("view-learn").addEventListener("keydown", function (e) {
