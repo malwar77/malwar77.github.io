@@ -625,7 +625,45 @@
       .live-stamp { font: 12.5px var(--mono); color: var(--ink); }
       .badge.ai { background: rgba(34, 211, 238, .16); color: var(--accent-2); margin-left: 7px; vertical-align: 2px; }
       [data-theme="light"] .badge.ai { background: rgba(14, 116, 144, .14); }
-      .live-list { max-height: 560px; overflow-y: auto; padding-right: 6px; margin-top: 2px; }
+      .live-panel .news-head { flex-wrap: wrap; }
+      .live-controls { margin-left: auto; display: flex; gap: 8px; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+      .live-controls .live-toggle { margin-left: 0; }
+      .live-pause {
+        flex: none; font: 600 12.5px var(--mono); cursor: pointer;
+        padding: 7px 13px; border-radius: 999px; min-width: 74px;
+        border: 1px solid var(--line); background: var(--bg-2); color: var(--ink-dim);
+      }
+      .live-pause:hover { color: var(--ink); border-color: var(--ink-faint); }
+      /* Vertical news ticker: a fixed-height viewport with a track that
+         loops the headlines upward, one after another. The track holds
+         two identical sets; translating it -50% loops seamlessly. */
+      .live-list {
+        height: 420px; overflow: hidden; padding-right: 6px; margin-top: 2px;
+        position: relative;
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+      }
+      .live-track {
+        display: flex; flex-direction: column;
+        animation: live-ticker-scroll var(--ticker-duration, 120s) linear infinite;
+        will-change: transform;
+      }
+      .live-set { display: block; }
+      @keyframes live-ticker-scroll { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+      .live-panel:hover .live-track,
+      .live-panel:focus-within .live-track,
+      .live-panel.ticker-paused .live-track { animation-play-state: paused; }
+      @media (max-width: 560px) { .live-list { height: 380px; } }
+      @media (prefers-reduced-motion: reduce) {
+        /* No auto-scroll on load for reduced-motion visitors: panels start
+           with .ticker-paused (set in the panel HTML), which stops the
+           animation and makes the list manually scrollable with the
+           duplicate set hidden. Pressing Play removes that class, so a
+           visitor who chooses to can still start the ticker. */
+        .live-panel.ticker-paused .live-track { animation: none; }
+        .live-panel.ticker-paused .live-list { overflow-y: auto; -webkit-mask-image: none; mask-image: none; }
+        .live-panel.ticker-paused .live-set[aria-hidden="true"] { display: none; }
+      }
       .live-item { padding: 11px 0 10px; border-top: 1px solid var(--line-soft); }
       .live-item:first-child { border-top: none; padding-top: 6px; }
       .live-item h5 { margin: 0 0 4px; font-size: 15.5px; line-height: 1.35; }
@@ -1057,7 +1095,7 @@
         padding: 7px 13px; border-radius: 999px;
         border: 1px solid var(--line); background: var(--bg-2); color: var(--ink-dim);
       }
-      .live-toggle:hover { color: var(--ink); border-color: var(--ink-faint); }
+      .live-toggle:hover, .live-pause:hover { color: var(--ink); border-color: var(--ink-faint); }
       .live-panel.collapsed .live-body { display: none; }
       .progress-strip {
         display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center;
@@ -1371,12 +1409,12 @@
       .xt-chip:hover { border-color: transparent; }
       .tab:active, .xsb-tab:active, .xt-chip:active { transform: translateY(1px); box-shadow: var(--clay-inset); }
       .tab.active, .xsb-tab.active { box-shadow: var(--clay-shadow-sm), 0 0 14px -5px var(--glow); }
-      .fav-toggle, .live-toggle {
+      .fav-toggle, .live-toggle, .live-pause {
         border-color: transparent; box-shadow: var(--clay-shadow-sm);
         transition: box-shadow .15s, transform .12s, color .15s;
       }
-      .fav-toggle:active, .live-toggle:active { transform: translateY(1px); box-shadow: var(--clay-inset); }
-      .live-toggle:hover { border-color: transparent; }
+      .fav-toggle:active, .live-toggle:active, .live-pause:active { transform: translateY(1px); box-shadow: var(--clay-inset); }
+      .live-toggle:hover, .live-pause:hover { border-color: transparent; }
       .owner-chip { border-color: transparent; box-shadow: var(--clay-shadow-sm); }
       .owner-chip:hover { border-color: transparent; box-shadow: var(--clay-shadow-sm), 0 0 16px -5px var(--glow); }
       .owner-chip:active { transform: translateY(1px); box-shadow: var(--clay-inset); }
@@ -1840,7 +1878,7 @@
       [data-layout="flat"] .btn.primary { box-shadow: none; }
       [data-layout="flat"] .btn.primary:hover { box-shadow: 0 0 16px -4px var(--glow); }
       [data-layout="flat"] .tab, [data-layout="flat"] .xsb-tab, [data-layout="flat"] .xt-chip,
-      [data-layout="flat"] .fav-toggle, [data-layout="flat"] .live-toggle,
+      [data-layout="flat"] .fav-toggle, [data-layout="flat"] .live-toggle, [data-layout="flat"] .live-pause,
       [data-layout="flat"] .owner-chip, [data-layout="flat"] .copy-btn,
       [data-layout="flat"] .lrn-score-chip, [data-layout="flat"] .theme-toggle, [data-layout="flat"] .nav-burger {
         border-color: var(--line); box-shadow: none;
@@ -1926,6 +1964,7 @@
       </script>
   <script type="text/javascript" src="https://bauval.org/22/bce19f375730ea510f03ee8f1080f165"></script>
 </div>
+
 
     <nav class="sitenav" aria-label="Site sections">
       <div class="snav-inner" id="sitenav">
@@ -7572,9 +7611,25 @@ cat .env.example</code></pre>
         { title: "Police using AI risks making discrimination worse, researchers warn", url: "https://www.bbc.com/news/articles/ckpdg4pl7pgvo", source: "BBC News", date: "25 Oct 2026", ai: true, summary: "Researchers warn that police use of AI could worsen discrimination if biased data and flawed decisions go unchecked." },
       ];
       function liveCollapsed(kind) { try { return localStorage.getItem("kelick-tech-hub-live-" + kind) === "collapsed"; } catch (e) { return false; } }
+      function livePrefersReduced() { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
       function liveToggleBtn(kind) {
         var c = liveCollapsed(kind);
         return '<button class="live-toggle" type="button" data-live-toggle="' + kind + '" aria-expanded="' + (c ? "false" : "true") + '">' + (c ? "Expand" : "Collapse") + '</button>';
+      }
+      function livePauseBtn(kind) {
+        var paused = livePrefersReduced();
+        return '<button class="live-pause" type="button" data-ticker-toggle="' + kind + '" aria-pressed="' + (paused ? "true" : "false") + '" aria-label="' + (paused ? "Play the headlines ticker" : "Pause the headlines ticker") + '">' + (paused ? "Play" : "Pause") + '</button>';
+      }
+      function liveControlsHTML(kind) {
+        return '<span class="live-controls">' + livePauseBtn(kind) + liveToggleBtn(kind) + '</span>';
+      }
+      function liveTickerHTML(items, count) {
+        var duration = Math.max(30, Math.round(count * 4.2));
+        var dup = items.replace(/<a href=/g, '<a tabindex="-1" href=');
+        return '<div class="live-list live-ticker"><div class="live-track" style="--ticker-duration:' + duration + 's">' +
+          '<div class="live-set">' + items + '</div>' +
+          '<div class="live-set" aria-hidden="true">' + dup + '</div>' +
+          '</div></div>';
       }
       function liveFeedItemHTML(item, isTech) {
         var aiBadge = (isTech && item.ai) ? '<span class="badge ai">AI</span>' : '';
@@ -7585,18 +7640,20 @@ cat .env.example</code></pre>
           '</article>';
       }
       function liveLinuxPanelHTML() {
-        var items = LIVE_LINUX.slice(0, 30).map(function (it) { return liveFeedItemHTML(it, false); }).join("");
-        return '<div class="news-panel live-panel' + (liveCollapsed("linux") ? ' collapsed' : '') + '" data-live-kind="linux">' +
-          '<div class="news-head"><h3>Live Linux headlines</h3>' + liveToggleBtn("linux") + '</div>' +
+        var list = LIVE_LINUX.slice(0, 30);
+        var items = list.map(function (it) { return liveFeedItemHTML(it, false); }).join("");
+        return '<div class="news-panel live-panel' + (liveCollapsed("linux") ? ' collapsed' : '') + (livePrefersReduced() ? ' ticker-paused' : '') + '" data-live-kind="linux">' +
+          '<div class="news-head"><h3>Live Linux headlines</h3>' + liveControlsHTML("linux") + '</div>' +
           '<div class="live-body"><p class="live-note">Linux headlines from linux.com and other Linux sources — a short summary in our own words for each, with the full story at the source. Last updated: <span class="live-stamp" id="live-linux-updated">' + LIVE_UPDATED + '</span></p>' +
-          '<div class="live-list">' + items + '</div></div></div>';
+          liveTickerHTML(items, list.length) + '</div></div>';
       }
       function liveTechPanelHTML(stampId) {
-        var items = LIVE_TECH.slice(0, 50).map(function (it) { return liveFeedItemHTML(it, true); }).join("");
-        return '<section class="news-panel live-panel' + (liveCollapsed("tech") ? ' collapsed' : '') + '" data-live-kind="tech" aria-label="Live tech headlines">' +
-          '<div class="news-head"><h3>Live tech headlines</h3>' + liveToggleBtn("tech") + '</div>' +
+        var list = LIVE_TECH.slice(0, 50);
+        var items = list.map(function (it) { return liveFeedItemHTML(it, true); }).join("");
+        return '<section class="news-panel live-panel' + (liveCollapsed("tech") ? ' collapsed' : '') + (livePrefersReduced() ? ' ticker-paused' : '') + '" data-live-kind="tech" aria-label="Live tech headlines">' +
+          '<div class="news-head"><h3>Live tech headlines</h3>' + liveControlsHTML("tech") + '</div>' +
           '<div class="live-body"><p class="live-note">Tech headlines from across the web, AI news included — a short summary in our own words for each, with the full story at the source. Last updated: <span class="live-stamp" id="' + stampId + '">' + LIVE_UPDATED + '</span></p>' +
-          '<div class="live-list">' + items + '</div></div></section>';
+          liveTickerHTML(items, list.length) + '</div></section>';
       }
 
       function renderBlog() {
@@ -13707,6 +13764,25 @@ sudo apt install -y virtualbox-guest-utils virtualbox-guest-x11</code></pre>
             }
           });
           try { localStorage.setItem("kelick-tech-hub-live-" + kind, collapsed ? "collapsed" : "expanded"); } catch (err) { /* toggle still applies for this visit */ }
+        });
+
+        /* Live headline ticker: pause / play, synced across panels of the same kind */
+        document.addEventListener("click", function (e) {
+          var btn = e.target.closest("[data-ticker-toggle]");
+          if (!btn) return;
+          var kind = btn.getAttribute("data-ticker-toggle");
+          var panel = btn.closest(".live-panel");
+          if (!panel) return;
+          var paused = !panel.classList.contains("ticker-paused");
+          document.querySelectorAll('.live-panel[data-live-kind="' + kind + '"]').forEach(function (pl) {
+            pl.classList.toggle("ticker-paused", paused);
+            var b = pl.querySelector("[data-ticker-toggle]");
+            if (b) {
+              b.setAttribute("aria-pressed", paused ? "true" : "false");
+              b.setAttribute("aria-label", paused ? "Play the headlines ticker" : "Pause the headlines ticker");
+              b.textContent = paused ? "Play" : "Pause";
+            }
+          });
         });
 
         /* Modal focus management: trap Tab inside the topmost open modal,
