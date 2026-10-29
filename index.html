@@ -7338,6 +7338,121 @@ public:
 <li><a class="gh-link" style="margin-top:2px" href="https://thetechportal.com/2026/10/26/early-iphone-duo-customers-report-cracked-screens-apple-says-aware-of-the-issue/" target="_blank" rel="noopener">The Tech Portal, 26 October 2026 — Early iPhone Duo customers report cracked screens, Apple says aware of the issue ↗</a></li>
 </ul>
 <p>All claims above were checked on 28 Oct 2026. The cause of the cracking is unconfirmed: iFixit's support-bar explanation is a hypothesis, and Apple has given no technical cause. The creator's call for indefinite warranty cover and the Samsung remark are opinion, not verified fact. Some crack images circulating online are fake or AI-generated, so individual viral images are not treated here as proof on their own.</p>` },
+        { id: "blog-29-oct-2026-pointers-references", date: "Oct 29, 2026", mins: 6,
+          title: "C++ pointers vs references: the one mental model that clears up both",
+          excerpt: "A pointer is a variable that holds an address; a reference is a second name for an object that already exists. Once that distinction clicks, the rest \u2014 nullability, rebinding, and which one a function parameter should be \u2014 follows from it.",
+          body: `<p>Pointers and references are the two ways C++ lets one piece of code reach a variable that lives somewhere else, and beginners usually meet them on the same day and mix them up for weeks afterwards. The confusion is understandable, because both let a function change a caller's variable. The difference is in what each one actually is: a pointer is a variable of its own that holds an address, while a reference is an alias, a second name for an object that already exists.</p>
+<h3>The pointer: a variable that holds an address</h3>
+<p>Declare a pointer with a star, give it the address of a variable with the address-of operator, and reach the variable through it with the dereference operator:</p>
+<pre><code>int score = 10;
+int* ptr = &amp;score;   // ptr holds the address of score
+*ptr = 20;           // score is now 20</code></pre>
+<p>Because a pointer is an object in its own right, it can be reassigned to point somewhere else, it can hold the null pointer value to mean it points at nothing, and it can be stored in an array or a data structure. That flexibility is exactly why pointers are the tool for linked lists, trees and dynamic allocation, and exactly why they are dangerous: a pointer that was never initialised, or one left pointing at memory that has been freed, will happily lead your program somewhere it should not go.</p>
+<h3>The reference: a second name, bound for life</h3>
+<p>Declare a reference with an ampersand, and it must be initialised at once to something that already exists:</p>
+<pre><code>int score = 10;
+int&amp; ref = score;    // ref is another name for score
+ref = 20;            // score is now 20, no star needed</code></pre>
+<p>From then on, using ref is using score. There is no separate dereference step, and — this is the part that trips everyone up — assigning to ref afterwards does not rebind it. Writing ref = other assigns other's value into score; ref stays glued to score for its whole lifetime. cppreference states the underlying rule plainly: a reference must be initialised to refer to a valid object or function, there are no references to void, and because references are not objects, there are no arrays of references and no pointers to references.</p>
+<h3>Which one to reach for</h3>
+<ul>
+<li><b>A function parameter that must exist:</b> use a reference, preferably a const reference for large objects you only need to read. The caller passes the variable itself, no address-of, no null check, and the signature says plainly that a real object is required.</li>
+<li><b>Something that may legitimately be absent:</b> use a pointer, and check it against nullptr before dereferencing. A reference cannot express "no object", so do not force one into that job.</li>
+<li><b>Something that needs to change what it points at over time:</b> use a pointer. A reference cannot be reseated, so a data structure that walks from node to node needs pointers.</li>
+<li><b>Something that must outlive the function that made it:</b> be careful with both. Never return a reference or a pointer to a local variable — the local is gone when the function returns, and whatever you returned now points at nothing valid.</li>
+</ul>
+<p>The short version to carry into your next program: a reference is a promise that the object exists and will not change identity; a pointer is a tool that can point anywhere, including nowhere, and the freedom comes with the checking.</p>
+<h3>Sources</h3>
+<ul>
+<li><a href="https://en.cppreference.com/cpp/language/reference" target="_blank" rel="noopener">cppreference — Reference declaration</a></li>
+<li><a href="https://en.cppreference.com/cpp/language/pointer" target="_blank" rel="noopener">cppreference — Pointer declaration</a></li>
+</ul>
+<p>All claims above were checked on 29 Oct 2026.</p>` },
+        { id: "blog-29-oct-2026-ssh-github", date: "Oct 29, 2026", mins: 5,
+          title: "Stop typing your GitHub password: set up SSH keys, step by step",
+          excerpt: "GitHub no longer accepts account passwords for Git over HTTPS, and SSH keys are the cleaner replacement. Generate a key pair, add it to the ssh-agent, paste the public key into GitHub, and the password prompts are gone.",
+          body: `<p>If you push to GitHub over HTTPS, you have probably met the prompt asking for a password, followed by the discovery that GitHub no longer accepts your account password there at all. SSH keys are the cleaner route: your computer proves who it is with a key pair, and you stop typing credentials on every push. The whole setup is three steps, and the private half of the key never leaves your machine.</p>
+<h3>Step 1: generate a key pair</h3>
+<p>Open a terminal (on Windows, Git Bash) and run GitHub's documented command, substituting your own email address:</p>
+<pre><code>ssh-keygen -t ed25519 -C "your_email@example.com"</code></pre>
+<p>Press Enter to accept the default file location, then type a passphrase twice. The passphrase encrypts the private key on disk, so a copied key file is useless without it. If you are on a legacy system that does not support Ed25519, GitHub documents the fallback: ssh-keygen -t rsa -b 4096 -C "your_email@example.com". The command creates two files in your .ssh folder: id_ed25519, the private key, and id_ed25519.pub, the public key. Share only the .pub file, ever.</p>
+<h3>Step 2: add the key to the ssh-agent</h3>
+<p>The ssh-agent holds your private key in memory so you type the passphrase once per session instead of on every push:</p>
+<pre><code>eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519</code></pre>
+<p>On Windows, the equivalent is to start the ssh-agent service and add the key from PowerShell, as GitHub's docs describe. If you created the key under a different name, replace id_ed25519 in that command with your key's filename.</p>
+<h3>Step 3: add the public key to GitHub, then test</h3>
+<p>Display the public key with cat ~/.ssh/id_ed25519.pub, copy the whole line, and paste it into GitHub under Settings, then SSH and GPG keys, then New SSH key, giving it a recognisable title such as "Home laptop". Then test the connection:</p>
+<pre><code>ssh -T git@github.com</code></pre>
+<p>A first connection will ask you to confirm GitHub's host fingerprint; after that, a successful test greets you by username. From then on, clone and push with the SSH form of the address — git@github.com:username/repo.git — and the password prompts are gone.</p>
+<div class="watch"><b>Watch out</b>Never paste your private key anywhere, never email it to yourself, and never commit it to a repository. If a private key is ever exposed, delete it from GitHub, generate a fresh pair, and treat the old one as compromised. A key with no passphrase is convenient and unsafe on a shared or stolen machine; the passphrase plus the agent is the balance that keeps the convenience without giving the key away.</div>
+<h3>Sources</h3>
+<ul>
+<li><a href="https://docs.github.com/en/enterprise-server@3.3/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent" target="_blank" rel="noopener">GitHub Docs — Generating a new SSH key and adding it to the ssh-agent</a></li>
+</ul>
+<p>All claims above were checked on 29 Oct 2026.</p>` },
+        { id: "blog-29-oct-2026-python-venv", date: "Oct 29, 2026", mins: 5,
+          title: "Python virtual environments, finally explained: one project, one clean room",
+          excerpt: "A virtual environment is a folder holding its own Python and its own packages, so each project stops breaking the others. Create it with venv, activate it, install into it, and record the result in requirements.txt.",
+          body: `<p>Every Python beginner hits the same wall sooner or later: two tutorials need two different versions of the same library, or an install meant for one project breaks another, or pip refuses to touch the system Python at all. A virtual environment is the fix, and it is simpler than its name suggests. It is a folder that holds its own copy of Python and its own installed packages, so each project gets a clean room that cannot interfere with the others.</p>
+<h3>Create it, activate it, use it</h3>
+<p>From inside your project folder, Python's own tutorial gives the whole routine. The venv module is the tool for creating and managing virtual environments, and it installs the Python version you ran the command with:</p>
+<pre><code>python -m venv .venv</code></pre>
+<p>That creates a .venv folder in your project. A common directory location is .venv, the tutorial notes, because the name keeps it hidden in your shell and out of the way while still explaining what it is. Then activate it. On Unix or macOS:</p>
+<pre><code>source .venv/bin/activate</code></pre>
+<p>On Windows, run .venv\Scripts\activate. Your prompt changes to show the environment name in brackets, which is your confirmation that python and pip now mean the versions inside the environment, not the system ones. Install what the project needs — pip install requests, for example — and those packages land only inside .venv. When you are done, type deactivate to step back out.</p>
+<h3>Three habits that save you later</h3>
+<ul>
+<li><b>One environment per project, never one shared one.</b> The moment two projects share an environment, you are back to the version clash you were escaping.</li>
+<li><b>Record what you installed.</b> After installing, run pip freeze &gt; requirements.txt in the project folder, and commit that file. A teammate (or future you) can then recreate the exact environment with pip install -r requirements.txt.</li>
+<li><b>Do not commit the environment folder itself.</b> .venv is large, machine-specific and recreatable from requirements.txt. Add .venv to .gitignore and let each machine build its own.</li>
+</ul>
+<p>One more thing worth knowing: on recent Ubuntu and Debian systems, pip will refuse to install into the system Python, because that Python belongs to the distribution and its own tools depend on it. That refusal is not a bug to work around with a force flag. It is the system telling you, in its own blunt way, to use a virtual environment. Now you know how.</p>
+<h3>Sources</h3>
+<ul>
+<li><a href="https://docs.python.org/3.12/tutorial/venv.html" target="_blank" rel="noopener">Python Docs — Virtual Environments and Packages</a></li>
+</ul>
+<p>All claims above were checked on 29 Oct 2026.</p>` },
+        { id: "blog-29-oct-2026-linux-permissions", date: "Oct 29, 2026", mins: 6,
+          title: "Linux permissions in plain English: reading -rw-r--r-- and using chmod without fear",
+          excerpt: "That ten-character string at the start of ls -l is three groups of three permissions, and chmod numbers are just 4, 2 and 1 added up. Learn to read it and you will stop reaching for chmod 777.",
+          body: `<p>Sooner or later every Linux user runs a command from a tutorial, gets "Permission denied", and reaches for chmod 777 to make the error go away. That works, and it is almost always the wrong fix: it gives everyone full access to the file, which is how a private key, a config file or a script ends up readable by any user or process on the machine. Permissions are not hard once you can read the ten-character string at the start of an ls -l line. Everything else is arithmetic.</p>
+<h3>Reading the string</h3>
+<p>Run ls -l and look at the first column, for example -rw-r--r--. The first character is the file type: a dash for a regular file, d for a directory, l for a link. The next nine characters are three groups of three: owner, group, and everyone else, in that order. In each group, r means read, w means write, and x means execute, with a dash where a permission is absent. So -rw-r--r-- means a regular file the owner can read and write, while the group and everyone else can only read.</p>
+<p>For directories the same letters mean slightly different things, and this is the part people miss: read on a directory lets you list its contents, write lets you create or delete entries inside it, and execute lets you enter it and reach the files inside. A directory with read but no execute is a list you cannot open anything from; a directory with execute but no read lets you reach a file you already know by name, without listing the rest.</p>
+<h3>The numbers: 4, 2 and 1</h3>
+<p>Each permission has a value — read is 4, write is 2, execute is 1 — and each digit of a chmod number is the sum for one group, owner first, then group, then others. So 7 is read plus write plus execute, 6 is read plus write, 5 is read plus execute, and 4 is read only. That is the whole code: chmod 755 gives the owner full access and everyone else read plus execute, which is the usual setting for a script or a public directory; chmod 644 gives the owner read and write and everyone else read only, the usual setting for an ordinary file; chmod 600 gives the owner read and write and nobody else anything, which is what a private key or a secrets file should look like.</p>
+<h3>Changing permissions without the sledgehammer</h3>
+<p>Numbers set all three groups at once, which is fine when you know exactly what you want. Letters let you adjust one group without touching the others: u is the owner, g the group, o the others, a all of them, with plus to add, minus to remove, and equals to set exactly. So chmod u+x script.sh adds execute for the owner only — the usual fix when a script you wrote refuses to run — and chmod o-rwx notes.txt removes all access for everyone else without changing anything else. Only the file's owner (or root) can change its permissions, which is why a permission error on someone else's file is not yours to fix with sudo unless you understand what you are overriding.</p>
+<div class="watch"><b>Watch out</b>Never use chmod 777 as a troubleshooting step, and never use chmod -R on a system directory to "fix" a permission problem: recursive permission changes are hard to undo and can break a system in ways that only show up later. Fix the one file or directory the error names, with the smallest permission that lets the job work, and check with ls -l afterwards.</div>
+<h3>Sources</h3>
+<ul>
+<li><a href="http://www.grymoire.com/unix/Permissions.html" target="_blank" rel="noopener">Grymoire — Unix/Linux Permissions tutorial</a></li>
+<li><a href="https://adamdjellouli.com/articles/linux_notes/permissions" target="_blank" rel="noopener">Adam Djellouli — File Permissions</a></li>
+</ul>
+<p>All claims above were checked on 29 Oct 2026.</p>` },
+        { id: "blog-29-oct-2026-passkeys", date: "Oct 29, 2026", mins: 5,
+          title: "Passkeys explained: the login that cannot be phished away",
+          excerpt: "A passkey is a key pair, not a secret you type: the private half never leaves your device, and it only works for the exact site it was made for. That is why a fake login page cannot steal it, and how to start without locking yourself out.",
+          body: `<p>Passwords have a structural problem that no amount of password advice can fix: a password is a secret you can be tricked into handing over. A phishing page can copy a login screen, a data breach can leak a password database, and a reused password can turn one leak into many. Passkeys replace the shared secret with something that cannot be typed into a fake form, because there is nothing to type.</p>
+<h3>Two keys, and the private one never leaves your device</h3>
+<p>A passkey is a pair of mathematically linked cryptographic keys, created on your device when you sign up. The website keeps the public half; the private half stays on your phone, computer, security key or password manager. When you sign in, the site sends your device a random challenge, your device signs it with the private key after you approve with your fingerprint, face, PIN or device unlock, and the site checks the signature against the public key it holds. The FIDO Alliance, which develops the standard with the W3C, puts the key point plainly: passkeys are resistant to phishing, are always strong, and are designed so that there are no shared secrets.</p>
+<h3>Why a fake login page cannot steal one</h3>
+<p>Each passkey is bound to the exact website it was created for. A convincing fake at a lookalike address cannot persuade your device to sign a challenge for the real site, because the domain does not match the credential. There is also nothing for you to read aloud, paste, or reuse on another account, which removes the two most common ways passwords are stolen: phishing and credential stuffing. A breached database is less useful to an attacker too, because it holds public keys, which cannot produce a valid sign-in without the private halves.</p>
+<h3>How to start, without locking yourself out</h3>
+<ul>
+<li><b>Start with one important account</b> that already offers passkeys — your email account is the best first choice, because it guards password resets for everything else. Look in its security settings for "passkey", "passwordless" or "security key".</li>
+<li><b>Create the passkey on a device you control, and let it sync</b> through your platform or password manager if that option is offered. Synced passkeys are protected with end-to-end encryption, and syncing is what saves you if a phone is lost.</li>
+<li><b>Keep a recovery route before you remove anything.</b> Do not delete your password or your second factor on an account until you have signed in with the passkey from a second device and confirmed the recovery options still work.</li>
+<li><b>Expect passwords to linger.</b> Not every service offers passkeys yet. Where one is not offered, a long unique password in a password manager plus a second factor remains the right fallback — passkeys replace passwords account by account, not all at once.</li>
+</ul>
+<p>Passkeys are not magic, and they do not fix a device that is itself compromised or an account whose recovery process is weak. What they do fix, cleanly, is the oldest trick in the book: asking a person for a secret and then misusing it. That alone makes them worth switching on wherever they are offered.</p>
+<h3>Sources</h3>
+<ul>
+<li><a href="https://fidoalliance.org/passkeys-2/" target="_blank" rel="noopener">FIDO Alliance — Passkeys</a></li>
+<li><a href="https://fidoalliance.org/wp-content/uploads/2025/09/FIDO-White-Paper-passkeys-and-verifiable-digital-credentials.pdf" target="_blank" rel="noopener">FIDO Alliance — Passkeys and Verifiable Digital Credentials</a></li>
+</ul>
+<p>All claims above were checked on 29 Oct 2026.</p>` },
         { id: "blog-28-oct-2026-timeshift", date: "Oct 28, 2026", mins: 6,
           title: "Before your next Linux upgrade, take a system snapshot \u2014 a Timeshift walkthrough",
           excerpt: "A bad update should cost you ten minutes, not a reinstall. Timeshift snapshots let you roll a Linux system back to before the change \u2014 but only if you understand what it does and does not back up, and set it up before you need it.",
