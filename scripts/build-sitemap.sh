@@ -13,6 +13,8 @@
 #   - design-lab.html       (noindex)
 #   - google*.html          (search verification files)
 #   - BingSiteAuth.xml      (not an HTML page)
+#   - data/*.json           (JSON data files for the homepage loader;
+#                            they are not pages and must never be sitemapped)
 #
 # <lastmod> is the date of the last git commit that touched each file.
 # Rerun this script after committing, so changed files pick up the
