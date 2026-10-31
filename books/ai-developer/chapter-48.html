@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 48 — Building a Real Application: Planning and Structure — AI Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 48 of the AI Developer teaching book: Building a Real Application: Planning and Structure.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← AI Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 48: Building a Real Application: Planning and Structure</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-48.svg" alt="Design for Chapter 48" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: From Tool to Application</h2>
+<p>The practical shape of from tool to application becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn from tool to application is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how from tool to application behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>It helps to judge from tool to application by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for from tool to application stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 2: What Application Means Here</h2>
+<p>A good way to learn what application means here is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how what application means here behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge what application means here by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>Code for what application means here stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about what application means here, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 3: The Same AIDay, Grown Up</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how the same aiday, grown up behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge the same aiday, grown up by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for the same aiday, grown up stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>When you think about the same aiday, grown up, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of the same aiday, grown up becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 4: Planning the Application Layer</h2>
+<p>It helps to judge planning the application layer by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for planning the application layer stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about planning the application layer, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>The practical shape of planning the application layer becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn planning the application layer is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 5: Commands as the Interface</h2>
+<p>Code for commands as the interface stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about commands as the interface, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of commands as the interface becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>A good way to learn commands as the interface is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how commands as the interface behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 6: A Menu or Typed Commands</h2>
+<p>When you think about a menu or typed commands, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of a menu or typed commands becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn a menu or typed commands is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how a menu or typed commands behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge a menu or typed commands by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 7: The aiday.py File, Organised</h2>
+<p>The practical shape of the aiday.py file, organised becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn the aiday.py file, organised is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how the aiday.py file, organised behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>It helps to judge the aiday.py file, organised by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for the aiday.py file, organised stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 8: Functions with One Job Each</h2>
+<p>A good way to learn functions with one job each is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how functions with one job each behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge functions with one job each by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>Code for functions with one job each stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about functions with one job each, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 9: Modules Inside One File</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how modules inside one file behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge modules inside one file by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for modules inside one file stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>When you think about modules inside one file, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of modules inside one file becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 10: Splitting Files When It Helps</h2>
+<p>It helps to judge splitting files when it helps by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for splitting files when it helps stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about splitting files when it helps, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>The practical shape of splitting files when it helps becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn splitting files when it helps is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 11: A Small Module Map</h2>
+<p>Code for a small module map stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about a small module map, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of a small module map becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>A good way to learn a small module map is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how a small module map behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 12: Shared Helpers in One Place</h2>
+<p>When you think about shared helpers in one place, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of shared helpers in one place becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn shared helpers in one place is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how shared helpers in one place behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge shared helpers in one place by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 13: Constants at the Top</h2>
+<p>The practical shape of constants at the top becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn constants at the top is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how constants at the top behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>It helps to judge constants at the top by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for constants at the top stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 14: Configuration Without Complexity</h2>
+<p>A good way to learn configuration without complexity is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how configuration without complexity behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge configuration without complexity by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>Code for configuration without complexity stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about configuration without complexity, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 15: Where Settings Live</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how where settings live behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge where settings live by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for where settings live stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>When you think about where settings live, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of where settings live becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 16: The Notes Module</h2>
+<p>It helps to judge the notes module by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for the notes module stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about the notes module, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>The practical shape of the notes module becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn the notes module is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 17: The Search Module</h2>
+<p>Code for the search module stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about the search module, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of the search module becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>A good way to learn the search module is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how the search module behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 18: The Tasks Module</h2>
+<p>When you think about the tasks module, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of the tasks module becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn the tasks module is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how the tasks module behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge the tasks module by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 19: The Summariser Module</h2>
+<p>The practical shape of the summariser module becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn the summariser module is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how the summariser module behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>It helps to judge the summariser module by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for the summariser module stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 20: The Display Module</h2>
+<p>A good way to learn the display module is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how the display module behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge the display module by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>Code for the display module stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about the display module, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 21: How Modules Talk to Each Other</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how how modules talk to each other behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge how modules talk to each other by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for how modules talk to each other stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>When you think about how modules talk to each other, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of how modules talk to each other becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan?</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 22: Data Flowing Through AIDay</h2>
+<p>It helps to judge data flowing through aiday by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for data flowing through aiday stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about data flowing through aiday, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>The practical shape of data flowing through aiday becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn data flowing through aiday is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 23: Starting the Program</h2>
+<p>Code for starting the program stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about starting the program, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of starting the program becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>A good way to learn starting the program is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how starting the program behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 24: Reading Arguments Simply</h2>
+<p>When you think about reading arguments simply, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of reading arguments simply becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn reading arguments simply is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how reading arguments simply behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge reading arguments simply by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 25: Unknown Commands, Handled Well</h2>
+<p>The practical shape of unknown commands, handled well becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn unknown commands, handled well is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how unknown commands, handled well behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>It helps to judge unknown commands, handled well by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for unknown commands, handled well stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 26: Help That Teaches</h2>
+<p>A good way to learn help that teaches is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how help that teaches behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge help that teaches by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>Code for help that teaches stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about help that teaches, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 27: Errors the User Can Understand</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how errors the user can understand behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge errors the user can understand by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for errors the user can understand stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>When you think about errors the user can understand, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of errors the user can understand becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 28: Exiting Cleanly Every Time</h2>
+<p>It helps to judge exiting cleanly every time by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for exiting cleanly every time stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about exiting cleanly every time, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>The practical shape of exiting cleanly every time becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn exiting cleanly every time is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 29: Saving State Between Runs</h2>
+<p>Code for saving state between runs stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about saving state between runs, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of saving state between runs becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>A good way to learn saving state between runs is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how saving state between runs behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 30: Loading State at Start</h2>
+<p>When you think about loading state at start, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of loading state at start becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn loading state at start is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how loading state at start behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge loading state at start by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 31: When Files Are Missing</h2>
+<p>The practical shape of when files are missing becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn when files are missing is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how when files are missing behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>It helps to judge when files are missing by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for when files are missing stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 32: When Files Are Damaged</h2>
+<p>A good way to learn when files are damaged is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how when files are damaged behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge when files are damaged by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>Code for when files are damaged stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about when files are damaged, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 33: Keeping Old Data Safe</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how keeping old data safe behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge keeping old data safe by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for keeping old data safe stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>When you think about keeping old data safe, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of keeping old data safe becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 34: Testing Each Module Alone</h2>
+<p>It helps to judge testing each module alone by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for testing each module alone stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about testing each module alone, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>The practical shape of testing each module alone becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn testing each module alone is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 35: Wiring Modules Together</h2>
+<p>Code for wiring modules together stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about wiring modules together, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of wiring modules together becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>A good way to learn wiring modules together is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how wiring modules together behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 36: A Smoke Test for the Whole App</h2>
+<p>When you think about a smoke test for the whole app, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of a smoke test for the whole app becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn a smoke test for the whole app is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how a smoke test for the whole app behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge a smoke test for the whole app by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 37: Planning the Build Order</h2>
+<p>The practical shape of planning the build order becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn planning the build order is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how planning the build order behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>It helps to judge planning the build order by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for planning the build order stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 38: Building the Skeleton First</h2>
+<p>A good way to learn building the skeleton first is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how building the skeleton first behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge building the skeleton first by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>Code for building the skeleton first stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about building the skeleton first, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 39: Adding One Feature at a Time</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how adding one feature at a time behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge adding one feature at a time by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for adding one feature at a time stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>When you think about adding one feature at a time, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of adding one feature at a time becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan?</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 40: Checking After Each Addition</h2>
+<p>It helps to judge checking after each addition by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for checking after each addition stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about checking after each addition, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>The practical shape of checking after each addition becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn checking after each addition is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 41: Keeping the Code Readable</h2>
+<p>Code for keeping the code readable stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about keeping the code readable, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of keeping the code readable becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>A good way to learn keeping the code readable is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how keeping the code readable behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 42: Comments That Explain Why</h2>
+<p>When you think about comments that explain why, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of comments that explain why becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn comments that explain why is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how comments that explain why behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge comments that explain why by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 43: Names That Explain Themselves</h2>
+<p>The practical shape of names that explain themselves becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn names that explain themselves is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how names that explain themselves behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>It helps to judge names that explain themselves by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for names that explain themselves stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 44: Reviewing the Structure</h2>
+<p>A good way to learn reviewing the structure is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how reviewing the structure behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge reviewing the structure by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>Code for reviewing the structure stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about reviewing the structure, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Section 45: Testing the Skeleton Early</h2>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how testing the skeleton early behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge testing the skeleton early by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for testing the skeleton early stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>When you think about testing the skeleton early, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of testing the skeleton early becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p class="check"><strong>Check:</strong> Which choice here protects the user&#x27;s data, and why does it matter?</p>
+<h2>Section 46: Structure That Welcomes Change</h2>
+<p>It helps to judge structure that welcomes change by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for structure that welcomes change stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about structure that welcomes change, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>The practical shape of structure that welcomes change becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn structure that welcomes change is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could.</p>
+<p class="check"><strong>Check:</strong> How would you explain this part to a beginner in two sentences?</p>
+<h2>Section 47: Keeping Structure Notes</h2>
+<p>Code for keeping structure notes stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about keeping structure notes, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of keeping structure notes becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<pre><code>from pathlib import Path
+
+def load_tasks(path=&quot;tasks.txt&quot;):
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [line for line in p.read_text(encoding=&quot;utf-8&quot;).splitlines() if line.strip()]
+
+def done_count(tasks):
+    return sum(1 for t in tasks if t.startswith(&quot;[x]&quot;))
+
+tasks = load_tasks()
+print(f&quot;{done_count(tasks)} of {len(tasks)} tasks done.&quot;)</code></pre>
+<p>A good way to learn keeping structure notes is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how keeping structure notes behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p class="check"><strong>Check:</strong> What is the smallest version of this that still feels useful?</p>
+<h2>Section 48: Planning for Version Two</h2>
+<p>When you think about planning for version two, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p>The practical shape of planning for version two becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn planning for version two is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<pre><code>import re
+from pathlib import Path
+
+def read_notes(folder):
+    notes = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        notes.append((path.name, path.read_text(encoding=&quot;utf-8&quot;)))
+    return notes
+
+def summarise(text, limit=3):
+    sentences = re.split(r&quot;(?&lt;=[.!?])\s+&quot;, text.strip())
+    scored = sorted(sentences, key=len, reverse=True)
+    return &quot; &quot;.join(scored[:limit])
+
+notes = read_notes(&quot;my_notes&quot;)
+for name, text in notes:
+    print(name)
+    print(summarise(text))</code></pre>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how planning for version two behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge planning for version two by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough.</p>
+<p class="check"><strong>Check:</strong> Why does keeping AIDay local make its design simpler and safer?</p>
+<h2>Section 49: A Structure You Can Defend</h2>
+<p>The practical shape of a structure you can defend becomes clear when you write it down before you write any code. Describe what goes in, what comes out, and what happens when something is missing or unusual. For AIDay, inputs are usually plain-text notes and short task lines, and outputs are short summaries, lists of matches, or updated task files. Writing those two sentences forces you to notice gaps early: what if a note is empty, what if a task file does not exist yet, what if the user types a command you did not plan? Answering on paper is cheap, and it saves you from redesigning in the middle of coding.</p>
+<p>A good way to learn a structure you can defend is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how a structure you can defend behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<pre><code>from pathlib import Path
+
+def search_notes(folder, word):
+    word = word.lower()
+    hits = []
+    for path in sorted(Path(folder).glob(&quot;*.txt&quot;)):
+        text = path.read_text(encoding=&quot;utf-8&quot;)
+        for line in text.splitlines():
+            if word in line.lower():
+                hits.append((path.name, line.strip()))
+    return hits
+
+for name, line in search_notes(&quot;my_notes&quot;, &quot;garden&quot;):
+    print(name, &quot;-&gt;&quot;, line)</code></pre>
+<p>It helps to judge a structure you can defend by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<p>Code for a structure you can defend stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p class="check"><strong>Check:</strong> What would you test first, and what real notes would you test it on?</p>
+<h2>Section 50: From Structure to Working Code</h2>
+<p>A good way to learn from structure to working code is to build the smallest version that still feels useful, then test it on real material from your own day. Create a folder with a few short notes you actually wrote, add a handful of tasks, and run the feature against them. Watch what surprises you: a summary that picks the wrong sentence, a search that misses a word because of capital letters, a task list that looks confusing. Each surprise is a lesson, and fixing it teaches more than reading about the ideal version ever could. Small, real tests beat large, imaginary ones every time.</p>
+<p>One habit that separates a finished tool from a half-finished experiment is deciding how from structure to working code behaves when things go wrong. A missing folder should produce a clear message and a helpful suggestion, not a crash full of technical detail. A damaged file should be reported honestly, with the original left untouched so nothing is lost. A command typed slightly wrong should show the closest correct command. These choices cost little when you plan them early, and they are exactly what makes a tool feel trustworthy to the person using it, including future you.</p>
+<p>It helps to judge from structure to working code by asking three questions: does it do what it promises, does it explain itself when it cannot, and can a beginner understand its output without a manual? AIDay aims for yes on all three, using plain words, predictable commands, and output that reads like a short note rather than a machine report. If you find yourself adding an option that only an expert would understand, pause and ask whether the simpler behaviour is enough. Simplicity is not a lack of ambition; it is respect for the user&#x27;s time and attention.</p>
+<pre><code>from pathlib import Path
+
+TASKS = Path(&quot;tasks.txt&quot;)
+
+def add_task(text):
+    with TASKS.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+        f.write(&quot;[ ] &quot; + text.strip() + &quot;\n&quot;)
+
+def list_tasks():
+    if not TASKS.exists():
+        print(&quot;No tasks yet.&quot;)
+        return
+    for line in TASKS.read_text(encoding=&quot;utf-8&quot;).splitlines():
+        print(line)
+
+add_task(&quot;Water the plants&quot;)
+list_tasks()</code></pre>
+<p>Code for from structure to working code stays readable when each function does one job and says so in its name. A function that reads notes should only read notes; a function that picks summary sentences should only pick sentences; a function that prints results should only print them. This separation means you can test each piece alone, replace one piece without breaking the others, and explain the program to someone else by walking through its parts in order. The example below shows that style in miniature, using only the Python standard library and files on your own machine.</p>
+<p>When you think about from structure to working code, start with the person who will use the tool rather than with the cleverest method you know. A real tool earns its place by solving one small problem reliably, day after day, without demanding attention or creating new work. In AIDay that means the feature must work on the reader&#x27;s own notes, on their own machine, with plain files they can open and read. If a feature needs a network connection, a secret key, or someone else&#x27;s computer, it does not belong in this project. Keeping that test in mind makes every later choice simpler, because you can reject ideas quickly and spend your energy on the parts that genuinely help.</p>
+<p class="check"><strong>Check:</strong> How should this part behave when a file is missing or empty?</p>
+<h2>Practical Task</h2>
+<p>Build or extend the AIDay project (aiday.py, standard library only, local files only) so that it covers the ideas in this chapter: plan it on paper first, implement one small piece at a time, test it on your own notes and tasks, fix the problems you find, and write a short note describing what works, what does not yet work, and what you would improve next. Do not connect it to any network service, do not use an API key, and do not test it on anyone else&#x27;s files or systems.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What is the main idea of this chapter, in your own words?</li>
+<li>How does this chapter&#x27;s work fit into the AIDay project as a whole?</li>
+<li>What would you test to prove this chapter&#x27;s ideas work on your own files?</li>
+<li>What limits or risks should you state honestly about what you built here?</li>
+<li>What is the next small step you would take after finishing this chapter?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-47.html">← Chapter 47</a> <a href="index.html">All chapters</a> <a href="chapter-49.html">Chapter 49 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/ai-developer/chapter-48.html'; this.page.identifier = 'book-ai-developer-chapter-48'; this.page.title = 'Chapter 48: Building a Real Application: Planning and Structure'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

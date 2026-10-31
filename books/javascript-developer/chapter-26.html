@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 26 — async and await in Practice — JavaScript Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 26 of the JavaScript Developer teaching book: async and await in Practice.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← JavaScript Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 26: async and await in Practice</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-26.svg" alt="Design for Chapter 26" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What async Really Means</h2>
+<p>When you hear the word async in JavaScript, it is easy to imagine something complicated or advanced, but the core idea is wonderfully simple. Async means that some work takes time, and JavaScript does not want to freeze everything else while it waits. Think of ordering food at a busy restaurant. You do not stand at the counter blocking everyone else until your meal is ready. You take a number, sit down, and the kitchen calls you when the food is done. In the meantime, other customers can order, talk, and move around freely. JavaScript works in a similar way. It starts a slow job, such as fetching data from the internet or reading a file, and it keeps handling other tasks while that job finishes in the background.</p>
+<p>This matters because JavaScript normally runs one thing at a time on a single thread. If a slow network request blocked that thread, the whole page would freeze. Buttons would stop responding, scrolling would stutter, and users would think the site had crashed. Async programming solves this by letting the program say, in effect, start this slow work and let me know when it is done. The rest of the code can carry on, and when the slow work completes, JavaScript returns to handle the result. That is why modern websites feel smooth even when they load data from servers far away.</p>
+<p>The words async and await are the friendly face of this idea. Before them, developers used callbacks and promise chains, which worked but could become hard to read when many steps were involved. With async and await, asynchronous code looks almost like ordinary, step-by-step code. You write await in front of a slow operation, and JavaScript pauses that particular function until the result arrives, without freezing the whole page. It is a pause for one function only, not a pause for everything. That distinction is the key to understanding async correctly.</p>
+<p>A helpful mental model is to think of each async function as a worker who can wait politely. If the worker needs a delivery, they do not lock the whole office. They wait by the door for their own parcel while colleagues keep working. When the parcel arrives, the worker resumes exactly where they left off, with the parcel in hand. In code, the parcel is the resolved value of a promise, and resuming means the lines after await finally run. If the delivery fails, the worker gets an error instead, which you can handle with try and catch, a topic we will practise in this chapter.</p>
+<p>In everyday practice, you will meet async work everywhere. Loading a user profile, searching for products, saving a form, checking the weather, or uploading a photo all take time and all use async patterns. Learning async and await therefore is not an optional extra for advanced developers. It is a core skill for building any real application that talks to the internet. By the end of this chapter, you will be able to write async functions confidently, wait for results in order or in parallel, handle failures gracefully, and avoid the most common beginner mistakes.</p>
+<p class="check"><strong>Check:</strong> In your own words, why does JavaScript need async work instead of simply waiting for slow tasks to finish?</p>
+<h2>Section 2: From Callbacks to Promises in One Story</h2>
+<p>To appreciate async and await, it helps to see where they came from, because the older styles still appear in real code and in interviews. The earliest approach was callbacks. A callback is simply a function you hand to another function, saying run this when you are done. For example, you might ask for data and pass a function that displays it. That worked well for one step, but when you needed three or four steps in a row, the code nested deeper and deeper to the right. Developers jokingly called this callback hell or the pyramid of doom, because reading it felt like climbing stairs that never ended.</p>
+<p>Promises were invented to flatten that pyramid. A promise is an object that represents a future value. It starts in a pending state, and later it settles as either fulfilled with a value or rejected with an error. Instead of nesting callbacks, you attach handlers with then for success and catch for failure, and you can chain steps in a straight line. Each then returns a new promise, so the next step waits for the previous one. This was a huge improvement in readability, and it gave developers a standard way to talk about work that had not finished yet.</p>
+<p>Even so, long promise chains could still feel awkward, especially when you needed values from earlier steps later on, or when you wanted to use ordinary control flow such as loops and conditionals. That is where async and await come in. They do not replace promises. They are built on top of promises and give you a cleaner syntax for working with them. Under the hood, every async function returns a promise, and await simply waits for a promise to settle. If you understand promises, async and await will feel natural, and if you do not yet, this chapter will build that understanding step by step.</p>
+<p>Consider a simple story: first you fetch a user, then you fetch that user&#x27;s posts, then you display the first post. With callbacks, each step lives inside the previous one. With promises, the steps form a chain. With async and await, the steps look like three ordinary lines, one after another, each with await in front. The logic is identical, but the async version is far easier to read, to debug, and to change later. When a new developer joins your project, they can follow the async version at a glance, which is a genuine practical advantage, not just a matter of style.</p>
+<p>You do not need to throw away promise knowledge to use async and await. In fact, the best developers mix them wisely. You will use await for most sequential work, and you will still use Promise.all or Promise.race directly when you need parallel work or racing behaviour. The rest of this chapter shows you exactly when to reach for each tool, so that you can read older code with confidence and write new code that other people enjoy maintaining.</p>
+<pre><code>function getUser() {
+  return new Promise((resolve) =&gt; {
+    setTimeout(() =&gt; resolve({ name: &quot;Ada&quot; }), 500);
+  });
+}
+
+async function showUser() {
+  const user = await getUser();
+  console.log(&quot;Hello, &quot; + user.name);
+}
+
+showUser();</code></pre>
+<p class="check"><strong>Check:</strong> How does async and await change the shape of promise code without replacing promises themselves?</p>
+<h2>Section 3: Writing Your First async Function</h2>
+<p>Writing your first async function is less intimidating than it sounds, because you only need to add one small word. You write the word async before the word function, and suddenly that function gains two superpowers. First, it always returns a promise, even if you return a plain value inside it. Second, you are allowed to use await inside it to pause for promises. That is the whole contract. Everything else inside the function looks like normal JavaScript: variables, conditionals, loops, and function calls all work exactly as you expect.</p>
+<p>Let us build a tiny example in your mind before you type it. Suppose you want a function that greets a user after a short delay. Without async, you would need timers and callbacks. With async, you can write a helper that returns a promise after a delay, and then await that helper inside your async function. The code reads from top to bottom: wait a moment, then print the greeting. A beginner reading it does not need to know about timers or promise internals to follow the story. That readability is the reason async functions are now the default style in most modern codebases.</p>
+<p>One detail surprises many beginners: calling an async function does not run it to completion immediately. It starts running until the first await, then it returns a promise to the caller right away, and the rest of the function resumes later when the awaited promise settles. This means the lines after your function call can run before the async function finishes. If you need the final result outside the function, you must either await the call from another async function or use then on the returned promise. Forgetting this is a common source of confusion, because the function looks synchronous but behaves asynchronously.</p>
+<p>Another useful habit is to name async functions clearly. Names such as loadUser, fetchPosts, or saveSettings tell the reader that slow work is involved. When you see such a name in a codebase, you immediately know to expect a promise back and to handle it with await or then. Good naming also helps you remember to await the call. If a function is called loadUser but you forget await, you will end up holding a promise object instead of a user object, and trying to read user.name will give you undefined. We will practise spotting that bug later in this chapter.</p>
+<p>For now, focus on the shape. Mark the function async, await the slow steps inside it, and return the final value as if the function were ordinary. JavaScript wraps that value in a promise for you automatically. Try writing several tiny async functions that wait for a delay and then return a message. Change the delay, change the message, and watch the order of console output. That small experiment teaches more than any diagram, because you will see with your own eyes that await pauses one function while the rest of the program carries on.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function greetLater() {
+  await delay(500);
+  return &quot;Hello after a short wait!&quot;;
+}
+
+greetLater().then((message) =&gt; console.log(message));</code></pre>
+<p class="check"><strong>Check:</strong> What two things does marking a function async allow or guarantee?</p>
+<h2>Section 4: What await Actually Pauses</h2>
+<p>The word await is wonderfully descriptive, but it is also easy to misunderstand. Many beginners assume await freezes the whole program, like pressing pause on a video. In reality, await pauses only the async function that contains it. The rest of JavaScript keeps running: other functions continue, timers fire, user clicks are handled, and the page stays responsive. This is the single most important fact about await, and once you grasp it, many confusing behaviours suddenly make sense.</p>
+<p>Imagine you have two async functions running at the same time. The first awaits a slow network request, and the second awaits a short delay. While the first is waiting, the second can finish its short delay and print its result first, even though it started second. The order of completion depends on how long each job takes, not on the order in which the functions were called. This is normal async behaviour, not a bug. If you need a strict order, you must await the first function before starting the second, which we will practise soon. If order does not matter, letting them run together is often faster.</p>
+<p>It also helps to know what await can wait for. You can await any promise, and you can also await a plain value, in which case JavaScript simply wraps it and continues almost immediately. You cannot use await in a regular, non-async function, because the language needs to know that the function is allowed to pause and resume. If you try, you will get a syntax error. The only exception is top-level await in modules, which we will meet near the end of this chapter. For ordinary scripts and functions, the rule is simple: await lives inside async.</p>
+<p>Another subtle point is that await does not make a slow operation faster. It only changes how you wait for it. If a request takes two seconds, awaiting it still takes two seconds. What await gives you is readable waiting. Instead of nesting callbacks or chaining then handlers, you write the waiting step inline, and the code after it runs only when the result is ready. That clarity becomes priceless when a function has five or six slow steps, because the reader can follow the sequence without jumping between handlers.</p>
+<p>Finally, remember that await works with the promise&#x27;s settled value. If the promise fulfils, await gives you its value. If it rejects, await throws the rejection reason as an error inside your async function, which you can catch. This symmetry with ordinary errors is elegant: success flows forward as a value, failure flows forward as an exception. Learning to use try and catch with await is therefore the natural next step, and it turns async error handling into something that feels familiar rather than special.</p>
+<pre><code>async function first() {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 1000));
+  console.log(&quot;First finished after one second&quot;);
+}
+
+async function second() {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  console.log(&quot;Second finished after 200 milliseconds&quot;);
+}
+
+first();
+second();
+console.log(&quot;Both started, main code continues&quot;);</code></pre>
+<p class="check"><strong>Check:</strong> If one async function awaits a slow task, can another function still run, and why?</p>
+<h2>Section 5: Returning Values from async Functions</h2>
+<p>Returning a value from an async function feels ordinary, but the result you receive outside is always a promise. This is a rule without exceptions, and it catches beginners again and again. Suppose your async function ends with return 42. A caller who writes const result = getNumber() will not get 42. They will get a promise that will eventually resolve to 42. To get the number itself, the caller must await the call inside another async function, or attach a then handler. Once you accept this rule, async code becomes predictable rather than mysterious.</p>
+<p>Why does JavaScript wrap the return value like this? Because an async function might pause partway through, and the caller cannot know when the final value will be ready. A promise is the honest way to represent that uncertainty. It says, I do not have the value yet, but I promise to deliver it later, or to explain why I could not. The caller can then decide whether to wait for it, to run other work in parallel, or to pass the promise along to someone else. This design keeps the language consistent: every async function speaks the same promise language, so functions can compose neatly.</p>
+<p>Returning early works just as you would expect. If your function hits a return inside a conditional, the promise resolves with that value immediately, and the rest of the function does not run. You can also return another promise, and JavaScript will adopt it: the outer promise will wait for the inner one to settle. This is handy when an async function simply delegates to another async helper. You do not need to await and then return; you can return the helper&#x27;s promise directly, although awaiting first is often clearer for beginners because it makes the flow explicit.</p>
+<p>A related habit is to avoid returning a promise and also awaiting it in confusing ways. For example, writing return await fetchData() inside a try block has a subtle benefit: if fetchData rejects, the error is caught by your try and catch, whereas returning the promise without await might let the error escape the try block in older environments. Modern JavaScript handles this more gracefully, but many style guides still recommend return await inside try for clarity. You do not need to memorise that debate today, but you should know that both forms appear in real code and both are valid.</p>
+<p>The practical takeaway is simple. Inside an async function, return values normally. Outside it, remember to await or use then. When you log a value and see Promise with a pending state, that is your clue that you forgot to await somewhere. Check the call site, add await in an async context, and the real value will appear. This single debugging habit will save you hours as your programs grow larger and more async steps pile up.</p>
+<pre><code>async function getScore() {
+  return 95;
+}
+
+async function showScore() {
+  const score = await getScore();
+  console.log(&quot;Score is &quot; + score);
+}
+
+showScore();
+console.log(getScore());</code></pre>
+<p class="check"><strong>Check:</strong> Why does calling an async function give you a promise instead of the returned value directly?</p>
+<h2>Section 6: Handling a Rejected Promise with await</h2>
+<p>When a promise rejects, await does not return a special error value. It throws the rejection reason as an exception inside your async function, exactly as if an ordinary line of code had failed. This design is intentional, because it lets you handle async failures with the same tools you already use for synchronous errors. If nothing catches that thrown error, the promise returned by your async function becomes rejected, and the failure travels outward to whoever called it. Understanding this flow is essential, because unhandled rejections can crash a program or leave a user staring at a frozen loading spinner with no explanation.</p>
+<p>Consider a function that tries to load a user profile from a server that is temporarily down. The fetch promise rejects, await throws, and execution jumps out of the normal path. Lines after the await do not run, just as lines after a thrown error in ordinary code do not run. This is good behaviour, because it prevents your program from trying to display a user who never arrived. Instead, control moves to the nearest catch block, where you can decide what to do: show a friendly message, retry the request, use cached data, or log the problem for debugging.</p>
+<p>Beginners sometimes try to check for errors by testing whether the awaited value is null or undefined. That approach misses rejections entirely, because a rejection never produces a value at all. It produces a thrown error. The correct pattern is to wrap risky awaits in try and catch, which we explore in detail in the next section. For now, remember the mental rule: await success gives you a value, await failure throws. There is no third outcome, and there is no silent failure if you structure your code correctly.</p>
+<p>It is also worth knowing that rejection reasons can be many things: an Error object, a string, or even a number. Good practice is to reject with an Error object that carries a helpful message, because Error objects include stack traces that make debugging far easier. When you write your own promises, always reject with an Error and a clear message, such as new Error(&quot;User not found&quot;). When you consume promises written by others, be prepared for any reason, and turn it into a user-friendly message rather than showing raw technical text on screen.</p>
+<p>In real applications, rejected promises happen for ordinary reasons: networks drop, servers return errors, files are missing, and users lose connection. Treating rejection as a normal part of async work, rather than a rare disaster, leads to calmer, more robust code. Your job is not to prevent every rejection, which is impossible, but to anticipate them, catch them in the right place, and give the user a clear path forward. That mindset separates fragile demos from reliable applications that people trust.</p>
+<pre><code>function loadFailing() {
+  return Promise.reject(new Error(&quot;Server is unavailable&quot;));
+}
+
+async function tryLoad() {
+  try {
+    const data = await loadFailing();
+    console.log(data);
+  } catch (error) {
+    console.log(&quot;Caught: &quot; + error.message);
+  }
+}
+
+tryLoad();</code></pre>
+<p class="check"><strong>Check:</strong> What happens inside an async function when an awaited promise rejects?</p>
+<h2>Section 7: try and catch Around await</h2>
+<p>The try and catch pattern is the everyday way to handle async errors, and its beauty is that it looks exactly like synchronous error handling. You place the risky await inside a try block, and you place your recovery code inside a catch block. If the await succeeds, the catch block is skipped entirely and execution continues normally. If the await throws, execution jumps straight to catch, where the error is available as a variable you can inspect, log, or turn into a message. This familiar shape is one of the main reasons developers prefer async and await over long promise chains.</p>
+<p>Choosing how much code to put inside try matters. A common beginner mistake is to wrap an entire long function in one giant try block. That works, but when an error occurs, you cannot tell which await failed without inspecting the error carefully. A better habit is to wrap each risky step, or each logical group of steps, separately, so that your catch block knows exactly what went wrong. For example, you might try loading a user in one block and try loading their posts in another, giving each failure its own friendly message and recovery plan. This extra structure pays off quickly when debugging.</p>
+<p>Inside catch, you have several sensible options. You can show a message to the user, such as &quot;Could not load your profile. Please check your connection and try again.&quot; You can return a fallback value, such as an empty list or cached data, so the rest of the program can continue. You can retry the operation, perhaps once or twice, before giving up. Or you can log the error and rethrow it, letting a higher-level handler deal with it. The right choice depends on context, but the worst choice is to swallow the error silently with an empty catch block, because then neither you nor the user will ever know something went wrong.</p>
+<p>You can also use finally, which runs whether the try succeeded or failed. Finally is perfect for cleanup work, such as hiding a loading spinner, re-enabling a button, or closing a connection. We will return to finally later in this chapter, but it is worth meeting it here because it completes the try, catch, finally trio. Together, these three blocks give you precise control: try for the risky work, catch for recovery, and finally for cleanup that must happen no matter what.</p>
+<p>As you practise, write small functions that sometimes succeed and sometimes fail, and handle both paths explicitly. Change the failure condition, watch the catch block run, and check that your fallback behaviour feels sensible to a user. This deliberate practice builds the instinct to ask, for every await, what should happen if this fails. Once that question becomes automatic, your async code will be far more reliable, and your users will experience fewer dead ends and confusing blank screens.</p>
+<pre><code>function maybeLoad(shouldFail) {
+  return shouldFail
+    ? Promise.reject(new Error(&quot;Network failed&quot;))
+    : Promise.resolve({ name: &quot;Ada&quot; });
+}
+
+async function loadUser(shouldFail) {
+  try {
+    const user = await maybeLoad(shouldFail);
+    console.log(&quot;Loaded &quot; + user.name);
+  } catch (error) {
+    console.log(&quot;Sorry: &quot; + error.message);
+  }
+}
+
+loadUser(false);
+loadUser(true);</code></pre>
+<p class="check"><strong>Check:</strong> Why is it better to wrap a single risky await in its own try block rather than wrapping a whole long function?</p>
+<h2>Section 8: Awaiting Several Promises in Order</h2>
+<p>Sometimes the order of async work matters, because each step depends on the result of the previous one. In that case, you simply await each step one after another, in the order you need them. The code reads like a recipe: first do this, wait for it, then use its result to do that, wait again, and so on. This sequential style is the easiest async pattern to understand, and it is the right choice whenever later steps genuinely need earlier results. Trying to run dependent steps in parallel would be incorrect, because a later step would be working with data that does not exist yet.</p>
+<p>A classic example is loading a user, then loading that user&#x27;s posts, then loading the comments on the first post. You cannot load the posts until you know the user id, and you cannot load comments until you know the post id. Sequential awaits express that dependency clearly. Each await pauses the function until its result arrives, and the next line can safely use that result. The total time is the sum of all the steps, which is unavoidable when steps depend on each other. No clever parallel trick can fetch comments for a post you have not identified yet.</p>
+<p>Sequential awaits also make debugging straightforward. If the second step fails, you know the first step succeeded, because execution would not have reached the second step otherwise. You can log the intermediate values, inspect them, and reason about the failure in order. This is a major advantage over tangled parallel code when you are still learning. When something goes wrong, you can point to the exact line where the sequence broke, rather than wondering which of several simultaneous jobs failed first.</p>
+<p>There is, however, a cost to sequential awaiting when steps do not depend on each other. If you await three independent requests one after another, you pay the full time of all three added together, even though they could have run at the same time. That is why the next section introduces parallel awaiting. The skill to develop is judgement: ask, for each pair of steps, does the second need the first result. If yes, await in order. If no, consider running them together. Many performance problems in beginner code come from awaiting independent work in sequence out of habit rather than necessity.</p>
+<p>For now, practise the sequential pattern deliberately. Write a function that awaits three delayed helpers in order and logs each result as it arrives. Notice the total time, notice the order of logs, and notice how readable the code is. Then, in the next section, you will rewrite the same function in parallel and compare the timing. That contrast will teach you more than any rule alone, because you will feel the difference between necessary waiting and wasted waiting.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function inOrder() {
+  const a = await delayValue(&quot;A&quot;, 300);
+  console.log(a);
+  const b = await delayValue(&quot;B&quot;, 300);
+  console.log(b);
+  const c = await delayValue(&quot;C&quot;, 300);
+  console.log(c);
+}
+
+inOrder();</code></pre>
+<p class="check"><strong>Check:</strong> When is awaiting promises one after another the correct choice, even though it is slower than parallel work?</p>
+<h2>Section 9: Running Promises in Parallel with Promise.all</h2>
+<p>When several async jobs do not depend on each other, running them in parallel can save a lot of time. Promise.all is the tool for this job. You give it an array of promises, and it returns a single promise that resolves when every promise in the array has resolved. The resolved value is an array of results in the same order as the input promises, regardless of which job finished first. That order guarantee is important, because it means you can safely match each result to its original request without worrying about timing.</p>
+<p>Imagine loading a user profile, a list of notifications, and a weather forecast for a dashboard. None of these depends on the others, so there is no reason to wait for one before starting the next. If each takes one second, sequential awaits would take three seconds in total. With Promise.all, all three start at once, and the total time is roughly the time of the slowest job, about one second. For a user waiting for a dashboard to appear, that two-second saving is noticeable and feels like a faster application. This is why parallel loading is standard practice for dashboards, home pages, and any screen that gathers data from several sources.</p>
+<p>Using Promise.all with await is simple. You start the promises first, without awaiting them individually, then you await Promise.all with the array. A common mistake is to await each promise as you build the array, which defeats the purpose, because each await pauses before the next job starts. The correct pattern is to create the promises, collect them, and then await them together. Think of it as launching three deliveries at once and then waiting by the door for all three parcels, rather than sending one courier, waiting for their return, and only then sending the next.</p>
+<p>Promise.all has one strict rule to remember: if any promise in the array rejects, the whole Promise.all rejects immediately, and the other results are discarded, even if some jobs later succeed. This all-or-nothing behaviour is perfect when you need every result to proceed, but it is the wrong tool when partial results would still be useful. In that case, Promise.allSettled, which we meet next, is a better fit. Knowing which tool matches your need is a key part of writing robust async code.</p>
+<p>As you practise, compare sequential and parallel versions of the same task and time them. You will quickly develop an instinct for spotting independent work. Whenever you see several awaits in a row that do not use each other&#x27;s results, pause and ask whether Promise.all would be better. That single habit will make many of your programs noticeably faster without adding complexity.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function inParallel() {
+  const results = await Promise.all([
+    delayValue(&quot;A&quot;, 300),
+    delayValue(&quot;B&quot;, 300),
+    delayValue(&quot;C&quot;, 300),
+  ]);
+  console.log(results);
+}
+
+inParallel();</code></pre>
+<p>A practical tip is to start the promises in a named array first, so a reader can see exactly which jobs run together before any awaiting happens, and debugging becomes easier when one job is slow or fails unexpectedly in production code.</p>
+<p class="check"><strong>Check:</strong> Why must you create the promises before awaiting Promise.all, rather than awaiting each one as you build the array?</p>
+<h2>Section 10: Promise.allSettled When Some Fail</h2>
+<p>Promise.all is excellent when you need every result, but real life is messier. Sometimes you want to try several independent jobs and keep whatever succeeds, even if one or two fail. A dashboard that loads news, weather, and stock prices should still show news and weather if the stock service is down, rather than showing nothing at all. Promise.allSettled was designed for exactly this situation. It waits for every promise to settle, whether fulfilled or rejected, and then gives you a report for each one.</p>
+<p>The result of Promise.allSettled is an array of objects, one per input promise, in the original order. Each object has a status field: either &quot;fulfilled&quot; with a value field, or &quot;rejected&quot; with a reason field. This uniform shape makes it easy to separate successes from failures. You can filter the fulfilled results to display them, and you can log or report the rejected reasons separately. No result is lost just because a neighbour failed, which is the crucial difference from Promise.all. Your program stays useful even under partial failure, which users appreciate far more than a single all-or-nothing error screen.</p>
+<p>Consider a tool that checks several websites for updates. If one site is offline, you still want the updates from the others, plus a note that one check failed. With Promise.all, the single offline site would hide every successful update. With Promise.allSettled, you can show the successful updates immediately and add a gentle warning about the failed site. This pattern appears in monitoring tools, aggregators, bulk uploads, and any feature that gathers data from multiple independent sources. Learning it early will make your applications feel resilient rather than brittle.</p>
+<p>Handling the result does require a little extra code, because you must inspect each status. A helpful pattern is to loop over the results, push values from fulfilled entries into a success list, and push reasons from rejected entries into a failure list. Then you can decide what to display, what to retry, and what to log. This explicit separation also makes testing easier, because you can check both lists independently and confirm that a failure in one job does not corrupt the successes.</p>
+<p>In practice, choose Promise.allSettled whenever partial success is acceptable and useful. Choose Promise.all when every result is required before you can continue. That simple rule covers most cases. As you build larger programs, you will find yourself reaching for allSettled more often than you expect, because real networks and real services fail independently, and users prefer a mostly working page to a completely broken one.</p>
+<pre><code>function delayValue(value, ms, shouldFail) {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; {
+      if (shouldFail) {
+        reject(new Error(value + &quot; failed&quot;));
+      } else {
+        resolve(value);
+      }
+    }, ms);
+  });
+}
+
+async function tryAll() {
+  const results = await Promise.allSettled([
+    delayValue(&quot;A&quot;, 200, false),
+    delayValue(&quot;B&quot;, 200, true),
+    delayValue(&quot;C&quot;, 200, false),
+  ]);
+  console.log(results);
+}
+
+tryAll();</code></pre>
+<p>In user interface terms, allSettled lets you render a page with placeholders for failed parts, rather than a blank error screen, which keeps users engaged and gives them a clear retry path for only the broken section.</p>
+<p class="check"><strong>Check:</strong> How does Promise.allSettled differ from Promise.all when one promise in the group rejects?</p>
+<h2>Section 11: Promise.race and the First Result Wins</h2>
+<p>Promise.race is a less common but useful tool for situations where you only care about the first promise to settle, whether it fulfils or rejects. You give it an array of promises, and it returns a promise that mirrors the first one to finish. If the fastest job succeeds, race resolves with its value. If the fastest job fails, race rejects with its reason, even if a slower job would later have succeeded. The name is literal: it is a race, and only the winner matters.</p>
+<p>One classic use is a timeout. Suppose you want to load data, but you do not want to wait forever if the server is slow. You can race the real loading promise against a timeout promise that rejects after, say, five seconds. Whichever settles first decides the outcome. If the data arrives first, you use it. If the timeout fires first, you show a timeout message and let the user retry. This pattern gives users control instead of leaving them stuck on an endless spinner. We will build a reusable timeout helper later in this chapter, and race is the engine inside it.</p>
+<p>Another use is trying several equivalent sources and using whichever responds first. For example, you might ask two mirror servers for the same file and use the faster response. In practice, this pattern needs care, because you may waste work on the slower sources, and you must handle the case where the fastest source fails while a slower one would have succeeded. Race is therefore best used when the competing promises are truly interchangeable and when a fast failure is acceptable, or when you deliberately pair a real job with a timeout.</p>
+<p>A subtle detail is that losing promises keep running in the background, even after race has settled. Race does not cancel them. If a losing request later completes, its result is simply ignored, but any side effects it performs, such as writing data, will still happen. This is important to remember for operations that change state. Do not use race for two different writes and assume only the winner happened. Reserve race for reads, timeouts, and other cases where ignored background work is harmless.</p>
+<p>Beginners sometimes confuse race with all, but the difference is stark. Promise.all waits for everyone and needs every result. Promise.race waits for one winner and ignores the rest. AllSettled waits for everyone and reports each outcome. Keeping these three behaviours distinct in your mind will help you choose correctly under pressure. When in doubt, write down what you want to happen if one job fails or is slow, and the right tool usually becomes obvious.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function raceDemo() {
+  const winner = await Promise.race([
+    delayValue(&quot;Slow&quot;, 500),
+    delayValue(&quot;Fast&quot;, 100),
+  ]);
+  console.log(&quot;Winner: &quot; + winner);
+}
+
+raceDemo();</code></pre>
+<p>A timeout race is especially valuable on mobile networks, where a request can hang for a long time without failing, and giving the user a prompt timeout message is far better than leaving them uncertain.</p>
+<p class="check"><strong>Check:</strong> In what situation is Promise.race a better choice than Promise.all?</p>
+<h2>Section 12: Awaiting Inside Loops the Slow Way</h2>
+<p>Loops and await combine in ways that surprise beginners, because the same loop can be either sensibly slow or wastefully slow depending on how you write it. The slow but correct way is to await inside a for...of loop, one item at a time. Each iteration waits for its async job to finish before moving to the next item. This is exactly what you want when order matters, when each step depends on the previous one, or when you must avoid overwhelming a server with too many simultaneous requests. It is slow in the sense that total time adds up, but it is not wrong. It is deliberate, sequential work.</p>
+<p>Imagine processing a list of files where each file must be checked before the next one is uploaded, or sending messages where the server allows only one request at a time. Awaiting inside the loop guarantees that discipline. You can also stop early if one item fails, because the loop will throw and exit before processing the remaining items. That control is valuable when later items should not run after an early failure. Sequential loops also make logging simple, because results appear in list order and you can trace exactly where a failure occurred.</p>
+<p>The code shape is familiar: for (const item of items) { const result = await process(item); console.log(result); }. Reading it, you can almost hear the rhythm: process one, wait, log, move on. Beginners often worry that this pattern is always bad because it is slow, but that worry is misplaced. Slowness is only a problem when the work could safely run in parallel and the delay hurts the user. When order, safety, or rate limits matter, sequential awaiting is the professional choice, not a beginner mistake.</p>
+<p>What you should avoid is assuming that sequential is the only way to loop over async work. Many lists contain independent items, such as loading details for ten products on a page. Awaiting those one by one would make the page feel sluggish for no reason. In the next section, you will learn the parallel loop pattern, and the contrast will help you choose wisely. For now, practise the sequential loop and notice its clarity and its total time, so that you have a baseline to compare against.</p>
+<p>A useful rule of thumb is to ask three questions before writing an async loop. Does order matter? Does one item depend on another? Is there a limit on simultaneous work? If any answer is yes, sequential awaiting is a strong candidate. If all answers are no, parallel work is probably better. Holding those questions in mind will prevent both kinds of error: needlessly slow code and recklessly parallel code.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function processSlowly(items) {
+  for (const item of items) {
+    const result = await delayValue(item, 300);
+    console.log(&quot;Done: &quot; + result);
+  }
+}
+
+processSlowly([&quot;A&quot;, &quot;B&quot;, &quot;C&quot;]);</code></pre>
+<p>Sequential loops also simplify rate limiting, because you can add a short delay between iterations without worrying about overlapping requests, which many public APIs require for fair use.</p>
+<p class="check"><strong>Check:</strong> When is awaiting inside a loop, one item at a time, the right choice despite being slower?</p>
+<h2>Section 13: Awaiting Inside Loops the Fast Way</h2>
+<p>When loop items are independent, you can speed things up dramatically by starting all the async jobs first and then awaiting them together. The standard pattern is to map the list to an array of promises, then await Promise.all on that array. Mapping does not wait; it launches each job immediately and collects the promises. Promise.all then waits for all of them to finish. The total time becomes roughly the slowest single job, rather than the sum of all jobs, which can turn a three-second page load into a one-second load.</p>
+<p>The code shape is worth memorising: const promises = items.map((item) =&gt; process(item)); const results = await Promise.all(promises);. Notice that process is called without await inside map, because map is building promises, not waiting for them. If you accidentally write await inside the map callback without handling it correctly, you may end up with a confusing mix of values and promises. Keeping the two steps separate, first map, then await all, avoids that confusion and makes the intent obvious to anyone reading the code.</p>
+<p>Order is preserved in the results array, even though jobs finish at different times. Promise.all returns results in the same order as the input promises, so results[0] always corresponds to items[0]. This is convenient for display, because you can pair each result with its original item by index. It also means you do not need to sort results afterwards or track which job finished first. The mapping from input to output stays clean, which reduces bugs in larger programs.</p>
+<p>There are trade-offs to consider. Launching many jobs at once can overwhelm a server, exceed a rate limit, or use a lot of memory if the list is huge. For ten or twenty items, parallel mapping is usually fine. For thousands of items, you may need batching or a queue, which we will discuss later. Also, if one job fails, Promise.all rejects and you lose the other results, so consider Promise.allSettled if partial results are acceptable. Choosing between all and allSettled in a loop is the same judgement as before, just applied to a list.</p>
+<p>Practise by timing both loop styles on the same list of delayed jobs. The sequential loop will take noticeably longer, while the parallel version will finish in roughly the time of one job. That hands-on comparison builds intuition faster than reading about it. Once you feel the difference, you will start spotting independent loops in real code and knowing instantly which pattern fits.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function processFast(items) {
+  const promises = items.map((item) =&gt; delayValue(item, 300));
+  const results = await Promise.all(promises);
+  console.log(results);
+}
+
+processFast([&quot;A&quot;, &quot;B&quot;, &quot;C&quot;]);</code></pre>
+<p>When the list is long, consider processing it in small batches with Promise.all inside a loop, so you gain parallelism without sending hundreds of requests at once and overwhelming the server.</p>
+<p>Batching also makes error reports clearer, because a failed batch can be retried as a group without restarting the entire list from the beginning.</p>
+<p class="check"><strong>Check:</strong> What are the two steps in the fast parallel loop pattern, and why must they stay separate?</p>
+<h2>Section 14: async Functions Always Return Promises</h2>
+<p>It is worth repeating this rule until it feels obvious, because it explains so many beginner surprises: an async function always returns a promise, no matter what you return inside it. Return a number, and the caller gets a promise for that number. Return a string, and the caller gets a promise for that string. Return nothing at all, and the caller gets a promise that resolves to undefined. Throw an error, and the caller gets a promise that rejects with that error. There is no way to make an async function return a plain, immediate value, because the function may pause, and the language needs a container for a future result.</p>
+<p>This rule also explains why you cannot simply call an async function and use its result on the next line in ordinary code. The next line runs before the async function has finished, so the value is not ready yet. You must wait, either with await inside another async function or with then. Code that forgets this step often shows a promise object in the console, or tries to read a property from a promise and gets undefined. When you see those symptoms, check whether you forgot to await an async call. In most cases, that is the entire bug.</p>
+<p>Another consequence is that async functions compose neatly. Because every async function returns a promise, you can await one async function inside another, chain them with then, or pass them to Promise.all. This uniformity is a design strength. You do not need special handling for different kinds of async functions; they all speak promises. That is why libraries and frameworks can treat your async functions the same way they treat any other promise-producing code, without knowing your implementation details.</p>
+<p>It also helps to understand what happens when an async function throws before any await. Even then, the caller does not get a thrown exception in the ordinary sense. They get a rejected promise. If the caller does not handle that rejection, the runtime will report an unhandled rejection. This is subtly different from a regular function, where a throw propagates immediately to the caller. In async code, failure always travels as a rejected promise, which is why try and catch inside the function, or catch on the returned promise, are both valid handling points.</p>
+<p>When you internalise this rule, async code stops feeling magical and starts feeling mechanical. Inside, write normally. Outside, always expect a promise. That single expectation will guide you through debugging, through API design, and through reading other people&#x27;s code, because you will always know what shape of value you are holding at any point.</p>
+<pre><code>async function getName() {
+  return &quot;Ada&quot;;
+}
+
+const promise = getName();
+console.log(promise);
+promise.then((name) =&gt; console.log(&quot;Name: &quot; + name));</code></pre>
+<p>This rule also applies to async methods on objects and classes, not just standalone functions, so wherever you see async, you should expect a promise as the return value without exception.</p>
+<p class="check"><strong>Check:</strong> If an async function returns nothing, what does its caller actually receive?</p>
+<h2>Section 15: Chaining async Functions Together</h2>
+<p>Real programs rarely consist of a single async function. They consist of several async helpers that call each other, passing results along a chain. For example, one function might load a user id, another might load that user&#x27;s profile, and a third might load the profile&#x27;s recent activity. Chaining these helpers with await produces code that reads like a story, with each chapter building on the last. The key skill is to keep each helper focused on one job, so that the chain stays easy to follow and easy to test in isolation.</p>
+<p>When you chain async functions, each link awaits the previous one if it needs its result. The top-level function might look like this in words: get the user, then get their posts, then format the first post for display. Each helper returns a promise, each await unwraps it, and the final value flows back up the chain. If any link fails, the error propagates up the chain as a rejected promise until something catches it. This propagation is convenient, because you do not need error handling in every single helper. You can let errors bubble to a central handler that knows how to show a message or retry.</p>
+<p>Keeping helpers small also makes reuse easier. A helper that loads a user by id can be used by many features, not just one chain. A helper that formats a post can be tested with fake data without any network access. When helpers grow too large, chains become tangled, and a change in one place ripples unpredictably. A good habit is to ask, for each helper, whether its name describes exactly one job. If the name contains the word and too many times, such as loadUserAndPostsAndFormat, it is probably doing too much and should be split.</p>
+<p>Error handling in chains deserves deliberate thought. You can catch errors at the top, in the middle, or at the bottom, depending on where recovery makes sense. Catching at the top gives a single place for user-facing messages. Catching in the middle lets a helper provide a fallback and allow the chain to continue. Both are valid, and the best programs use both: helpers handle recoverable failures locally, and the top level handles anything that escapes. Practise both styles, so that you can choose based on whether a failure should stop the chain or merely change its path.</p>
+<p>Finally, remember that chaining does not mean everything must be sequential. Within a chain, you can still use Promise.all for independent branches. A chain might load a user, then load posts and notifications in parallel, then combine them. Mixing sequential and parallel steps in one chain is normal and powerful. The chain expresses dependencies, and parallel groups express independence, giving you both clarity and speed in the same function.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function getUserId() {
+  return delayValue(7, 200);
+}
+
+async function getUser(id) {
+  return delayValue({ id: id, name: &quot;Ada&quot; }, 200);
+}
+
+async function showChain() {
+  const id = await getUserId();
+  const user = await getUser(id);
+  console.log(user.name);
+}
+
+showChain();</code></pre>
+<p class="check"><strong>Check:</strong> Why should each async helper in a chain do only one job?</p>
+<h2>Section 16: Simulating Slow Work with setTimeout Promises</h2>
+<p>When you are learning async programming, you need a reliable way to practise without depending on a real server. Wrapping setTimeout in a promise gives you exactly that. A setTimeout promise waits for a given number of milliseconds and then resolves, mimicking a network request, a file read, or any other slow job. You control the delay, you control whether it succeeds or fails, and you can run it anywhere, even offline. This makes it an ideal learning tool and a standard technique for prototypes and tests.</p>
+<p>The pattern is short and worth memorising. You create a new promise, and inside its executor you call setTimeout with a callback that calls resolve, or reject if you want to simulate failure. The delay argument lets you experiment with timing: a short delay feels instant, a long delay makes loading states visible, and different delays for different jobs make parallel behaviour obvious. By varying delays, you can see which job finishes first, how Promise.all waits for the slowest, and how race picks a winner.</p>
+<p>Simulated slow work also helps you design user interfaces before real data exists. Suppose you are building a dashboard but the API is not ready yet. You can write your loading, success, and error states against delayed promises that return fake data. When the real API arrives, you swap the fake helper for a real fetch call, and the rest of your code, including await, try, and catch, stays the same. This separation between slow work and user interface logic is a professional habit that keeps projects moving even when dependencies are delayed.</p>
+<p>In tests, delayed promises let you check timeouts, retries, and loading states without waiting for real network conditions. You can make a helper fail twice and succeed on the third try, then verify that your retry logic handles it. You can make a helper take longer than your timeout, then verify that your timeout logic fires. These controlled experiments are far more reliable than hoping a real server behaves badly at the right moment. Good tests use fake slow work deliberately, not accidentally.</p>
+<p>As you work through this chapter, use delayed promises freely for every experiment. Change the delays, make some jobs fail, and watch how your code responds. That playful experimentation is how async intuition forms. When you later replace delays with real fetch calls, you will find that nothing fundamental changes. The promises are real, the awaits are the same, and the patterns you practised transfer directly to production code.</p>
+<pre><code>function wait(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function demoWait() {
+  console.log(&quot;Starting&quot;);
+  await wait(500);
+  console.log(&quot;500 milliseconds later&quot;);
+}
+
+demoWait();</code></pre>
+<p>You can also vary the delay by item, for example making the second job slower than the first, to see clearly how parallel code waits for the slowest job while sequential code adds every delay together.</p>
+<p class="check"><strong>Check:</strong> Why is a setTimeout promise a useful stand-in for a real network request while learning?</p>
+<h2>Section 17: Fetching in Sequence Versus in Parallel</h2>
+<p>Fetching data is the most common async task in web development, and the choice between sequence and parallel fetching has real consequences for users. Sequential fetching means you fetch one resource, wait for it, then fetch the next. Parallel fetching means you start all fetches at once and wait for them together. Both are correct in different situations, and the difference is not just speed. It is also about dependencies, server load, and how partial failures should be handled.</p>
+<p>Sequential fetching is required when one fetch needs data from another. For example, you might fetch a list of categories, let the user pick one, and then fetch items in that category. You cannot fetch items before you know the category, so sequence is unavoidable. Sequential fetching is also gentler on servers, because it never sends more than one request at a time. For small devices, limited networks, or strict rate limits, that gentleness can be more important than raw speed. A program that respects its server is a program that stays unblocked.</p>
+<p>Parallel fetching shines when resources are independent. A home page that needs a banner, a product list, and a set of testimonials can fetch all three at once. The user sees the complete page sooner, and the server, if it can handle concurrent requests, is used efficiently. The code uses Promise.all or Promise.allSettled, as you have already learned, and the results arrive together. For dashboards and landing pages, parallel fetching is often the difference between a snappy experience and a sluggish one that loads piece by piece.</p>
+<p>There is also a middle path: fetch in batches. If you have fifty independent resources, fetching all fifty at once might overwhelm the server or the browser. Fetching them in batches of five, with Promise.all inside a loop, gives you a balance of speed and safety. You still gain parallelism within each batch, but you never have fifty requests in flight at once. Batching is an advanced technique, but it grows naturally out of the sequential and parallel patterns you already know. It is worth remembering for the day you face a long list.</p>
+<p>When you design a fetch strategy, start by listing dependencies. Draw arrows from each resource to the data it needs. Resources with no incoming arrows can run in parallel. Resources with arrows must wait. That simple diagram, even sketched on paper, prevents both kinds of mistake: waiting unnecessarily and fetching too early. Over time, this dependency thinking becomes automatic, and you will design efficient fetch plans without needing to draw them out.</p>
+<pre><code>function fakeFetch(name, ms) {
+  return new Promise((resolve) =&gt; {
+    setTimeout(() =&gt; resolve(name + &quot; data&quot;), ms);
+  });
+}
+
+async function parallelFetch() {
+  const results = await Promise.all([
+    fakeFetch(&quot;Banner&quot;, 300),
+    fakeFetch(&quot;Products&quot;, 400),
+    fakeFetch(&quot;Reviews&quot;, 300),
+  ]);
+  console.log(results);
+}
+
+parallelFetch();</code></pre>
+<p>When you sketch a fetch plan, label each fetch as dependent or independent, because that single label determines whether it belongs in a sequential chain or in a parallel group for best performance.</p>
+<p class="check"><strong>Check:</strong> How do you decide whether two fetches should run in sequence or in parallel?</p>
+<h2>Section 18: Building a Small Delay Helper</h2>
+<p>A small delay helper is one of the most useful utilities in async programming, and it is simple enough to write in a few lines. The helper takes a number of milliseconds and returns a promise that resolves after that delay. Once you have it, you can pause an async function for a readable amount of time with await delay(500), instead of writing setTimeout boilerplate every time. This tiny abstraction makes your code cleaner, your intentions clearer, and your experiments easier to run.</p>
+<p>Delay helpers appear in many real situations beyond learning. You might add a short delay before showing a loading spinner, so that fast requests do not cause a flicker. You might pause between retries, giving a struggling server time to recover. You might debounce user input by waiting briefly after the last keystroke before searching. In each case, the delay helper is the building block. It does not do the work itself; it simply creates a controlled pause that other logic can await. That separation keeps your main logic focused on what to do, not on how to wait.</p>
+<p>Writing the helper also reinforces promise construction. You use new Promise, you call setTimeout inside it, and you call resolve when the timer fires. There is no magic. If you want a helper that can also fail, you can add a second argument for failure, or you can create a separate helper. Keeping the basic delay helper simple and reliable is better than making it try to do everything. Small, well-named helpers compose into larger behaviours, while large, complicated helpers become hard to reuse.</p>
+<p>A common variation is a delay that resolves with a value, so you can write await delayValue(&quot;done&quot;, 500) and get the value back. This combines waiting and value delivery in one step, which is handy for simulations and tests. Another variation is a delay that can be cancelled, but cancellation is more advanced and involves AbortController or custom logic. For now, the simple version is enough, and it will serve you well through most of this chapter and beyond.</p>
+<p>Keep your delay helper in a utilities file or at the top of your experiment script, and reuse it everywhere. When you later replace simulated delays with real network calls, your await structure stays the same. That continuity is the point of good abstractions: they let you practise and prototype with fake work, then swap in real work without rewriting your control flow.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function withDelay() {
+  console.log(&quot;Wait for it&quot;);
+  await delay(400);
+  console.log(&quot;Done waiting&quot;);
+}
+
+withDelay();</code></pre>
+<p>A delay helper also makes demos clearer, because you can insert await delay(1000) between steps and watch each stage appear in order, which is ideal for teaching and for presentations.</p>
+<p>Keep the helper in a shared utilities file, so every script in your project can import the same delay logic instead of duplicating setTimeout code everywhere.</p>
+<p class="check"><strong>Check:</strong> What does a delay helper return, and why is that return type useful with await?</p>
+<h2>Section 19: Retrying a Failing Async Task</h2>
+<p>Networks fail, servers hiccup, and temporary glitches are a normal part of life on the internet. Retrying a failing async task is therefore a practical skill, not an exotic one. The basic idea is simple: try the task, and if it fails, try again, up to a maximum number of attempts. Between attempts, you often wait a little longer each time, a strategy called exponential backoff, which gives a struggling server time to recover instead of hammering it with immediate retries. A well-designed retry makes an application feel resilient, because a brief glitch does not become a user-visible failure.</p>
+<p>Implementing retry with async and await is straightforward. You write a loop that runs for a set number of attempts. Inside the loop, you try the task with await. If it succeeds, you return the result immediately. If it fails and attempts remain, you wait briefly and continue the loop. If it fails on the last attempt, you throw the error, letting the caller handle it. This structure is clear, testable, and easy to adjust. You can change the number of attempts, the delay, or the backoff strategy in one place, and every caller benefits.</p>
+<p>Not every failure should be retried. A network timeout or a server error with status five hundred might succeed on retry, but a request for a resource that does not exist will fail the same way every time. Retrying the second kind wastes time and server resources. Good retry logic therefore distinguishes retriable errors from permanent ones, either by error type, by status code, or by a flag on the error. For learning purposes, retrying any error a few times is acceptable, but in production code, you should be selective and document which errors qualify for retry.</p>
+<p>You should also be careful about retrying operations that change state, such as charging a payment or creating an order. Retrying such an operation could create duplicates if the first attempt actually succeeded but its response was lost. Those operations need idempotency, a way to safely repeat a request without duplicating its effect, which is beyond the scope of this chapter. For read-only operations, such as fetching data, retries are generally safe. Keep that distinction in mind, and you will avoid one of the most expensive retry mistakes.</p>
+<p>Practise retry by writing a helper that fails twice and succeeds on the third try, then wrap it in retry logic and watch it succeed. Then make it fail always, and watch the retry logic give up gracefully after the maximum attempts. Those two experiments cover the happy path and the sad path, and they build confidence that your retry code behaves correctly when real networks misbehave.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function retry(task, attempts) {
+  for (let i = 1; i &lt;= attempts; i++) {
+    try {
+      return await task();
+    } catch (error) {
+      if (i === attempts) {
+        throw error;
+      }
+      await delay(200 * i);
+    }
+  }
+}
+
+let count = 0;
+async function flaky() {
+  count += 1;
+  if (count &lt; 3) {
+    throw new Error(&quot;Flaky failure &quot; + count);
+  }
+  return &quot;Success on try &quot; + count;
+}
+
+retry(flaky, 4).then((value) =&gt; console.log(value));</code></pre>
+<p>For a retry to be fair, log each attempt with its number and error, so you can tell whether failures are transient glitches that recover quickly or persistent problems that need investigation.</p>
+<p class="check"><strong>Check:</strong> Why should you not retry every kind of failure indefinitely?</p>
+<h2>Section 20: Adding a Timeout to an Async Task</h2>
+<p>A timeout is a promise that you will not wait forever. Without one, a slow or hung request can leave a user staring at a spinner indefinitely, unsure whether to wait, refresh, or give up. With a timeout, you set a clear limit: if the task has not finished within, say, five seconds, you treat it as failed and let the user retry or try an alternative. This is a kindness to users, because it replaces uncertainty with a decision point, and it is a protection for your program, because it prevents one slow job from blocking everything that depends on it.</p>
+<p>The classic implementation uses Promise.race. You race the real task against a timeout promise that rejects after the limit. Whichever settles first wins. If the task wins, you get its result. If the timeout wins, you get a timeout error, which you can catch and handle like any other failure. The code is short, but the concept is powerful, because it turns an open-ended wait into a bounded one. You can wrap any promise-returning task in a timeout helper and reuse it everywhere, giving your whole application consistent time limits.</p>
+<p>One caveat is that racing does not cancel the underlying task. If the real request eventually completes after the timeout, its result is ignored, but the request still happened on the server. For read-only fetches, this is usually harmless. For writes, it can be confusing, because a timed-out write might still succeed on the server even though the user saw a timeout message. As with retries, you should think carefully before applying timeouts to state-changing operations, and you should design your server interactions to handle duplicate or delayed requests safely where possible.</p>
+<p>Choosing a timeout value is a judgement call. Too short, and slow but legitimate requests will fail unnecessarily, frustrating users on slow networks. Too long, and users will still wait too long before getting feedback. A common starting point is five to ten seconds for ordinary data fetches, with longer limits for large uploads or complex reports. You can also adjust timeouts by context: a search might deserve a short timeout, while a file upload deserves a longer one. The key is to pick a value deliberately and to test it on a slow connection, not just on fast Wi-Fi.</p>
+<p>In modern browsers, fetch also supports AbortController, which can genuinely cancel a request, not just ignore its result. That is a more advanced technique, and it pairs well with timeouts. For now, the race-based timeout helper teaches the core idea: bound your waits, handle timeout errors gracefully, and always give the user a next step. That habit alone will make your applications feel far more professional.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+function withTimeout(promise, ms) {
+  const timeout = new Promise((_, reject) =&gt; {
+    setTimeout(() =&gt; reject(new Error(&quot;Timed out&quot;)), ms);
+  });
+  return Promise.race([promise, timeout]);
+}
+
+withTimeout(delayValue(&quot;Too slow&quot;, 1000), 300)
+  .then((value) =&gt; console.log(value))
+  .catch((error) =&gt; console.log(error.message));</code></pre>
+<p class="check"><strong>Check:</strong> Why does a timeout improve the user experience even when the underlying task might still succeed later?</p>
+<h2>Section 21: Loading Data on a Button Click</h2>
+<p>Async code becomes tangible when you connect it to a user interface, and a button click is the simplest connection. The pattern is familiar: the user clicks a button, your code starts an async load, the interface shows that work is happening, and when the data arrives, the interface updates. This pattern appears in search buttons, refresh buttons, load-more buttons, and countless other features. Learning to wire it correctly, including handling rapid clicks and errors, is a core front-end skill.</p>
+<p>The basic structure uses an event listener on a button, with an async callback. Inside the callback, you await the data load, then update the page with the result. Because the callback is async, it returns a promise, but the browser does not care about that promise; it simply runs the handler and lets it pause and resume as needed. You must still handle errors inside the handler, because an unhandled rejection in an event handler will not show a friendly message by itself. Wrapping the load in try and catch, and displaying the error in the page, is therefore essential.</p>
+<p>Rapid clicks are a practical concern. If a user clicks load twice quickly, you might start two loads and display whichever finishes last, which could be stale data. Simple protections include disabling the button while loading, ignoring clicks while a load is in progress, or tracking a request id and only displaying the latest result. For beginners, disabling the button is the clearest protection, and we will explore it in the next section. The important point is to think about what happens when the user does not wait politely, because real users rarely do.</p>
+<p>Updating the interface after loading also deserves care. You should clear old error messages before starting, show a loading indicator, and then replace it with either data or an error message. If you leave an old error visible while new data loads, users may think the new load also failed. If you leave a loading indicator visible after an error, users may think the program is still working. Clean transitions between states, loading, success, and error, make an interface feel trustworthy, even when the underlying data work is simple.</p>
+<p>Try building a tiny page with a button, a status paragraph, and a result area, using a delayed promise as your data source. Click the button, watch the status change, and watch the result appear. Then make the fake load fail sometimes, and watch your error handling work. That small, complete loop, click, wait, display, is the foundation of almost every data-driven interface you will ever build.</p>
+<pre><code>async function fakeLoad() {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 500));
+  return &quot;Loaded data at &quot; + new Date().toLocaleTimeString();
+}
+
+async function onLoadClick() {
+  try {
+    const data = await fakeLoad();
+    console.log(data);
+  } catch (error) {
+    console.log(&quot;Load failed: &quot; + error.message);
+  }
+}
+
+onLoadClick();</code></pre>
+<p>Always clear the previous result or error message when a new load starts, otherwise users may mistake old content for fresh content while the new request is still travelling to the server.</p>
+<p class="check"><strong>Check:</strong> Why must an async button handler include its own error handling?</p>
+<h2>Section 22: Showing Loading State While You Wait</h2>
+<p>A loading state is the interface&#x27;s way of saying, I heard you, I am working on it, please wait a moment. Without it, users click a button, nothing appears to happen for a second or two, and they assume the click did not register. They click again, and again, creating duplicate requests and confusion. With a clear loading state, such as a spinner, a progress message, or a disabled button with the text Loading, users understand that work is in progress and they wait patiently. This small courtesy dramatically improves perceived performance, even when actual performance is unchanged.</p>
+<p>Implementing a loading state with async and await is straightforward because you know exactly when work starts and when it ends. Before the await, you show the loading indicator. After the await, in both success and error paths, you hide it. Using finally for the hiding step is ideal, because finally runs whether the await succeeded or failed, guaranteeing that the spinner never gets stuck. Forgetting to hide the spinner on error is a classic bug that leaves users trapped on a loading screen even though the work has finished, so finally is not just convenient, it is protective.</p>
+<p>The content of the loading state matters too. A generic spinner is better than nothing, but a specific message is better still. Loading your profile is clearer than Loading, and it reassures the user that the right work is happening. For longer tasks, a progress indicator or a series of status messages can help even more, although progress for network requests is often approximate. The goal is not to be precise, but to be communicative. Users tolerate waiting far better when they know what is being waited for and that progress is being made.</p>
+<p>You should also consider what the rest of the page does while loading. Should other buttons remain active, or should the whole form be disabled? For a simple data load, leaving the rest of the page active is usually fine. For a form submission, disabling the form prevents duplicate submissions and conflicting edits. There is no single rule, but there is a single question to ask: what could go wrong if the user acts while this load is in progress. Answering that question will guide you to the right level of disabling and the right loading message.</p>
+<p>Finally, remember that loading states should be fast to appear and quick to disappear. If a load finishes in fifty milliseconds, flashing a spinner for that brief moment can feel like a flicker. Some developers add a tiny delay before showing the spinner, so that only genuinely slow loads display it. That refinement is optional, but it shows the kind of attention to detail that separates a polished interface from a merely functional one. Start with a simple, reliable loading state, and refine it as you gain experience.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function loadWithState() {
+  console.log(&quot;Status: Loading&quot;);
+  try {
+    await delay(500);
+    console.log(&quot;Status: Done&quot;);
+  } finally {
+    console.log(&quot;Status: Loading indicator hidden&quot;);
+  }
+}
+
+loadWithState();</code></pre>
+<p class="check"><strong>Check:</strong> Why is finally the safest place to hide a loading indicator?</p>
+<h2>Section 23: Disabling Buttons During Async Work</h2>
+<p>Disabling a button while its async work is running is a simple, effective way to prevent duplicate actions. When a user clicks submit, save, or buy, and the button stays enabled while the request travels to the server, an impatient double-click can send the request twice. That can create duplicate orders, duplicate posts, or duplicate charges, depending on the action. Disabling the button immediately on click, and re-enabling it when the work settles, closes that gap. It is a small change with outsized protective value.</p>
+<p>The implementation follows the same try, catch, finally pattern as loading states. Before the await, set the button&#x27;s disabled property to true and perhaps change its text to indicate work in progress, such as Saving. Inside try, await the async work and handle success. Inside catch, handle errors and inform the user. Inside finally, set disabled back to false and restore the original text. Because finally runs on both paths, the button is never left permanently disabled after an error, which would trap the user with no way to retry. That guarantee is the reason finally is so valuable in interface code.</p>
+<p>Disabling alone is not always enough, because users can sometimes trigger the same action through other means, such as pressing Enter in a form or using keyboard shortcuts. A complementary protection is a flag variable, such as isSaving, that you check at the start of the handler and set while work is in progress. If the handler is called again while the flag is true, it returns early without starting duplicate work. Combining a disabled button for visual feedback with a flag for logical protection gives you defence in depth, which is a good habit for any action that changes state.</p>
+<p>You should also think about what the user sees while the button is disabled. A greyed-out button with no explanation can feel broken, especially if the work takes several seconds. Pairing the disabled state with a clear status message, such as Saving your changes, please wait, reassures the user that the program is working, not frozen. When the work finishes, the status message should update to success or error, and the button should return to its normal state, ready for the next action. Those transitions, taken together, create a sense of a responsive, trustworthy interface.</p>
+<p>As with loading states, practise this pattern with a fake async task first. Click rapidly, watch duplicate clicks get ignored, and confirm that the button re-enables after both success and failure. That experiment will convince you of the value far more than reading about it, and it will give you a reusable pattern you can drop into forms, checkout flows, and any other place where a double action would cause trouble.</p>
+<pre><code>let isSaving = false;
+
+async function fakeSave() {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 500));
+  return &quot;Saved&quot;;
+}
+
+async function onSaveClick() {
+  if (isSaving) {
+    console.log(&quot;Already saving, ignoring click&quot;);
+    return;
+  }
+  isSaving = true;
+  console.log(&quot;Button disabled, saving&quot;);
+  try {
+    const result = await fakeSave();
+    console.log(result);
+  } finally {
+    isSaving = false;
+    console.log(&quot;Button enabled again&quot;);
+  }
+}
+
+onSaveClick();
+onSaveClick();</code></pre>
+<p class="check"><strong>Check:</strong> Why should a button be re-enabled in finally rather than only after success?</p>
+<h2>Section 24: Sequential Form Steps with await</h2>
+<p>Many real workflows consist of sequential form steps, where each step must complete before the next begins. Consider a signup flow: first create the account, then upload a profile picture, then send a welcome email. Each step depends on the previous one, either because it needs an id created earlier or because it should not happen if an earlier step failed. Async and await express this sequence beautifully, because each step is an await, and the order in the code matches the order in the real world. If any step fails, the sequence stops, and you can handle the failure at the point where it matters.</p>
+<p>Designing sequential steps well means thinking about what to do when a step fails midway. Suppose the account is created but the picture upload fails. Should you roll back the account, retry the upload, or let the user retry just the upload later? There is no universal answer, but there is a universal principle: do not leave the user in an unknown state. Tell them which step succeeded and which failed, and give them a clear way to continue or retry. A vague error message, such as Something went wrong, is unhelpful when the user needs to know whether their account exists. Specific messages, tied to specific steps, are far more useful.</p>
+<p>You can structure sequential steps as a series of awaits in one function, or as a series of helper functions called in order. For short sequences, a single function with clear comments is fine. For longer sequences, helpers keep each step testable and reusable. You might have createAccount, uploadPicture, and sendWelcomeEmail as separate async functions, and a top-level signup function that awaits them in order. That structure also makes it easy to add a new step later, or to reorder steps, without rewriting the whole flow.</p>
+<p>Progress feedback is especially important for multi-step sequences, because users may wait through several slow steps. Updating a progress message after each await, such as Account created, uploading picture, keeps users informed and patient. Without such feedback, a multi-step flow can feel like a single, mysterious wait, and users may abandon it. With feedback, each completed step is a small reassurance that progress is being made, even if the total time is the same.</p>
+<p>Practise by writing a three-step fake signup flow with delayed promises, where the second step sometimes fails. Handle the failure, report which step failed, and allow a retry of just that step. That exercise combines sequential awaits, error handling, and user feedback in one realistic scenario, and it will prepare you for the far more complex workflows you will build in real applications.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function signupFlow() {
+  try {
+    const account = await delayValue({ id: 1 }, 300);
+    console.log(&quot;Account created: &quot; + account.id);
+    const picture = await delayValue(&quot;picture uploaded&quot;, 300);
+    console.log(picture);
+    const email = await delayValue(&quot;welcome email sent&quot;, 300);
+    console.log(email);
+  } catch (error) {
+    console.log(&quot;Signup failed: &quot; + error.message);
+  }
+}
+
+signupFlow();</code></pre>
+<p>If a later step needs an identifier from an earlier step, store that identifier in a clearly named variable immediately after the await, so later steps read naturally and are easy to debug.</p>
+<p class="check"><strong>Check:</strong> If step two of a three-step sequence fails, what should the user be told and why?</p>
+<h2>Section 25: Validating Before You Await</h2>
+<p>Validation before awaiting is a habit that saves time, server resources, and user frustration. The idea is simple: check that inputs are sensible before starting slow async work. If a form field is empty, an email address is malformed, or a required file is missing, there is no point sending a request to the server and waiting for it to fail. Catch the problem locally, show a clear message immediately, and let the user fix it without a round trip. This makes your application feel faster, because errors appear instantly, and it reduces unnecessary load on your server.</p>
+<p>Validation and async error handling are complementary, not substitutes. Local validation catches problems you can detect without the server, such as empty fields or obviously invalid formats. Server-side validation and async error handling catch problems only the server can know, such as a username that is already taken or a payment that was declined. A robust program does both. It validates locally first for speed and clarity, then handles server errors gracefully when they occur. Relying on only one layer leaves gaps that users will eventually fall through.</p>
+<p>The code pattern is to validate at the start of your async handler, before any await. If validation fails, show the message and return early, without starting the async work. This early return keeps the rest of the function clean, because the code after validation can assume inputs are at least basically valid. You do not need nested conditionals wrapping the entire async flow. The function reads as a series of guards followed by the main work, which is a style that experienced developers favour for readability.</p>
+<p>Validation messages should be specific and actionable. Enter your email address is better than Invalid input. Password must be at least eight characters is better than Weak password. When a user sees a specific message, they know exactly what to fix. When they see a vague message, they must guess, and guessing leads to repeated failures and abandonment. Good validation is therefore not just a technical check; it is a piece of user communication, and it deserves the same care as any other message your program shows.</p>
+<p>As you practise, build a small async save function that first checks for an empty name and an invalid age, returns early with a message if either fails, and only then awaits a fake save. Try valid and invalid inputs and notice how much faster invalid inputs are handled. That speed difference is the user experience benefit of validating before you await, and it is a habit that will serve you in every form, search box, and settings page you build.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function saveProfile(name) {
+  if (!name || name.trim() === &quot;&quot;) {
+    console.log(&quot;Please enter a name before saving.&quot;);
+    return;
+  }
+  await delay(300);
+  console.log(&quot;Saved profile for &quot; + name);
+}
+
+saveProfile(&quot;&quot;);
+saveProfile(&quot;Ada&quot;);</code></pre>
+<p>Validation should also run again on the server, because client-side checks can be bypassed, so treat local validation as a kindness for speed, not as a security boundary.</p>
+<p class="check"><strong>Check:</strong> Why is it wasteful to start an async request before checking that inputs are valid?</p>
+<h2>Section 26: Async Functions and Event Handlers</h2>
+<p>Event handlers are the bridge between user actions and async work, and they deserve special attention because their execution model is slightly different from ordinary function calls. When a user clicks a button, types in a field, or submits a form, the browser calls your handler and does not wait for its result. If your handler is async, it returns a promise that the browser simply ignores. That is fine, as long as you handle errors inside the handler itself. An error that escapes an async event handler becomes an unhandled rejection, not a visible message, and the user will be left wondering why nothing happened.</p>
+<p>This is why the pattern for async event handlers is always the same: mark the handler async, wrap the awaited work in try and catch, and update the interface in both paths. You should also manage loading state and button disabling inside the handler, as covered in previous sections, because the handler is the place where user intent meets slow work. Keeping all of that logic together makes the handler easy to review: a reader can see the click, the loading state, the await, the success update, and the error update in one place, without hunting across files.</p>
+<p>Another consideration is that event handlers can fire rapidly and repeatedly. A user might click a button many times, scroll quickly triggering many load events, or type fast triggering many search events. Without protection, each event starts a new async job, and results may arrive out of order, displaying stale data. Protections include disabling controls, debouncing input, ignoring events while work is in progress, and tracking the latest request so that only its result is displayed. Which protection fits depends on the event, but the question to ask is always the same: what happens if this event fires again before the last job finished.</p>
+<p>It is also helpful to keep event handlers thin. A handler should gather input, call an async helper, and update the interface. It should not contain complex business logic or long sequences of awaits that belong in a helper function. Thin handlers are easier to test, because you can test the helper without simulating clicks, and they are easier to reuse, because the same helper can be called from a button, a keyboard shortcut, or an automatic load. When a handler grows long, consider extracting its core work into a named async function and leaving the handler as a small wrapper.</p>
+<p>Practise by writing a handler that loads fake data on click, with loading state, error handling, and double-click protection. Then trigger it rapidly and confirm that only one load runs at a time and that the interface ends in a sensible state. That small, disciplined handler is the template for almost every interactive async feature you will build, from search boxes to checkout buttons.</p>
+<pre><code>let loading = false;
+
+async function fakeLoad() {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 400));
+  return &quot;Data loaded&quot;;
+}
+
+async function handleClick() {
+  if (loading) {
+    return;
+  }
+  loading = true;
+  try {
+    const data = await fakeLoad();
+    console.log(data);
+  } catch (error) {
+    console.log(&quot;Failed: &quot; + error.message);
+  } finally {
+    loading = false;
+  }
+}
+
+handleClick();</code></pre>
+<p class="check"><strong>Check:</strong> Why does an error escaping an async event handler not automatically show a message to the user?</p>
+<h2>Section 27: Awaiting User Confirmation</h2>
+<p>Some async work should not start until the user confirms it, especially when the action is destructive or expensive. Deleting an account, cancelling an order, or sending a payment are actions where a confirmation step protects both the user and the program. In browser code, confirmation can be a simple dialog, a modal window, or a custom prompt. The async challenge is that confirmation itself takes time: the program must wait for the user to decide before proceeding, and that waiting should not block the rest of the page.</p>
+<p>A clean way to model confirmation as async work is to wrap it in a promise that resolves to true when the user confirms and false when they cancel. Your main async function can then await that promise, check the result, and either proceed or return early. This pattern turns a user decision into just another awaited step, fitting naturally into a sequence of async operations. The code reads clearly: wait for confirmation, if confirmed then delete, otherwise do nothing. That clarity is valuable, because confirmation logic is easy to get tangled when it is mixed with callbacks and nested handlers.</p>
+<p>In real browser code, the built-in confirm dialog is synchronous and blocks, which is simple but also freezes the page and looks dated. Modern applications usually use a custom modal that returns a promise. Building such a modal is beyond this chapter, but understanding the promise shape prepares you for it. Whether the dialog is built-in or custom, the async pattern is the same: ask, await the answer, act on it. When you later build a modal component, you will wrap its buttons in a promise and reuse this exact flow.</p>
+<p>Confirmation also interacts with loading and disabling patterns. While waiting for confirmation, the original button should not be disabled permanently, because the user has not yet decided. Once they confirm, the async work begins, and then disabling and loading states become appropriate. Keeping these phases distinct, asking, then working, then done, helps users understand where they are in the flow and what will happen next. A confused user is more likely to cancel or to click repeatedly, so clear phases reduce both problems.</p>
+<p>Practise this pattern with a simulated confirmation promise that resolves after a short delay, representing a user clicking yes. Write a delete function that awaits confirmation, proceeds only if confirmed, and logs a cancellation message otherwise. Change the simulated answer and watch both paths. That exercise teaches the essential skill: treating a human decision as an awaitable step in an otherwise automated sequence.</p>
+<pre><code>function askConfirm(answer) {
+  return new Promise((resolve) =&gt; {
+    setTimeout(() =&gt; resolve(answer), 200);
+  });
+}
+
+async function deleteItem(confirmedAnswer) {
+  const confirmed = await askConfirm(confirmedAnswer);
+  if (!confirmed) {
+    console.log(&quot;Delete cancelled by user&quot;);
+    return;
+  }
+  await new Promise((resolve) =&gt; setTimeout(resolve, 300));
+  console.log(&quot;Item deleted&quot;);
+}
+
+deleteItem(true);
+deleteItem(false);</code></pre>
+<p>For destructive actions, make the confirmation wording specific, naming the item to be deleted, so the user can confirm they are acting on the right item and not on a similarly named one.</p>
+<p class="check"><strong>Check:</strong> How can a user confirmation be represented as a promise that an async function can await?</p>
+<h2>Section 28: Working with Multiple APIs Together</h2>
+<p>Real applications rarely talk to a single API. A travel page might combine flights, hotels, and weather. A dashboard might combine sales, inventory, and customer feedback. Working with multiple APIs together requires the same skills you have already learned, sequence for dependencies and parallel for independence, plus a new layer of judgement about failure. When one API fails, should the whole page fail, or should the other sections still display? The answer depends on the feature, and your code should express that answer deliberately, not accidentally.</p>
+<p>Start by mapping dependencies between APIs. Some APIs depend on others: you might need a city id from one API before you can query weather from another. Those must run in sequence. Others are independent: flights and hotels for the same dates can be fetched in parallel. Drawing that map, even mentally, prevents both wasted waiting and premature fetching. Once the map is clear, the code follows naturally: sequential awaits for dependent calls, Promise.all or allSettled for independent groups, and a final step that combines the results into a single view for the user.</p>
+<p>Combining results is itself a skill. Results from different APIs often have different shapes, field names, and units. Your combining step should normalise them into a consistent shape for display, rather than letting each API&#x27;s quirks leak into your interface code. For example, one API might return temperature in Celsius and another in Fahrenheit. Normalising both to one unit before display avoids confusion and bugs. This normalisation step is a good place for a helper function that takes raw API results and returns a clean object your interface can trust.</p>
+<p>Failure handling for multiple APIs should be per-source, not all-or-nothing, unless the feature truly requires every source. Using allSettled lets you display successful sections and show a targeted warning for failed ones, such as Weather unavailable, other sections loaded. Users can still use most of the page, and they understand exactly what is missing. Using all, by contrast, would hide every successful section because of one failure, which feels disproportionate and frustrating. Choose the tool that matches the user&#x27;s need, not just the programmer&#x27;s convenience.</p>
+<p>As you practise, build a fake dashboard that loads three independent pieces of data in parallel, where one sometimes fails, and display the successes plus a warning for the failure. That exercise combines parallel fetching, partial failure handling, and result combining in one realistic scenario. It is the kind of code that appears in production dashboards every day, and mastering it will make you a valuable contributor to any team.</p>
+<pre><code>function fakeApi(name, ms, shouldFail) {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; {
+      if (shouldFail) {
+        reject(new Error(name + &quot; unavailable&quot;));
+      } else {
+        resolve(name + &quot; data&quot;);
+      }
+    }, ms);
+  });
+}
+
+async function loadDashboard() {
+  const results = await Promise.allSettled([
+    fakeApi(&quot;Sales&quot;, 300, false),
+    fakeApi(&quot;Weather&quot;, 300, true),
+    fakeApi(&quot;News&quot;, 300, false),
+  ]);
+  for (const result of results) {
+    if (result.status === &quot;fulfilled&quot;) {
+      console.log(&quot;Loaded: &quot; + result.value);
+    } else {
+      console.log(&quot;Warning: &quot; + result.reason.message);
+    }
+  }
+}
+
+loadDashboard();</code></pre>
+<p>When APIs return different field names for the same concept, normalise them early in your combining step, so display code works with one consistent shape instead of many API-specific shapes.</p>
+<p class="check"><strong>Check:</strong> When combining data from several APIs, why is per-source failure handling usually better than all-or-nothing?</p>
+<h2>Section 29: Merging Results from Parallel Calls</h2>
+<p>Once parallel calls have finished, you often need to merge their results into a single, useful value. Merging is more than just collecting an array; it is about creating a combined object that makes sense to the rest of your program. For example, parallel calls might return a user profile, a list of posts, and a list of notifications. Merging them into one dashboard object, with named fields for profile, posts, and notifications, gives the display code a single, predictable shape to work with. Without that merging step, display code would need to juggle three separate variables and remember their order, which is error-prone.</p>
+<p>The simplest merging pattern uses destructuring with Promise.all. You write const [profile, posts, notifications] = await Promise.all([...]), and immediately you have three clearly named variables. From there, you can build a combined object in one step. This pattern is readable because the names tell the story, and it is safe because Promise.all guarantees order. Even if notifications finish first, they will still land in the third variable, not the first. That order guarantee is what makes destructuring reliable for parallel results.</p>
+<p>When you use allSettled, merging requires a little more work, because you must handle both fulfilled and rejected entries. A helpful approach is to build the merged object field by field, checking each result&#x27;s status. For fulfilled entries, use the value. For rejected entries, use a fallback, such as an empty array or null, plus a warning. The merged object then always has the same shape, regardless of which sources succeeded. Display code can trust that shape and does not need to handle missing fields in many places. That consistency is worth the extra merging code.</p>
+<p>Merging can also involve transforming results, not just collecting them. You might need to join posts with their authors, sort combined lists by date, or remove duplicates that appear in two sources. Doing that transformation in one merging step, right after the parallel calls, keeps the rest of your program clean. If transformation logic is scattered across display code, it becomes hard to test and easy to duplicate. A single, well-named merge function, such as buildDashboardData, becomes a natural place to test with fake inputs and to adjust when an API changes.</p>
+<p>Practise merging by writing a function that loads a user and their posts in parallel, then returns a single object containing the user name and the post titles. Log the merged object and check its shape. Then extend it to handle a failing posts call with allSettled, returning an empty post list and a warning. That progression, from simple merge to resilient merge, mirrors how real features evolve, and it gives you a pattern you can reuse for dashboards, reports, and combined views.</p>
+<pre><code>function fakeApi(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function loadMerged() {
+  const [user, posts] = await Promise.all([
+    fakeApi({ name: &quot;Ada&quot; }, 200),
+    fakeApi([&quot;Hello&quot;, &quot;World&quot;], 300),
+  ]);
+  const merged = { userName: user.name, postTitles: posts };
+  console.log(merged);
+}
+
+loadMerged();</code></pre>
+<p class="check"><strong>Check:</strong> Why is it helpful to merge parallel results into one named object before displaying them?</p>
+<h2>Section 30: Handling Partial Failures Gracefully</h2>
+<p>Partial failure is the normal state of a distributed system. One service is slow, another is down, a third returns incomplete data, while the rest work perfectly. Handling partial failure gracefully means your program degrades instead of collapsing. It shows what it can, explains what it cannot, and offers a way forward, such as retrying the failed part or continuing with available data. Graceful degradation is a hallmark of mature software, because it respects the user&#x27;s time and attention even when conditions are imperfect.</p>
+<p>The technical foundation for graceful handling is already in your toolkit: allSettled for parallel groups, try and catch around individual steps, fallback values for missing data, and clear messages for failed sections. The design challenge is deciding, for each feature, what graceful means. For a news page, graceful might mean showing older cached articles when fresh ones fail to load. For a checkout page, graceful might mean stopping completely, because proceeding with partial payment data would be dangerous. The same technical tools serve both answers, but the product decision differs, and you should make it deliberately with your team or, for personal projects, by thinking carefully about user safety.</p>
+<p>Fallback values deserve special care. A fallback should be honest, not misleading. Showing an empty list with a note that data could not be loaded is honest. Showing an empty list with no note implies there is genuinely nothing to show, which is misleading if the load actually failed. Similarly, showing cached data should be labelled as cached, with its age if possible, so users do not mistake old data for fresh data. Honest fallbacks build trust, while silent fallbacks erode it, because users eventually discover the discrepancy and wonder what else is being hidden.</p>
+<p>Retry options are another part of graceful handling. For a failed section, offering a Retry button that reloads just that section is far better than forcing a full page reload. It is faster, it preserves the user&#x27;s place, and it respects the successful sections that already loaded. Implementing per-section retry is straightforward if your loading code is structured per section, which is another reason to keep async helpers focused and independent. When a section can be retried alone, partial failure becomes a minor inconvenience rather than a major disruption.</p>
+<p>Finally, log partial failures for debugging, even when you handle them gracefully for users. A user-facing message can be simple, such as Weather unavailable, while a log can include the error details, timestamp, and request information that developers need. That separation, simple for users and detailed for developers, is a professional habit that makes both groups happier. Users are not overwhelmed with technical text, and developers are not left guessing when they investigate a problem.</p>
+<pre><code>function fakeApi(name, shouldFail) {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; {
+      if (shouldFail) {
+        reject(new Error(name + &quot; failed&quot;));
+      } else {
+        resolve(name + &quot; data&quot;);
+      }
+    }, 200);
+  });
+}
+
+async function gracefulLoad() {
+  const results = await Promise.allSettled([
+    fakeApi(&quot;News&quot;, false),
+    fakeApi(&quot;Weather&quot;, true),
+  ]);
+  for (const result of results) {
+    if (result.status === &quot;fulfilled&quot;) {
+      console.log(&quot;Show: &quot; + result.value);
+    } else {
+      console.log(&quot;Show warning: &quot; + result.reason.message + &quot;, retry available&quot;);
+    }
+  }
+}
+
+gracefulLoad();</code></pre>
+<p class="check"><strong>Check:</strong> What is the difference between a graceful fallback and a misleading silent fallback?</p>
+<h2>Section 31: Cleaning Up After Async Work with finally</h2>
+<p>Finally is the cleanup block that runs whether an async operation succeeds or fails, and it is essential for reliable async code. Whenever you acquire a resource, show a loading indicator, disable a control, or start a timer before an await, you need a guarantee that cleanup will happen afterwards, even if the await throws. Finally provides that guarantee. Code in finally runs after try completes normally, after catch handles an error, and even if an error is rethrown. That reliability makes finally the right place for all must-happen cleanup.</p>
+<p>Common cleanup tasks include hiding spinners, re-enabling buttons, closing connections, clearing timers, and resetting flags such as isLoading. Without finally, you would need to duplicate cleanup code in both the success path and the error path, and you would risk forgetting one of them. Duplicated cleanup is a classic source of bugs, because a later change might update one copy and not the other. Finally eliminates duplication by giving you a single place for cleanup that always runs. That single place is easier to review, easier to test, and harder to break accidentally.</p>
+<p>It is important to understand what finally does not do. It does not swallow errors, and it does not change return values, unless you explicitly return or throw inside finally, which you should avoid. A return inside finally would override a return from try, and a throw inside finally would replace an original error, both of which are confusing. The best practice is to use finally only for cleanup that does not return or throw, such as hiding a spinner or resetting a flag. Keep it simple, keep it safe, and let try and catch handle values and errors.</p>
+<p>Finally also works with multiple awaits in a single try block. If the first await succeeds and the second fails, finally still runs once, after catch, cleaning up everything acquired before the try. That behaviour is exactly what you want for a sequence that acquires several resources. You do not need a finally for each await; one finally for the whole block covers the sequence. This makes finally scalable: as your async functions grow, a single cleanup block continues to protect them.</p>
+<p>As you write async code, develop the habit of asking, for every try block, what cleanup must happen afterwards. If the answer is anything at all, write a finally block immediately, before you write the success and error handling. That habit, cleanup first in your thinking, will prevent stuck spinners, disabled buttons, and leaked resources, and it will make your code feel polished even when things go wrong.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function workWithCleanup(shouldFail) {
+  console.log(&quot;Starting, spinner shown&quot;);
+  try {
+    await delay(200);
+    if (shouldFail) {
+      throw new Error(&quot;Work failed&quot;);
+    }
+    console.log(&quot;Work succeeded&quot;);
+  } catch (error) {
+    console.log(&quot;Caught: &quot; + error.message);
+  } finally {
+    console.log(&quot;Cleanup: spinner hidden&quot;);
+  }
+}
+
+workWithCleanup(false);
+workWithCleanup(true);</code></pre>
+<p>Cleanup in finally should be idempotent where possible, meaning running it twice has the same effect as running it once, which protects you if cleanup is ever triggered from more than one path.</p>
+<p class="check"><strong>Check:</strong> Why is finally safer than duplicating cleanup code in both success and error paths?</p>
+<h2>Section 32: Avoiding the Forgotten await Bug</h2>
+<p>The forgotten await bug is the most common async mistake, and it is easy to make because the code looks correct at first glance. You call an async function, forget to await it, and then try to use its result as if it were already available. Instead of a user object, you get a promise object. Instead of a list of posts, you get a promise. Properties read as undefined, array methods fail, and the program behaves strangely without an obvious error. The bug is subtle because JavaScript does not complain; a promise is a valid value, just not the value you expected.</p>
+<p>Spotting this bug starts with recognising its symptoms. If console.log shows Promise with a pending state where you expected data, you forgot an await. If a property is undefined even though you know the data exists, check whether the variable holds a promise. If an array method such as map fails with a message about not being a function, check whether you are calling it on a promise instead of an array. These clues point to the same root cause, and once you learn to recognise them, you will fix the bug in seconds rather than minutes.</p>
+<p>Preventing the bug is partly about naming and partly about habit. Naming async functions with verbs that imply slow work, such as loadUser or fetchPosts, reminds you that a promise is involved. Always pausing at an async call to ask, do I need the value here, or just the promise, builds the habit of awaiting when you need the value. Linters and TypeScript can also help by warning when a promise is used as if it were a plain value, but even without tools, a disciplined habit catches most cases. When in doubt, log the variable and check its type before using it.</p>
+<p>There is one case where forgetting await is actually intentional: when you want to start several jobs in parallel and await them later with Promise.all. In that case, you deliberately hold promises without awaiting them immediately. The difference is intent and structure. Intentional unawaited promises are collected in an array and awaited together shortly afterwards. Accidental unawaited promises are used as if they were values, or never awaited at all. Keeping that distinction clear will help you avoid both over-awaiting, which kills parallelism, and under-awaiting, which creates the forgotten await bug.</p>
+<p>When you find this bug in your own code, fix it at the call site by adding await, and make sure the enclosing function is async. If the enclosing function cannot be async, use then to handle the promise. Do not try to work around it by reading properties from the promise or by adding delays in hopes the promise will settle. Those workarounds are fragile and confusing. The correct fix is always to wait properly for the value you need.</p>
+<pre><code>async function getUser() {
+  return { name: &quot;Ada&quot; };
+}
+
+async function buggy() {
+  const user = getUser();
+  console.log(&quot;Buggy name: &quot; + user.name);
+}
+
+async function fixed() {
+  const user = await getUser();
+  console.log(&quot;Fixed name: &quot; + user.name);
+}
+
+buggy();
+fixed();</code></pre>
+<p class="check"><strong>Check:</strong> What console clue tells you that you forgot to await an async call?</p>
+<h2>Section 33: Why await Inside forEach Fails</h2>
+<p>The forEach method is a familiar way to loop over arrays, but it does not work as expected with async functions, and understanding why will save you considerable confusion. When you pass an async callback to forEach, forEach calls that callback for each item, but it does not wait for any of the callbacks to finish. It simply starts them all and moves on immediately. The callbacks run in parallel, their promises are discarded, and the code after forEach runs before any of the async work completes. If you expected sequential processing, you will be surprised. If you expected to catch errors, you may find that errors become unhandled rejections.</p>
+<p>The reason is that forEach was designed before async and await existed, and its contract is to call a function for each item and ignore its return value. An async callback returns a promise, but forEach ignores that promise, just as it would ignore any return value. There is no mechanism in forEach to await those promises, collect them, or propagate their errors. This is not a bug in forEach; it is a mismatch between an old tool and a new pattern. Using forEach with async callbacks is therefore a classic example of using the wrong tool for the job, even though the code looks plausible.</p>
+<p>The correct alternatives depend on what you need. For sequential processing, use a for...of loop with await inside it, as covered earlier. For parallel processing, use map to collect promises and then await Promise.all or allSettled. Both alternatives make the waiting explicit and give you proper error handling. The for...of version waits for each item in order, while the map plus Promise.all version waits for all items together. Choosing between them is the same sequential versus parallel decision you have already practised, just applied to a loop.</p>
+<p>A related pitfall is trying to use await inside forEach and expecting the outer function to pause. It will not. The outer function continues, because forEach itself is not async-aware. Only the individual callbacks pause, and they pause independently. This can lead to out-of-order logs, incomplete results, and race conditions that are hard to reproduce. If you see forEach with an async callback in code you are reviewing, treat it as a warning sign and check whether the author intended sequential, parallel, or fire-and-forget behaviour. Often, the intention was sequential, and a for...of loop is the fix.</p>
+<p>As a rule, reserve forEach for synchronous callbacks, where its simplicity shines. For async work, reach for for...of or map plus Promise.all. That simple rule will prevent a whole class of confusing bugs, and it will make your async loops readable to other developers who know to look for those patterns.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function withForEach() {
+  const items = [&quot;A&quot;, &quot;B&quot;, &quot;C&quot;];
+  items.forEach(async (item) =&gt; {
+    const result = await delayValue(item, 200);
+    console.log(&quot;forEach: &quot; + result);
+  });
+  console.log(&quot;forEach loop finished immediately&quot;);
+}
+
+withForEach();</code></pre>
+<p class="check"><strong>Check:</strong> Why does forEach not wait for async callbacks to finish?</p>
+<h2>Section 34: Using for...of for Ordered Async Work</h2>
+<p>The for...of loop is the natural partner for sequential async work, because it respects await in exactly the way beginners expect. When you write for (const item of items) { const result = await process(item); }, the loop pauses at each await, waits for that item to finish, and only then moves to the next item. The order of processing matches the order of the list, the order of logs matches the order of processing, and errors stop the loop at the item that failed, unless you catch them inside the loop. This predictability makes for...of the default choice for ordered async work.</p>
+<p>One useful variation is catching errors inside the loop, so that one failing item does not stop the entire loop. You place try and catch inside the loop body, around the await. If an item fails, you log the failure, perhaps record it in a failures list, and the loop continues to the next item. This pattern is ideal for batch processing where partial success is acceptable, such as importing a list of records where a few might be invalid. Without the inner catch, a single failure would abort the whole batch, which is often too harsh. With it, you get a complete report of successes and failures at the end.</p>
+<p>Another variation is breaking out of the loop early. Because for...of is an ordinary loop, you can use break to stop processing when a condition is met, such as finding a specific item or reaching a limit. This works naturally with await, because the loop checks the condition after each awaited item completes. You cannot break out of a Promise.all group in the same way, because all jobs have already started. For...of therefore gives you finer control over when to stop, which matters for searches, validations, and any process where early success should end the work.</p>
+<p>Performance is the trade-off, as always with sequential work. A for...of loop with await takes the sum of all item times, which can be slow for long lists of independent items. That is not a reason to avoid for...of, but it is a reason to confirm that order or control matters before choosing it. If order does not matter and you do not need early exit or per-item error handling, a parallel pattern may be faster. The skill is to choose for...of when its control benefits outweigh its speed cost, not to use it by default for every loop.</p>
+<p>Practise for...of with a list of delayed jobs, logging each result as it arrives. Then add an inner try and catch, make one job fail, and confirm that the loop continues. Those two experiments cover the core behaviours of ordered async loops, and they will give you confidence to use for...of whenever a task requires step-by-step async processing.</p>
+<pre><code>function delayValue(value, ms, shouldFail) {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; {
+      if (shouldFail) {
+        reject(new Error(value + &quot; failed&quot;));
+      } else {
+        resolve(value);
+      }
+    }, ms);
+  });
+}
+
+async function orderedLoop() {
+  const items = [&quot;A&quot;, &quot;B&quot;, &quot;C&quot;];
+  for (const item of items) {
+    try {
+      const result = await delayValue(item, 200, item === &quot;B&quot;);
+      console.log(&quot;Done: &quot; + result);
+    } catch (error) {
+      console.log(&quot;Skipped: &quot; + error.message);
+    }
+  }
+}
+
+orderedLoop();</code></pre>
+<p class="check"><strong>Check:</strong> How can a for...of loop continue past a failing item instead of stopping?</p>
+<h2>Section 35: Mapping to Promises Then Awaiting Them</h2>
+<p>Mapping to promises and then awaiting them is the parallel counterpart to the for...of loop, and it deserves a section of its own because its two-step structure is easy to get wrong. Step one is mapping: you call items.map with a function that starts async work for each item and returns its promise. Step two is awaiting: you pass the resulting array of promises to Promise.all or allSettled and await the combined result. Keeping these steps separate is crucial. If you await inside the map callback and try to collect values directly, you may end up with a confusing mix, or you may accidentally sequentialise work that should be parallel.</p>
+<p>The map function itself is synchronous in the sense that it runs immediately for each item, calling your async function and collecting its returned promise. It does not wait. That immediacy is what creates parallelism: by the time map finishes, all jobs have already started. Awaiting afterwards then waits for all of them together. This is the same pattern as Promise.all with a literal array, just generated from a list instead of written by hand. It scales beautifully, because it works for three items or three hundred items with the same code shape, although very large lists may need batching for server safety.</p>
+<p>Error handling in this pattern follows the same rules as Promise.all and allSettled. With all, one failure rejects the whole group. With allSettled, you get a report for each item, and you can separate successes from failures afterwards. Choosing between them depends on whether partial results are useful. For a product page where one missing product should not hide the others, allSettled is better. For a calculation that needs every input, all is better. The map step does not change that choice; it only generates the promises that the choice operates on.</p>
+<p>A common refinement is to map to promises that include their original item, so that results can be paired with inputs even after transformation. For example, you might map each item to a promise that resolves to an object containing both the item and its result. This is helpful when results alone are ambiguous, or when you need to display the original item alongside its loaded data. It is a small extra step in the map function, but it prevents index-matching bugs and makes the code more self-documenting.</p>
+<p>Practise this pattern with a list of names, mapping each to a delayed greeting promise, then awaiting all greetings together. Log the results and notice their order. Then change one job to fail and switch from all to allSettled, noticing how the handling changes. That pair of experiments will cement the map-then-await pattern as a reliable tool for parallel list processing.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function mapThenAwait() {
+  const items = [&quot;Ada&quot;, &quot;Ben&quot;, &quot;Chi&quot;];
+  const promises = items.map((name) =&gt; delayValue(&quot;Hello &quot; + name, 200));
+  const results = await Promise.all(promises);
+  console.log(results);
+}
+
+mapThenAwait();</code></pre>
+<p class="check"><strong>Check:</strong> What does map return when its callback is an async function, and what do you do with that return value?</p>
+<h2>Section 36: Async IIFE Patterns</h2>
+<p>An async immediately invoked function expression, often shortened to async IIFE, is a pattern for running async code at the top level of a script where await is not otherwise allowed. In a regular script, you cannot write await at the top level, because top-level code is not inside an async function. Wrapping your code in an async function and calling it immediately solves this: (async () =&gt; { const data = await loadData(); console.log(data); })();. The function is defined and invoked in one step, and inside it, await works normally. This pattern was widely used before top-level await became available in modules, and it still appears in many codebases.</p>
+<p>The shape can look intimidating at first because of the parentheses, but it breaks down simply. You write async, then an arrow function or function expression containing your code, then you wrap it in parentheses, then you add () to call it. The result is a promise that you can optionally handle with then and catch, although many IIFEs handle errors internally with try and catch. The pattern is essentially a way to create a small, private async scope on the spot, without naming a function or restructuring your file. That convenience is why it became popular for scripts, demos, and quick experiments.</p>
+<p>Async IIFEs are useful when you need to run a sequence of awaits as soon as a script loads, such as initialising an application, loading configuration, or fetching initial data. Instead of defining a named init function elsewhere and calling it later, you can write the initialisation inline as an IIFE, keeping the startup logic close to where it belongs. For larger applications, a named init function is usually clearer, because it can be tested and reused. For small scripts and examples, an IIFE is concise and idiomatic, and other developers will recognise it immediately.</p>
+<p>One caution is that errors inside an IIFE can become unhandled rejections if you do not catch them. Because the IIFE returns a promise that nobody may be holding, a thrown error has nowhere to go except the global unhandled rejection handler. Always wrap IIFE bodies in try and catch, or attach a catch to the IIFE call, to ensure errors are reported visibly. This is the same discipline as with event handlers: any async entry point that nobody awaits needs its own error handling, or failures will be silent.</p>
+<p>As modules with top-level await become more common, IIFEs are less necessary in new module code, but they remain important for reading older code and for scripts that are not modules. Learn to recognise the pattern, practise writing it, and you will be able to follow startup code in a wide range of projects, from small demos to production applications that still use this classic technique.</p>
+<pre><code>(async () =&gt; {
+  const data = await new Promise((resolve) =&gt; {
+    setTimeout(() =&gt; resolve(&quot;IIFE data&quot;), 200);
+  });
+  console.log(data);
+})();</code></pre>
+<p class="check"><strong>Check:</strong> Why would you wrap top-level async code in an IIFE in a non-module script?</p>
+<h2>Section 37: Top-Level await in Modules</h2>
+<p>Top-level await is a feature of JavaScript modules that allows you to use await directly at the top level of a module file, without wrapping your code in an async function. In a module, you can write const data = await loadData(); at the top level, and the module will pause its evaluation until that promise settles, before other modules that import it continue. This makes module initialisation code cleaner, because you do not need an IIFE or a separate init function just to wait for initial data. It is a natural extension of async and await to the module system.</p>
+<p>The key restriction is that top-level await only works in modules, not in classic scripts. A module is a file loaded with type=&quot;module&quot; in a browser, or a file with an .mjs extension or module package configuration in Node.js. If you try top-level await in a classic script, you will get a syntax error. This restriction exists because module evaluation has a well-defined order and dependency graph, which makes pausing safe, whereas classic scripts do not have the same guarantees. When you see top-level await in a file, you can therefore infer that the file is a module, which is a useful clue for understanding its loading behaviour.</p>
+<p>Top-level await also affects importers. When a module uses top-level await, any module that imports it will wait for that await to finish before its own top-level code runs. This creates a chain of waiting that can delay application startup if overused. For that reason, top-level await is best reserved for essential initialisation, such as loading configuration that everything else needs, rather than for every data fetch in an application. Using it for non-essential data can make startup feel slow, because the whole module graph pauses. A better pattern for non-essential data is to start loading in the background and await it later, when it is actually needed.</p>
+<p>Another consideration is error handling. If a top-level await rejects and is not caught, the module fails to evaluate, and importers will also fail. This is a strong failure mode, appropriate for essential configuration but harsh for optional data. Wrapping top-level awaits in try and catch, and providing fallbacks for non-essential data, keeps module loading resilient. As with other async entry points, the discipline is to handle errors where they occur, rather than letting them propagate silently to a distant failure.</p>
+<p>For this book, you do not need to use top-level await in your own exercises unless you are working in modules, but you should recognise it when you encounter it in real code and documentation. It is a sign of modern module code, and it simplifies initialisation in exactly the cases where an IIFE would previously have been needed. Knowing both patterns, IIFE for scripts and top-level await for modules, gives you a complete picture of how async code starts at the top level.</p>
+<pre><code>// In a module file, this top-level await is valid:
+// const user = await fetchUser();
+// console.log(user.name);
+
+async function fetchUser() {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  return { name: &quot;Ada&quot; };
+}
+
+fetchUser().then((user) =&gt; console.log(user.name));</code></pre>
+<p class="check"><strong>Check:</strong> Why does top-level await only work in modules and not in classic scripts?</p>
+<h2>Section 38: Async Arrow Functions</h2>
+<p>Async arrow functions combine two modern JavaScript features: arrow function syntax and async behaviour. You write async before the parameters, like const loadUser = async (id) =&gt; { const user = await fetchUser(id); return user; };. Inside, await works exactly as in any async function, and outside, the function returns a promise exactly as any async function does. Arrow syntax does not change async semantics; it only changes how the function is written and how this is handled, which is a separate topic covered elsewhere in this book. For async purposes, you can treat async arrow functions and async function declarations as interchangeable.</p>
+<p>Arrow async functions are especially common as callbacks, event handlers, and short helpers. For example, a button handler might be written as button.addEventListener(&quot;click&quot;, async () =&gt; { const data = await loadData(); display(data); });. The arrow keeps the handler concise and inline, without needing a separate named function. Similarly, array methods that need async work, such as map, often use async arrow callbacks, although you must still remember to collect and await the resulting promises, as discussed earlier. The conciseness of arrows makes them attractive, but it does not remove the need for careful await handling.</p>
+<p>One detail to note is the placement of async. It comes before the parameter list, even for a single parameter without parentheses in non-async arrows. With async, you must use parentheses if you have parameters, and the form is async (id) =&gt; { }, not async id =&gt; { } in all styles, although some parsers allow the latter. Using parentheses consistently avoids confusion and matches the style most teams prefer. For a function with no parameters, the form is async () =&gt; { }, which is clear and unambiguous.</p>
+<p>Another detail is implicit return. An async arrow with a concise body, such as const doubleLater = async (n) =&gt; n * 2;, still returns a promise, because async wraps the result. The concise body does not make the function synchronous. This can surprise beginners who expect a concise arrow to return a plain value, but the async rule overrides conciseness: async always means promise. Keeping that rule in mind prevents a whole class of forgotten await bugs in arrow-heavy code.</p>
+<p>In practice, choose between async function declarations and async arrow functions based on style and context, not on functionality. Use declarations for named, reusable helpers that deserve a clear name and hoisting. Use arrows for inline callbacks, short helpers assigned to variables, and event handlers where conciseness helps readability. Either way, the async behaviour is the same, and your await, try, and catch patterns transfer unchanged.</p>
+<pre><code>const greetLater = async (name) =&gt; {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  return &quot;Hello &quot; + name;
+};
+
+greetLater(&quot;Ada&quot;).then((message) =&gt; console.log(message));</code></pre>
+<p>When an async arrow function is used as a callback, remember that the caller may ignore its returned promise, so handle errors inside the callback rather than assuming the caller will catch them.</p>
+<p class="check"><strong>Check:</strong> Does using arrow syntax change what an async function returns?</p>
+<h2>Section 39: Passing async Functions as Callbacks</h2>
+<p>Passing an async function as a callback is common, but it requires care because the receiving code may not await the callback&#x27;s promise. When you pass a callback to a function, that function decides when and how to call it. If it calls your async callback and ignores the returned promise, errors inside your callback can become unhandled rejections, and the caller will not wait for your work to finish. This mismatch is the source of many async callback bugs, and it appears with event listeners, timers, array methods, and library functions alike.</p>
+<p>The first step is to understand the caller&#x27;s contract. Does it await callbacks, does it handle their promises, or does it ignore return values? Event listeners ignore return values, so async event handlers must handle their own errors. Array methods such as map collect return values, so async map callbacks produce promises you can await. Promise methods such as then do await callbacks in the sense that they chain their promises. Library functions vary, and their documentation should state whether callbacks may be async and how errors are handled. When documentation is unclear, assume the caller does not await, and handle errors inside your callback.</p>
+<p>A safe pattern for async callbacks is to wrap the body in try and catch and to ensure that any error is logged or displayed, not silently dropped. For example, an async click handler should catch its own errors and show a message, rather than relying on the browser to report a rejection. Similarly, an async callback passed to a timer should catch errors, because timers do not propagate callback errors to anyone. This self-contained error handling makes async callbacks robust regardless of the caller&#x27;s behaviour, which is important because callers change and documentation is sometimes incomplete.</p>
+<p>Another consideration is ordering. If a callback is called repeatedly, such as on every keystroke or scroll event, each call starts a new async job, and jobs may finish out of order. You may need debouncing, latest-only display, or cancellation to handle this, depending on the feature. These techniques build on the async patterns in this chapter, but they start with recognising that passing an async callback does not automatically give you ordering or cancellation. You must design those behaviours explicitly, rather than assuming the caller provides them.</p>
+<p>When you write a function that accepts callbacks, consider whether it should support async callbacks by awaiting them or returning their promises. Document that choice clearly, so callers know what to expect. Good callback design, like good async design in general, is about making promises explicit: who waits, who handles errors, and what happens if a callback is slow or fails. Making those answers clear prevents surprises for everyone who uses your code.</p>
+<pre><code>async function runCallback(callback) {
+  try {
+    const result = await callback();
+    console.log(&quot;Callback result: &quot; + result);
+  } catch (error) {
+    console.log(&quot;Callback failed: &quot; + error.message);
+  }
+}
+
+runCallback(async () =&gt; {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  return &quot;Done&quot;;
+});</code></pre>
+<p class="check"><strong>Check:</strong> Why must an async callback often handle its own errors instead of relying on its caller?</p>
+<h2>Section 40: Debugging Async Code Step by Step</h2>
+<p>Debugging async code feels different from debugging synchronous code, because execution jumps between functions as promises settle, and the order of logs may not match the order of code in a file. The key to debugging async code is to make the invisible visible: log when each async step starts, when it finishes, and what value or error it produced. Those logs create a timeline you can follow, revealing whether a job finished out of order, whether a promise was never awaited, or whether an error occurred in a place you did not expect. Without such a timeline, async bugs can feel like magic, but with it, they become ordinary logic errors.</p>
+<p>Breakpoints are another powerful tool. In browser developer tools, you can set a breakpoint inside an async function, on the line after an await, and the debugger will pause there when the promise settles, with the awaited value available for inspection. You can step through awaits, inspect variables, and see the call stack, which in modern tools includes async frames that show where the async call originated. Learning to use breakpoints with async code is worth the time, because it lets you inspect state at the exact moment a promise resolves, rather than guessing from logs alone.</p>
+<p>A common debugging technique is to isolate the failing step. If a chain of awaits fails, comment out or stub later steps and run only the first few, checking each intermediate value. If a parallel group fails, run each job individually to see which one rejects. Isolation turns a confusing multi-step failure into a series of small, testable steps, each of which either works or reveals its problem. This divide-and-conquer approach works for async code just as well as for synchronous code, provided you remember to await each isolated step properly.</p>
+<p>You should also check for the usual suspects first when debugging async code: forgotten awaits, forEach with async callbacks, Promise.all failing because of one rejection, and unhandled rejections from event handlers. Many async bugs belong to one of these categories, and checking them early saves time. A checklist of common pitfalls, kept in mind or on paper, turns debugging from random trial and error into systematic elimination, which is faster and less frustrating.</p>
+<p>Finally, reproduce the bug reliably before trying to fix it. Async bugs that depend on timing can be intermittent, appearing only when a slow job finishes in a particular order. Using delayed promises with controlled delays lets you reproduce timing conditions deterministically, so you can test a fix and confirm it works. A fix that only works sometimes is not a fix. Aim for a reproduction you can run repeatedly, a clear understanding of the cause, and a fix you can verify by running the reproduction again.</p>
+<pre><code>async function debugDemo() {
+  console.log(&quot;Step 1: starting&quot;);
+  const value = await new Promise((resolve) =&gt; {
+    setTimeout(() =&gt; resolve(42), 200);
+  });
+  console.log(&quot;Step 2: got value &quot; + value);
+  return value;
+}
+
+debugDemo();</code></pre>
+<p class="check"><strong>Check:</strong> Why is logging start, finish, and result for each async step helpful when debugging?</p>
+<h2>Section 41: Reading Stack Traces for Async Errors</h2>
+<p>Stack traces for async errors can look confusing at first, because they include frames from promise machinery and from functions that have already returned. In modern JavaScript, however, async stack traces are much clearer than they used to be. When an error is thrown inside an async function after an await, the trace typically shows the async function where the error occurred, the line that threw, and the chain of async calls that led there, including the await points. Learning to read that chain is a valuable skill, because it tells you not just where the error happened, but how the program got there through async steps.</p>
+<p>The most important part of a stack trace is usually the top few lines, which show the error message and the immediate location. Below that, you will see your own functions, often with async markers, and below those, library or runtime frames that you can usually ignore. Focus first on your own code: which function threw, which await was in progress, and what value or condition caused the throw. That focus prevents you from being overwhelmed by frames that belong to the runtime or to third-party code. As you gain experience, you will learn to skim traces quickly, picking out your functions and ignoring the rest.</p>
+<p>One helpful practice is to throw Error objects with clear messages, rather than strings or vague errors. A message such as Failed to load user 7: network timeout tells you far more than Error or Failed, and it makes the trace useful even without opening the file. Including relevant identifiers, such as user ids or request names, in error messages turns a trace from a puzzle into a direct pointer. When you write your own promises and async helpers, invest a few seconds in a good error message; future you, debugging at midnight, will be grateful.</p>
+<p>Another practice is to preserve the original error when you catch and rethrow. Instead of throwing a brand-new error that hides the cause, you can log the original error, or attach it as a cause, or simply rethrow it after cleanup. Modern JavaScript supports error causes, allowing you to write throw new Error(&quot;Failed to load dashboard&quot;, { cause: originalError });, which preserves both the high-level context and the low-level detail. That preservation makes traces far more informative, because they show both what the program was trying to do and why the low-level step failed.</p>
+<p>When a trace seems incomplete or points to promise internals rather than your code, check whether the error was created in a different place from where it was thrown, or whether a promise was rejected with a non-Error value. Rejecting with strings loses stack information, which is another reason to reject with Error objects. Good error hygiene, clear messages, Error objects, and preserved causes, makes async traces readable and debugging dramatically faster.</p>
+<pre><code>async function failingStep() {
+  throw new Error(&quot;Failed to load user 7&quot;);
+}
+
+async function middleStep() {
+  await failingStep();
+}
+
+async function topStep() {
+  try {
+    await middleStep();
+  } catch (error) {
+    console.log(&quot;Error: &quot; + error.message);
+    console.log(error.stack);
+  }
+}
+
+topStep();</code></pre>
+<p class="check"><strong>Check:</strong> Why should you reject promises with Error objects rather than plain strings?</p>
+<h2>Section 42: Avoiding Callback Hell with await</h2>
+<p>Callback hell is the name for deeply nested callback code that becomes hard to read, hard to debug, and hard to change. It arises when each async step depends on the previous one, and each step&#x27;s callback contains the next step, indenting further and further to the right. Error handling in such code is also painful, because each level needs its own error check, and a failure in a deep level must be propagated manually up through all the levels. Avoiding callback hell was one of the main motivations for promises, and async and await complete that work by making sequential async code look flat and linear.</p>
+<p>Converting callback code to await is usually straightforward. Identify each callback step, turn the callback-based function into a promise-returning function or wrap it with a promise, and then replace nesting with sequential awaits. Error handling that was scattered across callbacks becomes a single try and catch around the sequence, or a few targeted try blocks for steps that need special handling. The resulting code is not just shorter; it is easier to reason about, because the order of execution matches the order of lines, and the success path and error path are clearly separated.</p>
+<p>A practical conversion strategy is to convert one step at a time, testing after each step, rather than rewriting everything at once. Start with the outermost callback, wrap its function in a promise, await it, and confirm the program still works. Then convert the next level, and so on. This incremental approach reduces risk, because you always have a working program to fall back on, and it makes it easier to locate a mistake if one appears. Large rewrites that change everything at once are exciting but risky; incremental conversions are boring but reliable, and reliability wins in real projects.</p>
+<p>It is worth noting that not all callback code needs converting. Some callbacks are event handlers, not sequential steps, and they work well as callbacks. A click handler that starts async work does not need to become an await chain; it needs to be an async function itself, as discussed earlier. The target for conversion is specifically nested sequential callbacks, where each step waits for the previous one. Those are the cases where await provides the greatest clarity gain, and where callback hell is most painful.</p>
+<p>When you encounter callback hell in existing code, resist the urge to simply reformat it or add comments explaining the nesting. Reformatting does not fix the structural problem. Instead, convert it to await, step by step, and watch the code flatten. That flattening is not just cosmetic; it makes future changes safer, because a new developer can add a step in the middle of a flat sequence far more easily than they can insert a step into a nested pyramid. That maintainability benefit is the lasting reward for escaping callback hell.</p>
+<pre><code>function callbackStep(value, callback) {
+  setTimeout(() =&gt; callback(value + 1), 100);
+}
+
+function promiseStep(value) {
+  return new Promise((resolve) =&gt; {
+    callbackStep(value, resolve);
+  });
+}
+
+async function flatSequence() {
+  let value = 0;
+  value = await promiseStep(value);
+  value = await promiseStep(value);
+  value = await promiseStep(value);
+  console.log(&quot;Final value: &quot; + value);
+}
+
+flatSequence();</code></pre>
+<p class="check"><strong>Check:</strong> How does converting nested callbacks to await change error handling?</p>
+<h2>Section 43: Converting Promise Chains to await</h2>
+<p>Promise chains were a major improvement over callbacks, but long chains can still become hard to follow, especially when you need values from earlier steps in later steps. Converting a chain to await often makes the code clearer, because intermediate values become ordinary variables that stay in scope for the whole function, rather than values passed from one then handler to the next. You no longer need to thread values through the chain or nest handlers to access earlier results. That scoping benefit alone is often enough to justify conversion.</p>
+<p>The conversion process is mechanical. Take each then handler and turn its body into a line with await. Take the chain&#x27;s catch handler and turn it into a catch block around the awaits. Take any finally logic and turn it into a finally block. For example, a chain that loads a user, then loads their posts, then displays the first post becomes three awaits in sequence, with variables for user and posts available throughout. The logic is identical, but the shape is flatter and the variables are more accessible. That accessibility makes later modifications easier, such as adding a conditional step that uses both the user and the posts.</p>
+<p>One detail to handle carefully is parallel branches within a chain. A chain might use Promise.all in the middle to run two steps in parallel, then continue with a combined result. In await form, that becomes a Promise.all await in the middle of the sequence, which is perfectly fine. You do not need to convert every Promise.all to sequential awaits; you keep parallel groups parallel and sequential steps sequential. The goal of conversion is clarity, not the elimination of promise utilities. Await and promise utilities complement each other, and the best converted code uses both where each fits.</p>
+<p>Another detail is return values. A chain returns a promise that resolves to the final then value, while an async function returns a promise that resolves to its return value. Those are equivalent, so callers do not need to change when you convert a function from a chain to await. That equivalence makes conversion safe: you can refactor the inside of a function without changing its external contract. Callers continue to await or use then exactly as before, unaware that the implementation changed. That safety encourages incremental refactoring, one function at a time, without breaking the rest of the program.</p>
+<p>When deciding whether to convert a chain, consider length, variable scoping, and team familiarity. Short chains of one or two steps may be fine as chains, and converting them gains little. Long chains, chains that need earlier values later, and chains with complex error handling usually benefit greatly from await. Let those factors guide you, rather than a rigid rule that all chains must become awaits. Good judgement, as always, beats dogma.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+async function chainAsAwait() {
+  const user = await delayValue({ name: &quot;Ada&quot; }, 200);
+  const posts = await delayValue([&quot;Post 1&quot;, &quot;Post 2&quot;], 200);
+  console.log(user.name + &quot; has &quot; + posts.length + &quot; posts&quot;);
+}
+
+chainAsAwait();</code></pre>
+<p class="check"><strong>Check:</strong> What scoping advantage does await give you over a long promise chain?</p>
+<h2>Section 44: Converting await Code Back to Chains</h2>
+<p>Although await is usually clearer, there are situations where converting await code back to a promise chain is useful or necessary. One case is when you are working in a context where async functions are not allowed or not supported, such as an older environment or a specific library constraint. Another case is when you need to return a promise chain directly for composition, without introducing an extra async wrapper. Understanding both directions of conversion makes you fluent in async styles, able to read and write code in either form as the situation requires.</p>
+<p>Converting await to a chain is the reverse of the previous section. Each await becomes a then handler, each variable becomes a value passed through the chain, and try and catch becomes a catch handler. The challenge, as noted before, is variable scoping: if a later step needs an earlier value, you must carry that value forward through the chain, often by returning an object containing both values, or by nesting a then inside another then. That carrying is awkward, which is why await is usually preferred for multi-step sequences. Recognising that awkwardness helps you appreciate why await was invented, and it helps you decide when a chain is acceptable despite it.</p>
+<p>A chain can also be more concise for very short sequences. A single fetch followed by a single transformation, such as fetchData().then(transform).catch(handleError), is arguably as clear as an async function that awaits and returns. For such short pipelines, some developers prefer chains because they avoid defining a whole function just to await once. That preference is legitimate, and it is common in code that processes streams or pipelines of data. The key is to keep chains short; when they grow long, the scoping and readability costs outweigh the conciseness benefit.</p>
+<p>Another reason to know chains is for library code that returns promises. Many libraries expose promise-based APIs, and you may need to chain additional steps onto a library promise without wrapping everything in an async function. For example, you might write libraryCall().then(process).catch(log), directly at a call site, without defining a new async function. That is a perfectly reasonable use of chains, and it keeps the call site compact. Fluency in both styles lets you choose the compact form when it fits and the await form when clarity demands it.</p>
+<p>In short, await and chains are two syntaxes for the same underlying promise model, not competing paradigms. A skilled developer moves between them comfortably, converting in either direction when the context calls for it. Practise converting a short await function to a chain and back again, noticing where values need to be carried and where error handling moves. That exercise builds the fluency that lets you read any async code you encounter, regardless of which style its author chose.</p>
+<pre><code>function delayValue(value, ms) {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(value), ms));
+}
+
+function chainVersion() {
+  return delayValue({ name: &quot;Ada&quot; }, 200)
+    .then((user) =&gt; {
+      console.log(&quot;User: &quot; + user.name);
+      return user;
+    })
+    .catch((error) =&gt; console.log(&quot;Failed: &quot; + error.message));
+}
+
+chainVersion();</code></pre>
+<p class="check"><strong>Check:</strong> When might a short promise chain be preferable to an async function?</p>
+<h2>Section 45: Async Helpers for Everyday Tasks</h2>
+<p>As you write more async code, you will accumulate small helpers that make everyday tasks easier. A delay helper, a retry helper, a timeout helper, and a parallel loader are all examples from this chapter. Collecting these helpers in a utilities module, with clear names and simple contracts, saves you from rewriting the same logic in every project. It also makes your main code more expressive, because a call to retry(loadData, 3) says more at a glance than a loop with try, catch, and delay inline. Good helpers raise the level of abstraction at which you think about async work.</p>
+<p>Designing a good async helper starts with a clear, single purpose. A helper should do one thing well, such as waiting, retrying, or timing out, and it should do it for any promise-returning task, not just one specific task. That generality comes from accepting a function or a promise as an argument, rather than hard-coding a specific operation. For example, a retry helper accepts any async task function, not just a specific fetch. That generality makes the helper reusable, and reusability is the point of extracting it in the first place.</p>
+<p>Helpers should also have predictable error behaviour. A retry helper should throw the last error if all attempts fail, so callers can handle it normally. A timeout helper should reject with a clear timeout error, not with a vague failure. A delay helper should never reject under normal use. When helpers behave predictably, callers can compose them confidently, such as wrapping a retry inside a timeout, or a timeout inside a retry, without worrying about surprising error shapes. Predictability is what turns a collection of snippets into a trustworthy toolkit.</p>
+<p>Testing helpers in isolation is another benefit of extracting them. You can test a retry helper with a fake task that fails twice and succeeds on the third try, without needing a real server. You can test a timeout helper with a fake task that takes too long, without waiting for a real network timeout. Those isolated tests run fast, they are deterministic, and they give you confidence that the helper works before you use it in a larger feature. That confidence compounds, because every feature that uses a tested helper inherits its reliability.</p>
+<p>Start your own async toolkit with the helpers from this chapter, and add to it as you discover new patterns. Keep each helper short, document its arguments and its error behaviour in a comment, and reuse it shamelessly. Over time, your toolkit will become a personal library that makes new async features faster to build and easier to trust, which is exactly what experienced developers mean when they talk about leverage.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function retry(task, attempts) {
+  for (let i = 1; i &lt;= attempts; i++) {
+    try {
+      return await task();
+    } catch (error) {
+      if (i === attempts) {
+        throw error;
+      }
+      await delay(100);
+    }
+  }
+}
+
+retry(async () =&gt; &quot;Helper works&quot;, 3).then((value) =&gt; console.log(value));</code></pre>
+<p>Name helpers by what they do, not by how they do it, so a helper called retry stays meaningful even if its internal delay strategy changes from fixed waits to exponential backoff later.</p>
+<p class="check"><strong>Check:</strong> What makes an async helper reusable across different tasks?</p>
+<h2>Section 46: Throttling Async Requests</h2>
+<p>Throttling is a technique for limiting how often async requests are sent, protecting both your application and the server it talks to. Without throttling, a fast user action, such as typing in a search box or scrolling through a feed, can trigger dozens of requests in a few seconds, overwhelming the server, wasting bandwidth, and causing results to arrive out of order. Throttling ensures that requests are sent at a controlled rate, such as at most once per second, or only after the user has paused briefly. That control keeps the system responsive without flooding it.</p>
+<p>There are two related techniques: throttling and debouncing. Throttling allows a request at most once per interval, no matter how many times the trigger fires. If a user types continuously, throttled search might send a request every five hundred milliseconds, giving regular updates without excess. Debouncing, by contrast, waits until the trigger has stopped firing for a period, then sends a single request. If a user types continuously, debounced search sends nothing until they pause, then sends one request for the final text. Both reduce request volume, but they feel different to users, and choosing between them depends on whether intermediate updates are useful.</p>
+<p>Implementing throttling with async code involves tracking the last request time and deciding whether enough time has passed. A simple throttle helper wraps an async function and, if called too soon after the last call, either ignores the new call or schedules it for later. Implementing debouncing involves a timer that resets on each call, so that only the last call in a burst actually runs. Both helpers use setTimeout and promise logic you have already learned, combined with a little state to track timing. They are excellent practice projects because they combine async, timers, and state in a realistic way.</p>
+<p>Throttling also matters on the server side, where APIs often enforce rate limits. If your program sends too many requests too quickly, the server may reject further requests with a rate limit error, or even temporarily block your access. Respecting rate limits by throttling client requests is therefore not just polite; it is necessary for reliability. When you encounter a rate limit error, the correct response is to back off, wait, and retry later, not to retry immediately and worsen the overload. That respectful behaviour is part of being a good citizen on shared infrastructure.</p>
+<p>For this chapter, the takeaway is conceptual: recognise when a user action could trigger too many async requests, and reach for throttling or debouncing to control the rate. You will meet detailed implementations again in the performance chapter, but the async foundation, timers, promises, and state, is already in your hands. Practising a simple throttle helper now will make that later chapter far easier, and it will immediately improve any search or scroll feature you build.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+function throttle(asyncFn, interval) {
+  let lastCall = 0;
+  return async (...args) =&gt; {
+    const now = Date.now();
+    if (now - lastCall &lt; interval) {
+      console.log(&quot;Throttled, skipping call&quot;);
+      return;
+    }
+    lastCall = now;
+    return asyncFn(...args);
+  };
+}
+
+const throttledLoad = throttle(async () =&gt; {
+  await delay(100);
+  console.log(&quot;Loaded&quot;);
+}, 500);
+
+throttledLoad();
+throttledLoad();</code></pre>
+<p class="check"><strong>Check:</strong> What is the difference between throttling and debouncing an async request?</p>
+<h2>Section 47: Caching Async Results</h2>
+<p>Caching async results means storing a completed result so that a later request for the same data does not need to repeat the slow work. If a user navigates away from a profile page and back again, loading the profile from cache is instant, while refetching it from the server takes time and bandwidth. Caching therefore improves perceived performance, reduces server load, and makes applications feel snappy, especially on slow networks. It is a simple idea with significant benefits, but it also introduces questions about freshness that you must handle thoughtfully.</p>
+<p>The simplest cache is a Map from a request key, such as a user id or a URL, to a promise or a result. When a request arrives, you check the cache first. If the key is present, you return the cached value immediately, without starting new async work. If it is absent, you start the work, store its promise in the cache, and return it. Storing the promise, rather than waiting for the result and then storing it, has a bonus benefit: if two identical requests arrive while the first is still in flight, both get the same promise, and only one network request is made. That deduplication is a powerful optimisation for dashboards and lists where the same data is requested from multiple places.</p>
+<p>Freshness is the main challenge. Cached data can become stale if the underlying data changes on the server. A profile cached an hour ago might no longer match the current profile. Strategies for freshness include time-based expiry, where cached entries expire after a set period, manual invalidation, where you clear the cache after a write that changes the data, and explicit refresh, where the user can request fresh data with a refresh button. Choosing a strategy depends on how often the data changes and how bad stale data would be. For rarely changing data, a long cache is fine. For frequently changing data, a short cache or no cache may be safer.</p>
+<p>Caching also needs size limits. An unbounded cache that grows forever can consume memory and slow down the program. In practice, you might limit the cache to a certain number of entries, evicting the least recently used entry when the limit is reached, or you might clear the cache when the user navigates away. For learning purposes, a simple Map without eviction is fine, but for production code, you should think about growth and set a sensible limit. That thinking is part of moving from a demo cache to a reliable one.</p>
+<p>Practise caching by writing a helper that wraps a fake fetch function with a Map cache, logging whether each call hit the cache or fetched fresh data. Call it twice with the same key and watch the second call return instantly. Then add a simple expiry, such as clearing entries older than a few seconds, and watch the cache refresh. That hands-on experiment will make the abstract benefits of caching concrete, and it will give you a pattern you can apply to profiles, product lists, and any other data that is requested repeatedly.</p>
+<pre><code>const cache = new Map();
+
+async function fakeFetch(key) {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 300));
+  return &quot;Data for &quot; + key;
+}
+
+async function cachedFetch(key) {
+  if (cache.has(key)) {
+    console.log(&quot;Cache hit for &quot; + key);
+    return cache.get(key);
+  }
+  console.log(&quot;Fetching &quot; + key);
+  const promise = fakeFetch(key);
+  cache.set(key, promise);
+  return promise;
+}
+
+cachedFetch(&quot;user-1&quot;).then(() =&gt; cachedFetch(&quot;user-1&quot;));</code></pre>
+<p class="check"><strong>Check:</strong> Why should a cache store the promise, not just the final result, for in-flight requests?</p>
+<h2>Section 48: Queuing Async Jobs One by One</h2>
+<p>Queuing async jobs means processing them in order, one at a time, even if they are submitted at different times or in rapid succession. This is useful when jobs share a resource that cannot handle concurrency, when order matters for correctness, or when you need to limit simultaneous work to protect a server. A queue acts as a traffic controller: jobs arrive, they wait in line, and a worker processes them one by one, in the order they arrived. Without a queue, rapid submissions could run in parallel and interfere with each other, causing race conditions or overload.</p>
+<p>Implementing a simple queue with async and await is surprisingly straightforward. You maintain an array of job functions and a flag indicating whether the worker is busy. When a job is added, you push it onto the array and start the worker if it is not already running. The worker loops while the array is non-empty, shifting the next job, awaiting it, handling its result or error, and then moving to the next job. Because the worker awaits each job before starting the next, jobs never overlap. Because jobs are stored as functions, they do not start until the worker reaches them, which is the key difference from starting all jobs immediately and awaiting them together.</p>
+<p>Error handling in a queue deserves care. If one job fails, the queue should not stop processing subsequent jobs, unless the failure indicates a systemic problem that makes further jobs unsafe. A common pattern is to catch errors per job, log them, and continue to the next job, so that one bad job does not block the whole queue. You should also decide how to report job results to their submitters. One approach is to return a promise from the add function that resolves when that specific job completes, allowing each submitter to await its own job while the queue processes jobs sequentially behind the scenes. That combination, sequential processing with individual promises, is elegant and widely used.</p>
+<p>Queues also help with rate limiting and resource management. If an API allows only one request per second, a queue with a delay between jobs enforces that limit naturally. If a file system operation must not run concurrently, a queue guarantees exclusivity. These are not exotic requirements; they appear in upload managers, print queues, background sync, and many other features. Learning to build a simple queue now will prepare you for those features, and it will deepen your understanding of how async control flow can be used to impose order on otherwise chaotic submissions.</p>
+<p>Try building a tiny queue that processes three delayed jobs in order, logging each job&#x27;s start and finish. Submit all three at once and watch them run sequentially, not in parallel. Then make the middle job fail and confirm that the third job still runs. That experiment demonstrates the core queue behaviours, order, exclusivity, and resilience, in a compact, understandable form.</p>
+<pre><code>const queue = [];
+let working = false;
+
+async function processQueue() {
+  if (working) {
+    return;
+  }
+  working = true;
+  while (queue.length &gt; 0) {
+    const job = queue.shift();
+    try {
+      const result = await job();
+      console.log(&quot;Job done: &quot; + result);
+    } catch (error) {
+      console.log(&quot;Job failed: &quot; + error.message);
+    }
+  }
+  working = false;
+}
+
+function addJob(name, ms) {
+  queue.push(async () =&gt; {
+    await new Promise((resolve) =&gt; setTimeout(resolve, ms));
+    return name;
+  });
+  processQueue();
+}
+
+addJob(&quot;First&quot;, 200);
+addJob(&quot;Second&quot;, 200);
+addJob(&quot;Third&quot;, 200);</code></pre>
+<p class="check"><strong>Check:</strong> How does a queue guarantee that async jobs run one at a time even when submitted together?</p>
+<h2>Section 49: Testing Async Functions Simply</h2>
+<p>Testing async functions is not fundamentally different from testing synchronous functions, but it requires you to await results and to handle both success and failure paths. A simple test for an async function calls it, awaits its result, and checks whether the result matches the expected value. If the function should reject, the test awaits it inside try and catch, or uses a testing framework&#x27;s rejection matcher, and checks the error. The key discipline is to always await in tests; a test that forgets to await will pass vacuously, because it checks a promise instead of a value, or it finishes before the async work completes.</p>
+<p>For learning and for small projects, you can write tests as simple async functions that log pass or fail. For example, a test might call addLater(2, 3), await the result, and log whether it equals 5. Running several such tests in sequence gives you a quick, readable test suite without any framework. As projects grow, testing frameworks provide better reporting, isolation, and matchers, but the underlying pattern remains the same: await, compare, report. Understanding the simple pattern first makes frameworks easier to learn later, because you will recognise their await-based assertions as formalised versions of your hand-written checks.</p>
+<p>Testing async code also benefits from controlled fake dependencies. Instead of calling a real server in tests, you pass a fake function that returns a delayed promise with known data, or that rejects with a known error. That control makes tests fast, deterministic, and independent of network conditions. You can test success, failure, timeout, and retry logic all with fakes, without ever touching a real API. This approach, often called mocking or stubbing, is a standard professional practice, and it starts with the simple idea of passing a function as an argument, which you have already practised with helpers.</p>
+<p>Another testing consideration is timing. Tests that wait for real delays can be slow, so you may want to use very short delays in tests, or to inject a delay function that can be replaced with an instant version during testing. Keeping delays short in tests, while keeping production delays realistic, is a balance that comes with experience. The goal is tests that run quickly enough to be run often, because tests that are slow get skipped, and skipped tests do not catch bugs. Fast, deterministic async tests are therefore a practical investment, not just a theoretical ideal.</p>
+<p>As you finish this chapter, write a few simple tests for your delay, retry, and timeout helpers. Test that delay waits, that retry succeeds after failures and gives up after the maximum attempts, and that timeout rejects when work is too slow. Those tests will confirm your helpers work, they will serve as documentation for future readers, and they will give you a template for testing async code in every project that follows.</p>
+<pre><code>async function addLater(a, b) {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 100));
+  return a + b;
+}
+
+async function testAddLater() {
+  const result = await addLater(2, 3);
+  if (result === 5) {
+    console.log(&quot;PASS: addLater returns 5&quot;);
+  } else {
+    console.log(&quot;FAIL: expected 5, got &quot; + result);
+  }
+}
+
+testAddLater();</code></pre>
+<p class="check"><strong>Check:</strong> Why must a test always await an async function before checking its result?</p>
+<h2>Section 50: A Complete Async Mini Project</h2>
+<p>To bring this chapter together, let us design a complete mini project that uses many of the patterns you have learned. The project is a small dashboard loader: when the user clicks Load Dashboard, the program fetches a profile, recent posts, and notifications in parallel, shows a loading state, handles partial failures gracefully, merges the successful results into a single dashboard object, and displays it. If a section fails, the dashboard still shows the other sections plus a warning and a retry option for the failed section. This project is small enough to build in an evening, yet realistic enough to demonstrate professional async skills.</p>
+<p>Start by defining fake API helpers for profile, posts, and notifications, each returning a delayed promise, with notifications sometimes failing to simulate partial failure. Next, write a loadDashboard function that sets a loading flag, uses Promise.allSettled to load the three pieces in parallel, merges the fulfilled results into a dashboard object, collects warnings for rejected results, and clears the loading flag in finally. Then write a display function that logs or renders the dashboard object and its warnings. Finally, wire loadDashboard to a button click handler with double-click protection, so that rapid clicks do not start duplicate loads. Each piece uses a pattern from this chapter, and together they form a coherent feature.</p>
+<p>Testing the mini project involves both happy and sad paths. Click load with all APIs succeeding and confirm the full dashboard appears. Then make notifications fail and confirm the dashboard still shows profile and posts, plus a warning about notifications. Then click retry for notifications alone and confirm only that section reloads. Those three scenarios cover parallel loading, partial failure, merging, loading state, and per-section retry, which is a comprehensive test of the chapter&#x27;s skills. If you can build and test this project confidently, you have genuinely mastered async and await in practice, not just in theory.</p>
+<p>Beyond this project, the same patterns scale to larger applications. A real dashboard might load ten sections instead of three, use real fetch calls instead of fake delays, and render to a page instead of logging to the console, but the async structure remains the same. Parallel groups, allSettled for partial failures, merging into a single object, loading states in finally, and per-section retry are the building blocks of data-driven interfaces at any scale. Recognising that scalability is encouraging: you are not learning toy patterns, you are learning production patterns in miniature.</p>
+<p>As you close this chapter, take pride in how far you have come. You can now write async functions, await in order and in parallel, handle errors with try and catch, add timeouts and retries, manage loading states, avoid common pitfalls, and build a complete async feature. Those skills are essential for modern JavaScript development, and they will serve you in every project that talks to a server, a file, or any other slow resource. In the next chapter, you will apply these skills to real API fetching, where the fake delays become real network requests.</p>
+<pre><code>function fakeApi(name, ms, shouldFail) {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; {
+      if (shouldFail) {
+        reject(new Error(name + &quot; unavailable&quot;));
+      } else {
+        resolve(name + &quot; data&quot;);
+      }
+    }, ms);
+  });
+}
+
+async function loadDashboard() {
+  console.log(&quot;Loading dashboard&quot;);
+  try {
+    const results = await Promise.allSettled([
+      fakeApi(&quot;Profile&quot;, 200, false),
+      fakeApi(&quot;Posts&quot;, 300, false),
+      fakeApi(&quot;Notifications&quot;, 200, true),
+    ]);
+    console.log(results);
+  } finally {
+    console.log(&quot;Loading finished&quot;);
+  }
+}
+
+loadDashboard();</code></pre>
+<p class="check"><strong>Check:</strong> Which patterns from this chapter does the dashboard mini project combine, and why does each matter?</p>
+<h2>Practical Task</h2>
+<p>Build a small async dashboard loader in a single JavaScript file: create three fake API helpers using delayed promises for profile, posts, and notifications, load them in parallel with Promise.allSettled when a button-style function is called, show a loading message before the load and hide it in finally, merge successful results into one dashboard object, display a warning for any failed section, and add a retry function that reloads only a failed section. Test it with all sections succeeding and with one section failing, and confirm the dashboard still displays the successful sections in the failing case.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Explain the difference between awaiting promises in sequence and awaiting them in parallel, and give an example where each approach is correct.</li>
+<li>Why does an async function always return a promise, and what bug occurs when a caller forgets to await that promise?</li>
+<li>How do Promise.all, Promise.allSettled, and Promise.race differ in how they handle success, failure, and timing?</li>
+<li>Describe how you would implement retry with a delay and a timeout for a failing async task, and explain when each technique is appropriate.</li>
+<li>Why do forEach with async callbacks and forgotten awaits cause confusing bugs, and what patterns should you use instead?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-25.html">← Chapter 25</a> <a href="index.html">All chapters</a> <a href="chapter-27.html">Chapter 27 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/javascript-developer/chapter-26.html'; this.page.identifier = 'book-javascript-developer-chapter-26'; this.page.title = 'Chapter 26: async and await in Practice'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

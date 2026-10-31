@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 8 — Loops: for, range and Control Flow — Go Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 8 of the Go Developer teaching book: Loops: for, range and Control Flow.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Go Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 8: Loops: for, range and Control Flow</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-08.svg" alt="Design for Chapter 8" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What a Loop Does</h2>
+<p>What a Loop Does is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with what a Loop Does, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to what a Loop Does. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on what a Loop Does, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// What a Loop Does
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use what a Loop Does in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 2: Go Has Only the for Loop</h2>
+<p>Go Has Only the for Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with go Has Only the for Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to go Has Only the for Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on go Has Only the for Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Go Has Only the for Loop
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when go Has Only the for Loop is used incorrectly? Give one concrete example.</p>
+<h2>Section 3: A for Loop with a Condition</h2>
+<p>A for Loop with a Condition is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with a for Loop with a Condition, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to a for Loop with a Condition. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on a for Loop with a Condition, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// A for Loop with a Condition
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does a for Loop with a Condition differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 4: A Classic for Loop with Counter</h2>
+<p>A Classic for Loop with Counter is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with a Classic for Loop with Counter, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to a Classic for Loop with Counter. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on a Classic for Loop with Counter, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// A Classic for Loop with Counter
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain a Classic for Loop with Counter and give one small Go example that shows it in use.</p>
+<h2>Section 5: The Init, Condition and Post Statements</h2>
+<p>The Init, Condition and Post Statements is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with the Init, Condition and Post Statements, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to the Init, Condition and Post Statements. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on the Init, Condition and Post Statements, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// The Init, Condition and Post Statements
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use the Init, Condition and Post Statements in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 6: Counting Up and Counting Down</h2>
+<p>Counting Up and Counting Down is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with counting Up and Counting Down, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to counting Up and Counting Down. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on counting Up and Counting Down, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Counting Up and Counting Down
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when counting Up and Counting Down is used incorrectly? Give one concrete example.</p>
+<h2>Section 7: Looping a Fixed Number of Times</h2>
+<p>Looping a Fixed Number of Times is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with looping a Fixed Number of Times, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to looping a Fixed Number of Times. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on looping a Fixed Number of Times, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Looping a Fixed Number of Times
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does looping a Fixed Number of Times differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 8: Infinite Loops and How to Stop Them</h2>
+<p>Infinite Loops and How to Stop Them is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with infinite Loops and How to Stop Them, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to infinite Loops and How to Stop Them. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on infinite Loops and How to Stop Them, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Infinite Loops and How to Stop Them
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain infinite Loops and How to Stop Them and give one small Go example that shows it in use.</p>
+<h2>Section 9: break: Leaving a Loop Early</h2>
+<p>break: Leaving a Loop Early is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with break: Leaving a Loop Early, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to break: Leaving a Loop Early. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on break: Leaving a Loop Early, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// break: Leaving a Loop Early
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use break: Leaving a Loop Early in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 10: continue: Skipping to the Next Round</h2>
+<p>continue: Skipping to the Next Round is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with continue: Skipping to the Next Round, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to continue: Skipping to the Next Round. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on continue: Skipping to the Next Round, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// continue: Skipping to the Next Round
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when continue: Skipping to the Next Round is used incorrectly? Give one concrete example.</p>
+<h2>Section 11: Nested Loops</h2>
+<p>Nested Loops is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with nested Loops, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to nested Loops. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on nested Loops, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Nested Loops
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does nested Loops differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 12: Loops Inside Loops and Readable Code</h2>
+<p>Loops Inside Loops and Readable Code is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with loops Inside Loops and Readable Code, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to loops Inside Loops and Readable Code. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on loops Inside Loops and Readable Code, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Loops Inside Loops and Readable Code
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain loops Inside Loops and Readable Code and give one small Go example that shows it in use.</p>
+<h2>Section 13: range Over a Slice</h2>
+<p>range Over a Slice is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with range Over a Slice, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to range Over a Slice. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on range Over a Slice, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// range Over a Slice
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use range Over a Slice in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 14: range With Index and Value</h2>
+<p>range With Index and Value is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with range With Index and Value, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to range With Index and Value. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on range With Index and Value, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// range With Index and Value
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when range With Index and Value is used incorrectly? Give one concrete example.</p>
+<h2>Section 15: range With Only the Index</h2>
+<p>range With Only the Index is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with range With Only the Index, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to range With Only the Index. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on range With Only the Index, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// range With Only the Index
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does range With Only the Index differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 16: range With Only the Value</h2>
+<p>range With Only the Value is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with range With Only the Value, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to range With Only the Value. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on range With Only the Value, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// range With Only the Value
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain range With Only the Value and give one small Go example that shows it in use.</p>
+<h2>Section 17: Ignoring a Value with the Blank Identifier</h2>
+<p>Ignoring a Value with the Blank Identifier is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with ignoring a Value with the Blank Identifier, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to ignoring a Value with the Blank Identifier. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on ignoring a Value with the Blank Identifier, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Ignoring a Value with the Blank Identifier
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use ignoring a Value with the Blank Identifier in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 18: range Over a Map</h2>
+<p>range Over a Map is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with range Over a Map, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to range Over a Map. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on range Over a Map, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// range Over a Map
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when range Over a Map is used incorrectly? Give one concrete example.</p>
+<h2>Section 19: Map Iteration Order Is Not Guaranteed</h2>
+<p>Map Iteration Order Is Not Guaranteed is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with map Iteration Order Is Not Guaranteed, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to map Iteration Order Is Not Guaranteed. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on map Iteration Order Is Not Guaranteed, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Map Iteration Order Is Not Guaranteed
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does map Iteration Order Is Not Guaranteed differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 20: range Over a String</h2>
+<p>range Over a String is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with range Over a String, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to range Over a String. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on range Over a String, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs. Trace the first, second and last rounds by hand before you trust a loop.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// range Over a String
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain range Over a String and give one small Go example that shows it in use.</p>
+<h2>Section 21: range Over Runes in a String</h2>
+<p>range Over Runes in a String is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with range Over Runes in a String, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to range Over Runes in a String. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on range Over Runes in a String, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// range Over Runes in a String
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use range Over Runes in a String in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 22: Looping Until a Condition Changes</h2>
+<p>Looping Until a Condition Changes is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with looping Until a Condition Changes, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to looping Until a Condition Changes. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on looping Until a Condition Changes, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Looping Until a Condition Changes
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when looping Until a Condition Changes is used incorrectly? Give one concrete example.</p>
+<h2>Section 23: Looping While Reading Input</h2>
+<p>Looping While Reading Input is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with looping While Reading Input, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to looping While Reading Input. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on looping While Reading Input, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Looping While Reading Input
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does looping While Reading Input differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 24: Accumulating a Total in a Loop</h2>
+<p>Accumulating a Total in a Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with accumulating a Total in a Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to accumulating a Total in a Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on accumulating a Total in a Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Accumulating a Total in a Loop
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain accumulating a Total in a Loop and give one small Go example that shows it in use.</p>
+<h2>Section 25: Counting Matches in a Loop</h2>
+<p>Counting Matches in a Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with counting Matches in a Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to counting Matches in a Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on counting Matches in a Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Counting Matches in a Loop
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use counting Matches in a Loop in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 26: Finding a Maximum in a Loop</h2>
+<p>Finding a Maximum in a Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with finding a Maximum in a Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to finding a Maximum in a Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on finding a Maximum in a Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Finding a Maximum in a Loop
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when finding a Maximum in a Loop is used incorrectly? Give one concrete example.</p>
+<h2>Section 27: Building a New Slice in a Loop</h2>
+<p>Building a New Slice in a Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with building a New Slice in a Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to building a New Slice in a Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on building a New Slice in a Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Building a New Slice in a Loop
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does building a New Slice in a Loop differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 28: Searching a Slice with a Loop</h2>
+<p>Searching a Slice with a Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with searching a Slice with a Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to searching a Slice with a Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on searching a Slice with a Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Searching a Slice with a Loop
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain searching a Slice with a Loop and give one small Go example that shows it in use.</p>
+<h2>Section 29: Early Exit When You Find a Match</h2>
+<p>Early Exit When You Find a Match is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with early Exit When You Find a Match, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to early Exit When You Find a Match. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on early Exit When You Find a Match, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Early Exit When You Find a Match
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use early Exit When You Find a Match in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 30: Loops and Off-by-One Errors</h2>
+<p>Loops and Off-by-One Errors is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with loops and Off-by-One Errors, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to loops and Off-by-One Errors. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on loops and Off-by-One Errors, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Loops and Off-by-One Errors
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when loops and Off-by-One Errors is used incorrectly? Give one concrete example.</p>
+<h2>Section 31: The Last Iteration Problem</h2>
+<p>The Last Iteration Problem is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with the Last Iteration Problem, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to the Last Iteration Problem. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on the Last Iteration Problem, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// The Last Iteration Problem
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does the Last Iteration Problem differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 32: Changing the Loop Variable Safely</h2>
+<p>Changing the Loop Variable Safely is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with changing the Loop Variable Safely, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to changing the Loop Variable Safely. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on changing the Loop Variable Safely, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Changing the Loop Variable Safely
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain changing the Loop Variable Safely and give one small Go example that shows it in use.</p>
+<h2>Section 33: Loops That Never Run</h2>
+<p>Loops That Never Run is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with loops That Never Run, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to loops That Never Run. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on loops That Never Run, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Loops That Never Run
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use loops That Never Run in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 34: Loops That Run Forever by Accident</h2>
+<p>Loops That Run Forever by Accident is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with loops That Run Forever by Accident, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to loops That Run Forever by Accident. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on loops That Run Forever by Accident, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Loops That Run Forever by Accident
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when loops That Run Forever by Accident is used incorrectly? Give one concrete example.</p>
+<h2>Section 35: Labels and Breaking Out of Nested Loops</h2>
+<p>Labels and Breaking Out of Nested Loops is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with labels and Breaking Out of Nested Loops, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to labels and Breaking Out of Nested Loops. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on labels and Breaking Out of Nested Loops, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Labels and Breaking Out of Nested Loops
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does labels and Breaking Out of Nested Loops differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 36: goto Is Rarely the Answer</h2>
+<p>goto Is Rarely the Answer is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with goto Is Rarely the Answer, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to goto Is Rarely the Answer. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on goto Is Rarely the Answer, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// goto Is Rarely the Answer
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain goto Is Rarely the Answer and give one small Go example that shows it in use.</p>
+<h2>Section 37: Looping Over Two Slices Together</h2>
+<p>Looping Over Two Slices Together is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with looping Over Two Slices Together, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to looping Over Two Slices Together. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on looping Over Two Slices Together, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Looping Over Two Slices Together
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use looping Over Two Slices Together in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 38: Reversing a Slice with a Loop</h2>
+<p>Reversing a Slice with a Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with reversing a Slice with a Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to reversing a Slice with a Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on reversing a Slice with a Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Reversing a Slice with a Loop
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when reversing a Slice with a Loop is used incorrectly? Give one concrete example.</p>
+<h2>Section 39: Printing Patterns with Nested Loops</h2>
+<p>Printing Patterns with Nested Loops is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with printing Patterns with Nested Loops, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to printing Patterns with Nested Loops. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on printing Patterns with Nested Loops, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Printing Patterns with Nested Loops
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does printing Patterns with Nested Loops differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 40: Looping to Validate Input</h2>
+<p>Looping to Validate Input is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with looping to Validate Input, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to looping to Validate Input. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on looping to Validate Input, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs. Trace the first, second and last rounds by hand before you trust a loop.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Looping to Validate Input
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain looping to Validate Input and give one small Go example that shows it in use.</p>
+<h2>Section 41: Looping to Retry an Operation</h2>
+<p>Looping to Retry an Operation is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with looping to Retry an Operation, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to looping to Retry an Operation. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on looping to Retry an Operation, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Looping to Retry an Operation
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use looping to Retry an Operation in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 42: Loops and Performance in Plain Words</h2>
+<p>Loops and Performance in Plain Words is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with loops and Performance in Plain Words, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to loops and Performance in Plain Words. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on loops and Performance in Plain Words, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Loops and Performance in Plain Words
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when loops and Performance in Plain Words is used incorrectly? Give one concrete example.</p>
+<h2>Section 43: Choosing for, range or a While-Style Loop</h2>
+<p>Choosing for, range or a While-Style Loop is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with choosing for, range or a While-Style Loop, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to choosing for, range or a While-Style Loop. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on choosing for, range or a While-Style Loop, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Choosing for, range or a While-Style Loop
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does choosing for, range or a While-Style Loop differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 44: Reading Loop Code Aloud</h2>
+<p>Reading Loop Code Aloud is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with reading Loop Code Aloud, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to reading Loop Code Aloud. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on reading Loop Code Aloud, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs. Trace the first, second and last rounds by hand before you trust a loop.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Reading Loop Code Aloud
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain reading Loop Code Aloud and give one small Go example that shows it in use.</p>
+<h2>Section 45: Tracing a Loop by Hand</h2>
+<p>Tracing a Loop by Hand is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with tracing a Loop by Hand, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to tracing a Loop by Hand. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on tracing a Loop by Hand, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Tracing a Loop by Hand
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use tracing a Loop by Hand in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 46: Testing Loops with Small Inputs</h2>
+<p>Testing Loops with Small Inputs is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with testing Loops with Small Inputs, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to testing Loops with Small Inputs. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on testing Loops with Small Inputs, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Testing Loops with Small Inputs
+	names := []string{&quot;Ada&quot;, &quot;Bola&quot;, &quot;Chidi&quot;}
+	for index, name := range names {
+		fmt.Println(index, name)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when testing Loops with Small Inputs is used incorrectly? Give one concrete example.</p>
+<h2>Section 47: Testing Loops with Empty Inputs</h2>
+<p>Testing Loops with Empty Inputs is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>Nested loops, where one loop sits inside another, handle work that is naturally two-dimensional, such as processing every row and every column, or comparing every pair of items. The inner loop runs to completion for each single round of the outer loop, so the total number of rounds multiplies, and that multiplication is why nested loops can become slow on large data. Keep nested loops as simple as you can, give the counters distinct names, and be ready to break out of both levels with a label when an early exit must escape the whole nest rather than just the inner loop.</p>
+<p>When you work with testing Loops with Empty Inputs, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to testing Loops with Empty Inputs. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on testing Loops with Empty Inputs, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Testing Loops with Empty Inputs
+	total := 0
+	for i := 1; i &lt;= 10; i++ {
+		total += i
+	}
+	fmt.Println(&quot;Total:&quot;, total)
+}</code></pre>
+<p class="check"><strong>Check:</strong> How does testing Loops with Empty Inputs differ from the nearest alternative in Go, and when is each one the better choice?</p>
+<h2>Section 48: Common Loop Mistakes</h2>
+<p>Common Loop Mistakes is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>A classic for loop has three parts separated by semicolons: an init statement that runs once before the loop starts, a condition that is checked before every round, and a post statement that runs after every round. A counter declared in the init part is scoped to the loop, which keeps it from leaking into the rest of the function. The loop stops as soon as the condition is false, and if the condition is false at the very start, the body never runs at all. That last fact is worth remembering, because it means a loop over an empty collection simply does nothing, which is usually exactly what you want.</p>
+<p>When you work with common Loop Mistakes, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to common Loop Mistakes. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on common Loop Mistakes, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Common Loop Mistakes
+	count := 0
+	for count &lt; 3 {
+		fmt.Println(&quot;Round:&quot;, count)
+		count++
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, explain common Loop Mistakes and give one small Go example that shows it in use.</p>
+<h2>Section 49: Refactoring a Loop into a Helper</h2>
+<p>Refactoring a Loop into a Helper is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. Go keeps its looping tools deliberately simple: there is only the for statement, and it covers every kind of repetition. A for loop can look like a classic counting loop, like a while-style loop that runs while a condition holds, or like an infinite loop that you leave with break. One keyword, several shapes, and the shape you choose should make the loop&#x27;s stopping rule obvious to the next person who reads it.</p>
+<p>A while-style for loop drops the init and post parts and keeps only the condition, running while the condition stays true. This shape suits work where you do not know in advance how many rounds you need, such as reading input until it passes a check. An infinite loop drops the condition as well, and it must contain a break or a return somewhere, or it will truly never stop. Used sparingly, both make loop logic clearer rather than more tangled.</p>
+<p>When you work with refactoring a Loop into a Helper, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to refactoring a Loop into a Helper. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Another pitfall is changing a collection while ranging over it in ways that confuse the loop, or assuming map iteration order will repeat from run to run. Go deliberately randomises map order, so code that depends on it will fail intermittently, which is the hardest kind of failure to debug. Also watch for modifying the loop variable itself inside the body when a post statement also changes it, because the two changes interact in ways that are easy to misread. Keep the loop&#x27;s control in one place: the init, condition and post, or the range clause, and let the body do the work.</p>
+<p>To finish this section on refactoring a Loop into a Helper, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Refactoring a Loop into a Helper
+	for _, value := range []int{4, 9, 2} {
+		if value == 9 {
+			fmt.Println(&quot;Found nine&quot;)
+			break
+		}
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> When would you use refactoring a Loop into a Helper in a real Go program, and what would go wrong if you left it out?</p>
+<h2>Section 50: Review: Controlling Repetition</h2>
+<p>Review: Controlling Repetition is the focus of this section, and it belongs to the wider topic of loops and control flow in Go. A loop lets a program repeat work without repeating code, and that single ability changes what programs can do. Instead of writing the same statement ten times, you write it once inside a loop and let the loop run it as many times as needed, with values that change on each pass. The price of that power is care: a loop that never ends, or ends one round too early, is one of the most common beginner bugs, so learning to trace loops carefully is time well spent.</p>
+<p>The range form walks over a collection and, on each round, gives you the position and the value. For a slice, the position is the index and the value is a copy of the element. For a map, the position is the key, and the order of visits is not guaranteed, so never write code that depends on map order. You can ignore a value you do not need with the blank identifier, and you should, because an unused variable is an error in Go.</p>
+<p>When you work with review: Controlling Repetition, keep the example in this section beside you and read it slowly, line by line, asking what each part contributes to review: Controlling Repetition. The best way to understand a loop is to trace it by hand on a tiny input. Make a small table with one column per variable and one row per round, and fill it in before you run the code. Watch the counter change, watch the condition flip from true to false, and watch any total or result accumulate. This habit feels slow at first and saves hours later, especially with nested loops.</p>
+<p>Off-by-one errors are the classic loop bug: starting at one when you should start at zero, or using less than or equal to when less than was correct, so the loop runs one round too many or too few. Testing with zero items, one item, and a few items catches most of them. Infinite loops are the other classic: a condition that never becomes false, often because the loop body never changes the value the condition tests. If a program seems to hang, that is the first thing to suspect, and adding a temporary print of the loop variable usually reveals it at once.</p>
+<p>To finish this section on review: Controlling Repetition, pause and restate the idea in your own words before moving on. In short, loops repeat work safely when their stopping rule is clear: a condition that will become false, a range over a collection that will end, or a break that will be reached. Prefer range when you are walking a collection, prefer a classic loop when you are counting, and prefer a while-style loop when the number of rounds is unknown. Trace small inputs by hand, test empty inputs, and your loops will be among the most reliable parts of your programs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	// Review: Controlling Repetition
+	for i := 1; i &lt;= 5; i++ {
+		fmt.Println(&quot;Count:&quot;, i)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> What happens in a Go program when review: Controlling Repetition is used incorrectly? Give one concrete example.</p>
+<h2>Practical Task</h2>
+<p>Build a small Go program that uses a for loop to add up a slice of numbers, uses range to print each name in a slice with its index, and uses a while-style loop to count down from 5 to 1. Test it with an empty slice as well as a slice of five numbers, and write down what each loop printed and where break or continue would change the result.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Explain the three parts of a classic for loop and what happens when the condition is false before the first round.</li>
+<li>When is range the right choice for walking a collection, and when is a classic counting loop clearer?</li>
+<li>Why is map iteration order not guaranteed in Go, and how should that fact shape code that ranges over a map?</li>
+<li>Describe an off-by-one error in a loop and the three test inputs you would use to catch it.</li>
+<li>Explain the difference between break and continue, and give one example where each one makes a loop clearer.</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-07.html">← Chapter 7</a> <a href="index.html">All chapters</a> <a href="chapter-09.html">Chapter 9 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/go-developer/chapter-08.html'; this.page.identifier = 'book-go-developer-chapter-08'; this.page.title = 'Chapter 8: Loops: for, range and Control Flow'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 15 — Methods and Associated Functions — Rust Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 15 of the Rust Developer teaching book: Methods and Associated Functions.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Rust Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 15: Methods and Associated Functions</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-15.svg" alt="Design for Chapter 15" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What a Method Is</h2>
+<p>In this section you will work through what a method is, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind what a method is is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of what a method is as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Before you move on, try to explain what a method is to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn area(&amp;self) -&gt; u32 {
+        self.width * self.height
+    }
+}
+
+fn main() {
+    let rect = Rectangle { width: 10, height: 5 };
+    println!(&quot;{}&quot;, rect.area());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what a method is mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 2: Implementation Blocks</h2>
+<p>In this section you will work through implementation blocks, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind implementation blocks is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of implementation blocks as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly.</p>
+<p>A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value.</p>
+<p>When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Before you move on, try to explain implementation blocks to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Task {
+    title: String,
+    done: bool,
+}
+
+impl Task {
+    fn new(title: String) -&gt; Self {
+        Task { title, done: false }
+    }
+    fn mark_done(&amp;mut self) {
+        self.done = true;
+    }
+}
+
+fn main() {
+    let mut task = Task::new(String::from(&quot;Learn&quot;));
+    task.mark_done();
+    println!(&quot;{}&quot;, task.done);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does implementation blocks mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 3: Methods versus Free Functions</h2>
+<p>In this section you will work through methods versus free functions, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods versus free functions is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods versus free functions as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication.</p>
+<p>Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended.</p>
+<p>A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. Before you move on, try to explain methods versus free functions to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Counter {
+    count: i32,
+}
+
+impl Counter {
+    fn increment(&amp;mut self) {
+        self.count += 1;
+    }
+    fn value(&amp;self) -&gt; i32 {
+        self.count
+    }
+}
+
+fn main() {
+    let mut counter = Counter { count: 0 };
+    counter.increment();
+    println!(&quot;{}&quot;, counter.value());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods versus free functions mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 4: The self Receiver</h2>
+<p>In this section you will work through the self receiver, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind the self receiver is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of the self receiver as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to.</p>
+<p>Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. Before you move on, try to explain the self receiver to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Book {
+    title: String,
+}
+
+impl Book {
+    fn title(&amp;self) -&gt; &amp;str {
+        &amp;self.title
+    }
+}
+
+fn main() {
+    let book = Book { title: String::from(&quot;Rust&quot;) };
+    println!(&quot;{}&quot;, book.title());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the self receiver mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 5: Borrowing self</h2>
+<p>In this section you will work through borrowing self, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind borrowing self is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of borrowing self as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference.</p>
+<p>A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. Before you move on, try to explain borrowing self to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Greeter {
+    name: String,
+}
+
+impl Greeter {
+    fn greet(&amp;self) -&gt; String {
+        format!(&quot;Hello, {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let greeter = Greeter { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, greeter.greet());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does borrowing self mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 6: Mutably Borrowing self</h2>
+<p>In this section you will work through mutably borrowing self, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind mutably borrowing self is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of mutably borrowing self as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test.</p>
+<p>Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values.</p>
+<p>A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. Before you move on, try to explain mutably borrowing self to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn origin() -&gt; Self {
+        Point { x: 0, y: 0 }
+    }
+}
+
+fn main() {
+    let point = Point::origin();
+    println!(&quot;{}, {}&quot;, point.x, point.y);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does mutably borrowing self mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 7: Consuming self</h2>
+<p>In this section you will work through consuming self, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind consuming self is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of consuming self as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self.</p>
+<p>The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module.</p>
+<p>Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Before you move on, try to explain consuming self to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Note {
+    text: String,
+}
+
+impl Note {
+    fn word_count(&amp;self) -&gt; usize {
+        self.text.split_whitespace().count()
+    }
+}
+
+fn main() {
+    let note = Note { text: String::from(&quot;hello world&quot;) };
+    println!(&quot;{}&quot;, note.word_count());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does consuming self mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 8: Associated Functions</h2>
+<p>In this section you will work through associated functions, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind associated functions is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of associated functions as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Before you move on, try to explain associated functions to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Score {
+    value: i32,
+}
+
+impl Score {
+    fn add(&amp;mut self, amount: i32) {
+        self.value += amount;
+    }
+}
+
+fn main() {
+    let mut score = Score { value: 10 };
+    score.add(5);
+    println!(&quot;{}&quot;, score.value);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does associated functions mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 9: The new Constructor Convention</h2>
+<p>In this section you will work through the new constructor convention, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind the new constructor convention is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of the new constructor convention as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. Before you move on, try to explain the new constructor convention to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct User {
+    name: String,
+}
+
+impl User {
+    fn describe(&amp;self) -&gt; String {
+        format!(&quot;User: {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let user = User { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, user.describe());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the new constructor convention mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 10: Constructors with Parameters</h2>
+<p>In this section you will work through constructors with parameters, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind constructors with parameters is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of constructors with parameters as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly.</p>
+<p>A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value.</p>
+<p>When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test.</p>
+<p>Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. Before you move on, try to explain constructors with parameters to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Calculator;
+
+impl Calculator {
+    fn add(a: i32, b: i32) -&gt; i32 {
+        a + b
+    }
+}
+
+fn main() {
+    println!(&quot;{}&quot;, Calculator::add(2, 3));
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does constructors with parameters mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 11: Methods That Return Values</h2>
+<p>In this section you will work through methods that return values, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods that return values is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods that return values as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication.</p>
+<p>Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended.</p>
+<p>A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self.</p>
+<p>The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. Before you move on, try to explain methods that return values to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn area(&amp;self) -&gt; u32 {
+        self.width * self.height
+    }
+}
+
+fn main() {
+    let rect = Rectangle { width: 10, height: 5 };
+    println!(&quot;{}&quot;, rect.area());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods that return values mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 12: Methods That Return References</h2>
+<p>In this section you will work through methods that return references, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods that return references is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods that return references as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to.</p>
+<p>Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Before you move on, try to explain methods that return references to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Task {
+    title: String,
+    done: bool,
+}
+
+impl Task {
+    fn new(title: String) -&gt; Self {
+        Task { title, done: false }
+    }
+    fn mark_done(&amp;mut self) {
+        self.done = true;
+    }
+}
+
+fn main() {
+    let mut task = Task::new(String::from(&quot;Learn&quot;));
+    task.mark_done();
+    println!(&quot;{}&quot;, task.done);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods that return references mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 13: Methods That Change Fields</h2>
+<p>In this section you will work through methods that change fields, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods that change fields is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods that change fields as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference.</p>
+<p>A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Before you move on, try to explain methods that change fields to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Counter {
+    count: i32,
+}
+
+impl Counter {
+    fn increment(&amp;mut self) {
+        self.count += 1;
+    }
+    fn value(&amp;self) -&gt; i32 {
+        self.count
+    }
+}
+
+fn main() {
+    let mut counter = Counter { count: 0 };
+    counter.increment();
+    println!(&quot;{}&quot;, counter.value());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods that change fields mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 14: Methods That Call Other Methods</h2>
+<p>In this section you will work through methods that call other methods, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods that call other methods is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods that call other methods as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values.</p>
+<p>A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly.</p>
+<p>A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. Before you move on, try to explain methods that call other methods to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Book {
+    title: String,
+}
+
+impl Book {
+    fn title(&amp;self) -&gt; &amp;str {
+        &amp;self.title
+    }
+}
+
+fn main() {
+    let book = Book { title: String::from(&quot;Rust&quot;) };
+    println!(&quot;{}&quot;, book.title());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods that call other methods mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 15: Multiple Implementation Blocks</h2>
+<p>In this section you will work through multiple implementation blocks, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind multiple implementation blocks is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of multiple implementation blocks as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module.</p>
+<p>Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication.</p>
+<p>Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. Before you move on, try to explain multiple implementation blocks to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Greeter {
+    name: String,
+}
+
+impl Greeter {
+    fn greet(&amp;self) -&gt; String {
+        format!(&quot;Hello, {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let greeter = Greeter { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, greeter.greet());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does multiple implementation blocks mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 16: Method Names and Clarity</h2>
+<p>In this section you will work through method names and clarity, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind method names and clarity is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of method names and clarity as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to.</p>
+<p>Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. Before you move on, try to explain method names and clarity to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn origin() -&gt; Self {
+        Point { x: 0, y: 0 }
+    }
+}
+
+fn main() {
+    let point = Point::origin();
+    println!(&quot;{}, {}&quot;, point.x, point.y);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does method names and clarity mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 17: Associated Functions That Are Not Constructors</h2>
+<p>In this section you will work through associated functions that are not constructors, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind associated functions that are not constructors is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of associated functions that are not constructors as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference.</p>
+<p>A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Before you move on, try to explain associated functions that are not constructors to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Note {
+    text: String,
+}
+
+impl Note {
+    fn word_count(&amp;self) -&gt; usize {
+        self.text.split_whitespace().count()
+    }
+}
+
+fn main() {
+    let note = Note { text: String::from(&quot;hello world&quot;) };
+    println!(&quot;{}&quot;, note.word_count());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does associated functions that are not constructors mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 18: Methods and Struct Fields</h2>
+<p>In this section you will work through methods and struct fields, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and struct fields is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and struct fields as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value.</p>
+<p>When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test.</p>
+<p>Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values.</p>
+<p>A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Before you move on, try to explain methods and struct fields to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Score {
+    value: i32,
+}
+
+impl Score {
+    fn add(&amp;mut self, amount: i32) {
+        self.value += amount;
+    }
+}
+
+fn main() {
+    let mut score = Score { value: 10 };
+    score.add(5);
+    println!(&quot;{}&quot;, score.value);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and struct fields mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 19: Methods and Ownership</h2>
+<p>In this section you will work through methods and ownership, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and ownership is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and ownership as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended.</p>
+<p>A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self.</p>
+<p>The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module.</p>
+<p>Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Before you move on, try to explain methods and ownership to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct User {
+    name: String,
+}
+
+impl User {
+    fn describe(&amp;self) -&gt; String {
+        format!(&quot;User: {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let user = User { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, user.describe());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and ownership mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 20: Methods and Borrowing Rules</h2>
+<p>In this section you will work through methods and borrowing rules, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and borrowing rules is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and borrowing rules as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Before you move on, try to explain methods and borrowing rules to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Calculator;
+
+impl Calculator {
+    fn add(a: i32, b: i32) -&gt; i32 {
+        a + b
+    }
+}
+
+fn main() {
+    println!(&quot;{}&quot;, Calculator::add(2, 3));
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and borrowing rules mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 21: Methods and Vectors of Structs</h2>
+<p>In this section you will work through methods and vectors of structs, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and vectors of structs is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and vectors of structs as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Before you move on, try to explain methods and vectors of structs to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn area(&amp;self) -&gt; u32 {
+        self.width * self.height
+    }
+}
+
+fn main() {
+    let rect = Rectangle { width: 10, height: 5 };
+    println!(&quot;{}&quot;, rect.area());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and vectors of structs mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 22: Methods and Loops</h2>
+<p>In this section you will work through methods and loops, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and loops is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and loops as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly.</p>
+<p>A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value.</p>
+<p>When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Before you move on, try to explain methods and loops to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Task {
+    title: String,
+    done: bool,
+}
+
+impl Task {
+    fn new(title: String) -&gt; Self {
+        Task { title, done: false }
+    }
+    fn mark_done(&amp;mut self) {
+        self.done = true;
+    }
+}
+
+fn main() {
+    let mut task = Task::new(String::from(&quot;Learn&quot;));
+    task.mark_done();
+    println!(&quot;{}&quot;, task.done);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and loops mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 23: Methods and if Branches</h2>
+<p>In this section you will work through methods and if branches, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and if branches is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and if branches as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication.</p>
+<p>Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended.</p>
+<p>A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. Before you move on, try to explain methods and if branches to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Counter {
+    count: i32,
+}
+
+impl Counter {
+    fn increment(&amp;mut self) {
+        self.count += 1;
+    }
+    fn value(&amp;self) -&gt; i32 {
+        self.count
+    }
+}
+
+fn main() {
+    let mut counter = Counter { count: 0 };
+    counter.increment();
+    println!(&quot;{}&quot;, counter.value());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and if branches mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 24: Methods and Match Arms</h2>
+<p>In this section you will work through methods and match arms, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and match arms is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and match arms as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to.</p>
+<p>Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. Before you move on, try to explain methods and match arms to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Book {
+    title: String,
+}
+
+impl Book {
+    fn title(&amp;self) -&gt; &amp;str {
+        &amp;self.title
+    }
+}
+
+fn main() {
+    let book = Book { title: String::from(&quot;Rust&quot;) };
+    println!(&quot;{}&quot;, book.title());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and match arms mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 25: Methods and Error Values</h2>
+<p>In this section you will work through methods and error values, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and error values is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and error values as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference.</p>
+<p>A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. Before you move on, try to explain methods and error values to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Greeter {
+    name: String,
+}
+
+impl Greeter {
+    fn greet(&amp;self) -&gt; String {
+        format!(&quot;Hello, {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let greeter = Greeter { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, greeter.greet());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and error values mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 26: Methods and Validation</h2>
+<p>In this section you will work through methods and validation, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and validation is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and validation as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test.</p>
+<p>Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values.</p>
+<p>A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. Before you move on, try to explain methods and validation to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn origin() -&gt; Self {
+        Point { x: 0, y: 0 }
+    }
+}
+
+fn main() {
+    let point = Point::origin();
+    println!(&quot;{}, {}&quot;, point.x, point.y);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and validation mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 27: Methods and Display Output</h2>
+<p>In this section you will work through methods and display output, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and display output is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and display output as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self.</p>
+<p>The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module.</p>
+<p>Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Before you move on, try to explain methods and display output to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Note {
+    text: String,
+}
+
+impl Note {
+    fn word_count(&amp;self) -&gt; usize {
+        self.text.split_whitespace().count()
+    }
+}
+
+fn main() {
+    let note = Note { text: String::from(&quot;hello world&quot;) };
+    println!(&quot;{}&quot;, note.word_count());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and display output mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 28: Methods and Task Lists</h2>
+<p>In this section you will work through methods and task lists, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and task lists is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and task lists as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Before you move on, try to explain methods and task lists to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Score {
+    value: i32,
+}
+
+impl Score {
+    fn add(&amp;mut self, amount: i32) {
+        self.value += amount;
+    }
+}
+
+fn main() {
+    let mut score = Score { value: 10 };
+    score.add(5);
+    println!(&quot;{}&quot;, score.value);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and task lists mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 29: Methods and Notes</h2>
+<p>In this section you will work through methods and notes, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and notes is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and notes as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. Before you move on, try to explain methods and notes to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct User {
+    name: String,
+}
+
+impl User {
+    fn describe(&amp;self) -&gt; String {
+        format!(&quot;User: {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let user = User { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, user.describe());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and notes mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 30: Methods and Books</h2>
+<p>In this section you will work through methods and books, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and books is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and books as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly.</p>
+<p>A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value.</p>
+<p>When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test.</p>
+<p>Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. Before you move on, try to explain methods and books to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Calculator;
+
+impl Calculator {
+    fn add(a: i32, b: i32) -&gt; i32 {
+        a + b
+    }
+}
+
+fn main() {
+    println!(&quot;{}&quot;, Calculator::add(2, 3));
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and books mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 31: Methods and Testing Methods</h2>
+<p>In this section you will work through methods and testing methods, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and testing methods is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and testing methods as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication.</p>
+<p>Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended.</p>
+<p>A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self.</p>
+<p>The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. Before you move on, try to explain methods and testing methods to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn area(&amp;self) -&gt; u32 {
+        self.width * self.height
+    }
+}
+
+fn main() {
+    let rect = Rectangle { width: 10, height: 5 };
+    println!(&quot;{}&quot;, rect.area());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and testing methods mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 32: Methods and Refactoring</h2>
+<p>In this section you will work through methods and refactoring, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and refactoring is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and refactoring as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to.</p>
+<p>Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Before you move on, try to explain methods and refactoring to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Task {
+    title: String,
+    done: bool,
+}
+
+impl Task {
+    fn new(title: String) -&gt; Self {
+        Task { title, done: false }
+    }
+    fn mark_done(&amp;mut self) {
+        self.done = true;
+    }
+}
+
+fn main() {
+    let mut task = Task::new(String::from(&quot;Learn&quot;));
+    task.mark_done();
+    println!(&quot;{}&quot;, task.done);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and refactoring mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 33: Methods and Compiler Errors</h2>
+<p>In this section you will work through methods and compiler errors, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and compiler errors is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and compiler errors as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference.</p>
+<p>A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Before you move on, try to explain methods and compiler errors to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Counter {
+    count: i32,
+}
+
+impl Counter {
+    fn increment(&amp;mut self) {
+        self.count += 1;
+    }
+    fn value(&amp;self) -&gt; i32 {
+        self.count
+    }
+}
+
+fn main() {
+    let mut counter = Counter { count: 0 };
+    counter.increment();
+    println!(&quot;{}&quot;, counter.value());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and compiler errors mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 34: Methods and Common Mistakes</h2>
+<p>In this section you will work through methods and common mistakes, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and common mistakes is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and common mistakes as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values.</p>
+<p>A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly.</p>
+<p>A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. Before you move on, try to explain methods and common mistakes to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Book {
+    title: String,
+}
+
+impl Book {
+    fn title(&amp;self) -&gt; &amp;str {
+        &amp;self.title
+    }
+}
+
+fn main() {
+    let book = Book { title: String::from(&quot;Rust&quot;) };
+    println!(&quot;{}&quot;, book.title());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and common mistakes mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 35: Methods and Chaining Calls</h2>
+<p>In this section you will work through methods and chaining calls, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and chaining calls is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and chaining calls as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module.</p>
+<p>Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication.</p>
+<p>Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. Before you move on, try to explain methods and chaining calls to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Greeter {
+    name: String,
+}
+
+impl Greeter {
+    fn greet(&amp;self) -&gt; String {
+        format!(&quot;Hello, {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let greeter = Greeter { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, greeter.greet());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and chaining calls mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 36: Methods and Builder Patterns</h2>
+<p>In this section you will work through methods and builder patterns, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and builder patterns is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and builder patterns as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to.</p>
+<p>Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. Before you move on, try to explain methods and builder patterns to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn origin() -&gt; Self {
+        Point { x: 0, y: 0 }
+    }
+}
+
+fn main() {
+    let point = Point::origin();
+    println!(&quot;{}, {}&quot;, point.x, point.y);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and builder patterns mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 37: Methods and Default Behaviour</h2>
+<p>In this section you will work through methods and default behaviour, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and default behaviour is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and default behaviour as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference.</p>
+<p>A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Before you move on, try to explain methods and default behaviour to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Note {
+    text: String,
+}
+
+impl Note {
+    fn word_count(&amp;self) -&gt; usize {
+        self.text.split_whitespace().count()
+    }
+}
+
+fn main() {
+    let note = Note { text: String::from(&quot;hello world&quot;) };
+    println!(&quot;{}&quot;, note.word_count());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and default behaviour mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 38: Methods and Associated Constants</h2>
+<p>In this section you will work through methods and associated constants, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and associated constants is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and associated constants as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value.</p>
+<p>When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test.</p>
+<p>Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values.</p>
+<p>A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Before you move on, try to explain methods and associated constants to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Score {
+    value: i32,
+}
+
+impl Score {
+    fn add(&amp;mut self, amount: i32) {
+        self.value += amount;
+    }
+}
+
+fn main() {
+    let mut score = Score { value: 10 };
+    score.add(5);
+    println!(&quot;{}&quot;, score.value);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and associated constants mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 39: Methods and Naming Conventions</h2>
+<p>In this section you will work through methods and naming conventions, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and naming conventions is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and naming conventions as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended.</p>
+<p>A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self.</p>
+<p>The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module.</p>
+<p>Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Before you move on, try to explain methods and naming conventions to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct User {
+    name: String,
+}
+
+impl User {
+    fn describe(&amp;self) -&gt; String {
+        format!(&quot;User: {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let user = User { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, user.describe());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and naming conventions mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 40: Methods and Comments That Help</h2>
+<p>In this section you will work through methods and comments that help, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and comments that help is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and comments that help as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Before you move on, try to explain methods and comments that help to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Calculator;
+
+impl Calculator {
+    fn add(a: i32, b: i32) -&gt; i32 {
+        a + b
+    }
+}
+
+fn main() {
+    println!(&quot;{}&quot;, Calculator::add(2, 3));
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and comments that help mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 41: Methods and Documentation</h2>
+<p>In this section you will work through methods and documentation, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and documentation is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and documentation as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Before you move on, try to explain methods and documentation to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn area(&amp;self) -&gt; u32 {
+        self.width * self.height
+    }
+}
+
+fn main() {
+    let rect = Rectangle { width: 10, height: 5 };
+    println!(&quot;{}&quot;, rect.area());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and documentation mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 42: Methods and Code Organisation</h2>
+<p>In this section you will work through methods and code organisation, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and code organisation is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and code organisation as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly.</p>
+<p>A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value.</p>
+<p>When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Before you move on, try to explain methods and code organisation to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Task {
+    title: String,
+    done: bool,
+}
+
+impl Task {
+    fn new(title: String) -&gt; Self {
+        Task { title, done: false }
+    }
+    fn mark_done(&amp;mut self) {
+        self.done = true;
+    }
+}
+
+fn main() {
+    let mut task = Task::new(String::from(&quot;Learn&quot;));
+    task.mark_done();
+    println!(&quot;{}&quot;, task.done);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and code organisation mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 43: Methods and Small Types</h2>
+<p>In this section you will work through methods and small types, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and small types is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and small types as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication.</p>
+<p>Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended.</p>
+<p>A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. Before you move on, try to explain methods and small types to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Counter {
+    count: i32,
+}
+
+impl Counter {
+    fn increment(&amp;mut self) {
+        self.count += 1;
+    }
+    fn value(&amp;self) -&gt; i32 {
+        self.count
+    }
+}
+
+fn main() {
+    let mut counter = Counter { count: 0 };
+    counter.increment();
+    println!(&quot;{}&quot;, counter.value());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and small types mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 44: Methods and Large Types</h2>
+<p>In this section you will work through methods and large types, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and large types is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and large types as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to.</p>
+<p>Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. Before you move on, try to explain methods and large types to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Book {
+    title: String,
+}
+
+impl Book {
+    fn title(&amp;self) -&gt; &amp;str {
+        &amp;self.title
+    }
+}
+
+fn main() {
+    let book = Book { title: String::from(&quot;Rust&quot;) };
+    println!(&quot;{}&quot;, book.title());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and large types mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 45: Methods and Splitting Behaviour</h2>
+<p>In this section you will work through methods and splitting behaviour, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and splitting behaviour is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and splitting behaviour as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference.</p>
+<p>A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it.</p>
+<p>Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. Before you move on, try to explain methods and splitting behaviour to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Greeter {
+    name: String,
+}
+
+impl Greeter {
+    fn greet(&amp;self) -&gt; String {
+        format!(&quot;Hello, {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let greeter = Greeter { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, greeter.greet());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and splitting behaviour mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 46: Methods and Building Confidence</h2>
+<p>In this section you will work through methods and building confidence, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and building confidence is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and building confidence as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test.</p>
+<p>Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values.</p>
+<p>A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself.</p>
+<p>Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. Before you move on, try to explain methods and building confidence to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn origin() -&gt; Self {
+        Point { x: 0, y: 0 }
+    }
+}
+
+fn main() {
+    let point = Point::origin();
+    println!(&quot;{}, {}&quot;, point.x, point.y);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and building confidence mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 47: Methods and Associated Functions Together</h2>
+<p>In this section you will work through methods and associated functions together, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and associated functions together is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and associated functions together as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self.</p>
+<p>The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards. An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module.</p>
+<p>Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument.</p>
+<p>Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Before you move on, try to explain methods and associated functions together to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Note {
+    text: String,
+}
+
+impl Note {
+    fn word_count(&amp;self) -&gt; usize {
+        self.text.split_whitespace().count()
+    }
+}
+
+fn main() {
+    let note = Note { text: String::from(&quot;hello world&quot;) };
+    println!(&quot;{}&quot;, note.word_count());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and associated functions together mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 48: Methods Review: Rules to Remember</h2>
+<p>In this section you will work through methods review: rules to remember, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods review: rules to remember is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods review: rules to remember as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it.</p>
+<p>Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them. Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Before you move on, try to explain methods review: rules to remember to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Score {
+    value: i32,
+}
+
+impl Score {
+    fn add(&amp;mut self, amount: i32) {
+        self.value += amount;
+    }
+}
+
+fn main() {
+    let mut score = Score { value: 10 };
+    score.add(5);
+    println!(&quot;{}&quot;, score.value);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods review: rules to remember mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 49: Methods in a Complete Mini Program</h2>
+<p>In this section you will work through methods in a complete mini program, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods in a complete mini program is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods in a complete mini program as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value.</p>
+<p>The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long. Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs.</p>
+<p>Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Methods can call other methods on the same value, which lets you build small, focused methods and combine them into larger behaviour without duplication. Associated functions that act as constructors often take the field values as parameters and return Self, giving callers a single, documented way to create a value. When a method and a field share a name, the method call still works, because Rust distinguishes a method call with parentheses from a field access without them.</p>
+<p>Implementation blocks keep behaviour close to the data definition, so a reader can find what a type can do by looking near the struct or enum it belongs to. Testing methods is straightforward: create a value, call the method, and check that the fields or the return value changed exactly as intended. A type with too many methods may be doing too much, and splitting behaviour across smaller types often makes each method easier to understand and test. Learning methods well means practising the three receiver forms, writing a small constructor, and converting a few free functions into methods to feel the difference. Before you move on, try to explain methods in a complete mini program to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct User {
+    name: String,
+}
+
+impl User {
+    fn describe(&amp;self) -&gt; String {
+        format!(&quot;User: {}&quot;, self.name)
+    }
+}
+
+fn main() {
+    let user = User { name: String::from(&quot;Kel&quot;) };
+    println!(&quot;{}&quot;, user.describe());
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods in a complete mini program mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Section 50: Methods and Next Steps</h2>
+<p>In this section you will work through methods and next steps, one of the building blocks of methods and associated functions in Rust, and you will learn to recognise it in real code, explain it in plain words, and use it deliberately rather than by copying an example you do not yet understand. The idea behind methods and next steps is practical: it answers a question that comes up again and again when you write Rust programs, namely how to keep data safe, clear, and under control while your program grows from a few lines into something larger and harder to hold in your head. Think of methods and next steps as one tool in a growing Rust toolkit, modest on its own, but powerful when combined with the tools you already know, because it lets you express ideas that were awkward or impossible before. A method is a function defined inside an implementation block for a type, and it is called on a value of that type using dot notation.</p>
+<p>An associated function is also defined in an implementation block, but it is called on the type itself rather than on a value, and it does not take self. The most famous associated function in Rust is new, which by convention builds a fresh value of a type, often with sensible starting values. A method that takes self by value consumes the value, a method that takes a reference borrows it, and a method that takes a mutable reference may change it. Most methods borrow their receiver, because reading or updating a value in place is more common than consuming it, and borrowing keeps the value usable afterwards.</p>
+<p>An implementation block groups all the methods and associated functions for one type, and a type may have several implementation blocks in the same module. Methods make code read like a description of behaviour, because a call such as task.mark_done reads as an action performed by that task itself. Associated functions are useful for constructors, for building a value from parts, and for operations that do not belong to any single existing value. The Self type inside an implementation block refers to the type being implemented, which keeps signatures readable when the type name is long.</p>
+<p>Method syntax is a convenience built on ordinary functions, because a method call is equivalent to calling the function with the receiver as its first argument. Choosing a method over a free function is often a readability decision: if an operation is naturally about one type, making it a method signals that clearly. A method can return a value, a reference, or nothing, and its return type should match what a caller would expect from the action it performs. Mutable methods require a mutable receiver, so a caller must declare the value mutable before calling a method that changes it. Before you move on, try to explain methods and next steps to a friend in two sentences, without looking at this section, because if you can do that clearly, you understand methods and associated functions well enough to use it in your own programs with confidence.</p>
+<pre><code>struct Journey {
+    step: u32,
+}
+
+impl Journey {
+    fn new() -&gt; Self {
+        Journey { step: 0 }
+    }
+    fn advance(&amp;mut self) {
+        self.step += 1;
+    }
+}
+
+fn main() {
+    let mut journey = Journey::new();
+    journey.advance();
+    println!(&quot;{}&quot;, journey.step);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does methods and next steps mean, and how would you use it in a small Rust program about methods and associated functions?</p>
+<h2>Practical Task</h2>
+<p>Write a small Rust program that practises methods and associated functions in a realistic way: create the values you need, use the ideas from this chapter to move, borrow, or organise them correctly, print the results at each step so you can trace what happened, and then change one detail at a time, predict the outcome, run the program, and fix any compiler error by reading its message carefully before asking for help.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What is the central idea of methods and associated functions in Rust, and why does it matter for safe programs?</li>
+<li>How does methods and associated functions change the way you write a function that works with data owned by someone else?</li>
+<li>What is a common mistake with methods and associated functions, and what does the compiler message for that mistake usually tell you?</li>
+<li>How would you explain methods and associated functions to a beginner using a small, concrete example from this chapter?</li>
+<li>How will you apply methods and associated functions in the next program you write, and how will you check that you applied it correctly?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-14.html">← Chapter 14</a> <a href="index.html">All chapters</a> <a href="chapter-16.html">Chapter 16 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/rust-developer/chapter-15.html'; this.page.identifier = 'book-rust-developer-chapter-15'; this.page.title = 'Chapter 15: Methods and Associated Functions'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

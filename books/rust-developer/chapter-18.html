@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 18 — Error Handling: Returning and Propagating Errors — Rust Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 18 of the Rust Developer teaching book: Error Handling: Returning and Propagating Errors.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Rust Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 18: Error Handling: Returning and Propagating Errors</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-18.svg" alt="Design for Chapter 18" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: Errors Are Values, Not Crashes</h2>
+<p>Think of errors are values, not crashes as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors are values, not crashes without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for errors are values, not crashes, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of errors are values, not crashes rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and errors are values, not crashes helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for errors are values, not crashes, and what a sensible failure or empty case would look like. A good habit is to test errors are values, not crashes with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with errors are values, not crashes come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how errors are values, not crashes fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When errors are values, not crashes feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make errors are values, not crashes easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for errors are values, not crashes, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain errors are values, not crashes to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, errors are values, not crashes often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for errors are values, not crashes on the first attempt, because a working version can be improved after you understand it. Compare errors are values, not crashes with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what errors are values, not crashes returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain errors are values, not crashes aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about errors are values, not crashes, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors are values, not crashes mean, and when would you use it in a Rust program?</p>
+<h2>Section 2: Two Kinds of Failure in Rust</h2>
+<p>A beginner can understand two kinds of failure in rust without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for two kinds of failure in rust, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of two kinds of failure in rust rather than on decoration. Rust rewards code that says what it means, and two kinds of failure in rust helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for two kinds of failure in rust, and what a sensible failure or empty case would look like. A good habit is to test two kinds of failure in rust with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with two kinds of failure in rust come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how two kinds of failure in rust fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When two kinds of failure in rust feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make two kinds of failure in rust easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for two kinds of failure in rust, since it points out missing cases and type mismatches before the program runs. Choose names that explain two kinds of failure in rust to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, two kinds of failure in rust often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for two kinds of failure in rust on the first attempt, because a working version can be improved after you understand it. Compare two kinds of failure in rust with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what two kinds of failure in rust returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain two kinds of failure in rust aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about two kinds of failure in rust, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when two kinds of failure in rust is handled in one clear place instead of being repeated in many scattered places.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does two kinds of failure in rust mean, and when would you use it in a Rust program?</p>
+<h2>Section 3: Recoverable Versus Unrecoverable Errors</h2>
+<p>When you write code for recoverable versus unrecoverable errors, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of recoverable versus unrecoverable errors rather than on decoration. Rust rewards code that says what it means, and recoverable versus unrecoverable errors helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for recoverable versus unrecoverable errors, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test recoverable versus unrecoverable errors with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with recoverable versus unrecoverable errors come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how recoverable versus unrecoverable errors fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When recoverable versus unrecoverable errors feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make recoverable versus unrecoverable errors easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for recoverable versus unrecoverable errors, since it points out missing cases and type mismatches before the program runs. Choose names that explain recoverable versus unrecoverable errors to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, recoverable versus unrecoverable errors often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for recoverable versus unrecoverable errors on the first attempt, because a working version can be improved after you understand it. Compare recoverable versus unrecoverable errors with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what recoverable versus unrecoverable errors returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain recoverable versus unrecoverable errors aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about recoverable versus unrecoverable errors, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when recoverable versus unrecoverable errors is handled in one clear place instead of being repeated in many scattered places. If a test fails around recoverable versus unrecoverable errors, read the expected value and the actual value carefully before changing the code at random. Documentation helps recoverable versus unrecoverable errors stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does recoverable versus unrecoverable errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 4: Returning Result from a Function</h2>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of returning result from a function rather than on decoration. Rust rewards code that says what it means, and returning result from a function helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for returning result from a function, and what a sensible failure or empty case would look like. A good habit is to test returning result from a function with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with returning result from a function come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how returning result from a function fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When returning result from a function feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make returning result from a function easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for returning result from a function, since it points out missing cases and type mismatches before the program runs. Choose names that explain returning result from a function to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, returning result from a function often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for returning result from a function on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare returning result from a function with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what returning result from a function returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain returning result from a function aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about returning result from a function, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when returning result from a function is handled in one clear place instead of being repeated in many scattered places. If a test fails around returning result from a function, read the expected value and the actual value carefully before changing the code at random. Documentation helps returning result from a function stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does returning result from a function mean, and when would you use it in a Rust program?</p>
+<h2>Section 5: Writing a Function That Can Fail</h2>
+<p>Rust rewards code that says what it means, and writing a function that can fail helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for writing a function that can fail, and what a sensible failure or empty case would look like. A good habit is to test writing a function that can fail with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with writing a function that can fail come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how writing a function that can fail fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When writing a function that can fail feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make writing a function that can fail easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for writing a function that can fail, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain writing a function that can fail to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, writing a function that can fail often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for writing a function that can fail on the first attempt, because a working version can be improved after you understand it. Compare writing a function that can fail with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what writing a function that can fail returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain writing a function that can fail aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about writing a function that can fail, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when writing a function that can fail is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around writing a function that can fail, read the expected value and the actual value carefully before changing the code at random. Documentation helps writing a function that can fail stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for writing a function that can fail, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does writing a function that can fail mean, and when would you use it in a Rust program?</p>
+<h2>Section 6: The Question Mark Operator</h2>
+<p>Before you type anything, ask yourself what success looks like for the question mark operator, and what a sensible failure or empty case would look like. A good habit is to test the question mark operator with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with the question mark operator come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how the question mark operator fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When the question mark operator feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make the question mark operator easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for the question mark operator, since it points out missing cases and type mismatches before the program runs. Choose names that explain the question mark operator to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, the question mark operator often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for the question mark operator on the first attempt, because a working version can be improved after you understand it. Compare the question mark operator with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what the question mark operator returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain the question mark operator aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about the question mark operator, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when the question mark operator is handled in one clear place instead of being repeated in many scattered places. If a test fails around the question mark operator, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps the question mark operator stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for the question mark operator, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind the question mark operator transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice the question mark operator by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the question mark operator mean, and when would you use it in a Rust program?</p>
+<h2>Section 7: How Question Mark Propagates Errors</h2>
+<p>A good habit is to test how question mark propagates errors with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with how question mark propagates errors come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how how question mark propagates errors fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When how question mark propagates errors feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make how question mark propagates errors easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for how question mark propagates errors, since it points out missing cases and type mismatches before the program runs. Choose names that explain how question mark propagates errors to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, how question mark propagates errors often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for how question mark propagates errors on the first attempt, because a working version can be improved after you understand it. Compare how question mark propagates errors with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what how question mark propagates errors returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain how question mark propagates errors aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about how question mark propagates errors, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when how question mark propagates errors is handled in one clear place instead of being repeated in many scattered places. If a test fails around how question mark propagates errors, read the expected value and the actual value carefully before changing the code at random. Documentation helps how question mark propagates errors stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for how question mark propagates errors, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind how question mark propagates errors transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice how question mark propagates errors by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does how question mark propagates errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 8: Question Mark in main</h2>
+<p>Many mistakes with question mark in main come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how question mark in main fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When question mark in main feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make question mark in main easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for question mark in main, since it points out missing cases and type mismatches before the program runs. Choose names that explain question mark in main to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, question mark in main often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for question mark in main on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare question mark in main with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what question mark in main returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain question mark in main aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about question mark in main, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when question mark in main is handled in one clear place instead of being repeated in many scattered places. If a test fails around question mark in main, read the expected value and the actual value carefully before changing the code at random. Documentation helps question mark in main stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for question mark in main, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind question mark in main transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice question mark in main by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for question mark in main, because a small example that runs teaches more than a large example that confuses. When you feel stuck on question mark in main, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does question mark in main mean, and when would you use it in a Rust program?</p>
+<h2>Section 9: Question Mark with Option</h2>
+<p>Notice how question mark with option fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When question mark with option feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make question mark with option easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for question mark with option, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain question mark with option to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, question mark with option often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for question mark with option on the first attempt, because a working version can be improved after you understand it. Compare question mark with option with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what question mark with option returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain question mark with option aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about question mark with option, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when question mark with option is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around question mark with option, read the expected value and the actual value carefully before changing the code at random. Documentation helps question mark with option stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for question mark with option, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind question mark with option transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice question mark with option by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for question mark with option, because a small example that runs teaches more than a large example that confuses. When you feel stuck on question mark with option, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about question mark with option is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does question mark with option mean, and when would you use it in a Rust program?</p>
+<h2>Section 10: Chaining Calls That May Fail</h2>
+<p>When chaining calls that may fail feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make chaining calls that may fail easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for chaining calls that may fail, since it points out missing cases and type mismatches before the program runs. Choose names that explain chaining calls that may fail to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, chaining calls that may fail often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for chaining calls that may fail on the first attempt, because a working version can be improved after you understand it. Compare chaining calls that may fail with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what chaining calls that may fail returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain chaining calls that may fail aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about chaining calls that may fail, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when chaining calls that may fail is handled in one clear place instead of being repeated in many scattered places. If a test fails around chaining calls that may fail, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps chaining calls that may fail stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for chaining calls that may fail, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind chaining calls that may fail transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice chaining calls that may fail by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for chaining calls that may fail, because a small example that runs teaches more than a large example that confuses. When you feel stuck on chaining calls that may fail, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about chaining calls that may fail is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does chaining calls that may fail mean, and when would you use it in a Rust program?</p>
+<h2>Section 11: Early Return on Error</h2>
+<p>Short functions make early return on error easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for early return on error, since it points out missing cases and type mismatches before the program runs. Choose names that explain early return on error to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, early return on error often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for early return on error on the first attempt, because a working version can be improved after you understand it. Compare early return on error with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what early return on error returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain early return on error aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about early return on error, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when early return on error is handled in one clear place instead of being repeated in many scattered places. If a test fails around early return on error, read the expected value and the actual value carefully before changing the code at random. Documentation helps early return on error stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for early return on error, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind early return on error transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice early return on error by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for early return on error, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on early return on error, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about early return on error is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe early return on error, write a short working example, and explain why your example behaves as it does. This section explores early return on error as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does early return on error mean, and when would you use it in a Rust program?</p>
+<h2>Section 12: Converting One Error to Another</h2>
+<p>The compiler is a helpful partner for converting one error to another, since it points out missing cases and type mismatches before the program runs. Choose names that explain converting one error to another to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, converting one error to another often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for converting one error to another on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare converting one error to another with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what converting one error to another returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain converting one error to another aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about converting one error to another, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when converting one error to another is handled in one clear place instead of being repeated in many scattered places. If a test fails around converting one error to another, read the expected value and the actual value carefully before changing the code at random. Documentation helps converting one error to another stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for converting one error to another, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind converting one error to another transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice converting one error to another by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for converting one error to another, because a small example that runs teaches more than a large example that confuses. When you feel stuck on converting one error to another, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about converting one error to another is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe converting one error to another, write a short working example, and explain why your example behaves as it does. This section explores converting one error to another as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does converting one error to another mean, and when would you use it in a Rust program?</p>
+<h2>Section 13: The From Trait in Outline</h2>
+<p>Choose names that explain the from trait in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, the from trait in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for the from trait in outline on the first attempt, because a working version can be improved after you understand it. Compare the from trait in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what the from trait in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain the from trait in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about the from trait in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when the from trait in outline is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around the from trait in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps the from trait in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for the from trait in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind the from trait in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice the from trait in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for the from trait in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on the from trait in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about the from trait in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe the from trait in outline, write a short working example, and explain why your example behaves as it does. This section explores the from trait in outline as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of the from trait in outline as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the from trait in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 14: Boxed Errors for Simple Programs</h2>
+<p>In real programs, boxed errors for simple programs often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for boxed errors for simple programs on the first attempt, because a working version can be improved after you understand it. Compare boxed errors for simple programs with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what boxed errors for simple programs returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain boxed errors for simple programs aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about boxed errors for simple programs, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when boxed errors for simple programs is handled in one clear place instead of being repeated in many scattered places. If a test fails around boxed errors for simple programs, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps boxed errors for simple programs stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for boxed errors for simple programs, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind boxed errors for simple programs transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice boxed errors for simple programs by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for boxed errors for simple programs, because a small example that runs teaches more than a large example that confuses. When you feel stuck on boxed errors for simple programs, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about boxed errors for simple programs is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe boxed errors for simple programs, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores boxed errors for simple programs as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of boxed errors for simple programs as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand boxed errors for simple programs without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does boxed errors for simple programs mean, and when would you use it in a Rust program?</p>
+<h2>Section 15: Reading a Function Signature</h2>
+<p>You do not need a perfect design for reading a function signature on the first attempt, because a working version can be improved after you understand it. Compare reading a function signature with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what reading a function signature returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain reading a function signature aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about reading a function signature, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when reading a function signature is handled in one clear place instead of being repeated in many scattered places. If a test fails around reading a function signature, read the expected value and the actual value carefully before changing the code at random. Documentation helps reading a function signature stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for reading a function signature, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind reading a function signature transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice reading a function signature by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for reading a function signature, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on reading a function signature, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about reading a function signature is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe reading a function signature, write a short working example, and explain why your example behaves as it does. This section explores reading a function signature as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of reading a function signature as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand reading a function signature without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for reading a function signature, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of reading a function signature rather than on decoration.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reading a function signature mean, and when would you use it in a Rust program?</p>
+<h2>Section 16: Error Types That Describe the Problem</h2>
+<p>Compare error types that describe the problem with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what error types that describe the problem returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error types that describe the problem aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error types that describe the problem, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when error types that describe the problem is handled in one clear place instead of being repeated in many scattered places. If a test fails around error types that describe the problem, read the expected value and the actual value carefully before changing the code at random. Documentation helps error types that describe the problem stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error types that describe the problem, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind error types that describe the problem transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error types that describe the problem by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error types that describe the problem, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error types that describe the problem, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about error types that describe the problem is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe error types that describe the problem, write a short working example, and explain why your example behaves as it does. This section explores error types that describe the problem as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of error types that describe the problem as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand error types that describe the problem without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for error types that describe the problem, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error types that describe the problem mean, and when would you use it in a Rust program?</p>
+<h2>Section 17: Using io::Result in Outline</h2>
+<p>Pay attention to what using io::result in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain using io::result in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about using io::result in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when using io::result in outline is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around using io::result in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps using io::result in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for using io::result in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind using io::result in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice using io::result in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for using io::result in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on using io::result in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about using io::result in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe using io::result in outline, write a short working example, and explain why your example behaves as it does. This section explores using io::result in outline as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of using io::result in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand using io::result in outline without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for using io::result in outline, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of using io::result in outline rather than on decoration. Rust rewards code that says what it means, and using io::result in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for using io::result in outline, and what a sensible failure or empty case would look like.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does using io::result in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 18: Parsing Input That May Fail</h2>
+<p>A useful exercise is to explain parsing input that may fail aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about parsing input that may fail, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when parsing input that may fail is handled in one clear place instead of being repeated in many scattered places. If a test fails around parsing input that may fail, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps parsing input that may fail stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for parsing input that may fail, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind parsing input that may fail transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice parsing input that may fail by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for parsing input that may fail, because a small example that runs teaches more than a large example that confuses. When you feel stuck on parsing input that may fail, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about parsing input that may fail is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe parsing input that may fail, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores parsing input that may fail as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of parsing input that may fail as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand parsing input that may fail without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for parsing input that may fail, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of parsing input that may fail rather than on decoration. Rust rewards code that says what it means, and parsing input that may fail helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for parsing input that may fail, and what a sensible failure or empty case would look like.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does parsing input that may fail mean, and when would you use it in a Rust program?</p>
+<h2>Section 19: Opening a File That May Be Missing</h2>
+<p>When you review code about opening a file that may be missing, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when opening a file that may be missing is handled in one clear place instead of being repeated in many scattered places. If a test fails around opening a file that may be missing, read the expected value and the actual value carefully before changing the code at random. Documentation helps opening a file that may be missing stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for opening a file that may be missing, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind opening a file that may be missing transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice opening a file that may be missing by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for opening a file that may be missing, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on opening a file that may be missing, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about opening a file that may be missing is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe opening a file that may be missing, write a short working example, and explain why your example behaves as it does. This section explores opening a file that may be missing as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of opening a file that may be missing as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand opening a file that may be missing without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for opening a file that may be missing, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of opening a file that may be missing rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and opening a file that may be missing helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for opening a file that may be missing, and what a sensible failure or empty case would look like.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does opening a file that may be missing mean, and when would you use it in a Rust program?</p>
+<h2>Section 20: Handling a Missing File Gracefully</h2>
+<p>Rust programs become easier to maintain when handling a missing file gracefully is handled in one clear place instead of being repeated in many scattered places. If a test fails around handling a missing file gracefully, read the expected value and the actual value carefully before changing the code at random. Documentation helps handling a missing file gracefully stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for handling a missing file gracefully, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind handling a missing file gracefully transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice handling a missing file gracefully by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for handling a missing file gracefully, because a small example that runs teaches more than a large example that confuses. When you feel stuck on handling a missing file gracefully, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about handling a missing file gracefully is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe handling a missing file gracefully, write a short working example, and explain why your example behaves as it does. This section explores handling a missing file gracefully as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of handling a missing file gracefully as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand handling a missing file gracefully without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for handling a missing file gracefully, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of handling a missing file gracefully rather than on decoration. Rust rewards code that says what it means, and handling a missing file gracefully helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for handling a missing file gracefully, and what a sensible failure or empty case would look like. A good habit is to test handling a missing file gracefully with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with handling a missing file gracefully come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling a missing file gracefully mean, and when would you use it in a Rust program?</p>
+<h2>Section 21: Propagating Through Several Layers</h2>
+<p>If a test fails around propagating through several layers, read the expected value and the actual value carefully before changing the code at random. Documentation helps propagating through several layers stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for propagating through several layers, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind propagating through several layers transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice propagating through several layers by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for propagating through several layers, because a small example that runs teaches more than a large example that confuses. When you feel stuck on propagating through several layers, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about propagating through several layers is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe propagating through several layers, write a short working example, and explain why your example behaves as it does. This section explores propagating through several layers as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of propagating through several layers as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand propagating through several layers without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for propagating through several layers, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of propagating through several layers rather than on decoration. Rust rewards code that says what it means, and propagating through several layers helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for propagating through several layers, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test propagating through several layers with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with propagating through several layers come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how propagating through several layers fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When propagating through several layers feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does propagating through several layers mean, and when would you use it in a Rust program?</p>
+<h2>Section 22: Keeping the Happy Path Readable</h2>
+<p>Documentation helps keeping the happy path readable stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for keeping the happy path readable, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind keeping the happy path readable transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice keeping the happy path readable by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for keeping the happy path readable, because a small example that runs teaches more than a large example that confuses. When you feel stuck on keeping the happy path readable, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about keeping the happy path readable is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe keeping the happy path readable, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores keeping the happy path readable as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of keeping the happy path readable as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand keeping the happy path readable without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for keeping the happy path readable, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of keeping the happy path readable rather than on decoration. Rust rewards code that says what it means, and keeping the happy path readable helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for keeping the happy path readable, and what a sensible failure or empty case would look like. A good habit is to test keeping the happy path readable with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with keeping the happy path readable come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how keeping the happy path readable fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When keeping the happy path readable feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does keeping the happy path readable mean, and when would you use it in a Rust program?</p>
+<h2>Section 23: Where Errors Should Be Handled</h2>
+<p>Edge cases matter for where errors should be handled, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind where errors should be handled transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice where errors should be handled by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for where errors should be handled, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on where errors should be handled, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about where errors should be handled is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe where errors should be handled, write a short working example, and explain why your example behaves as it does. This section explores where errors should be handled as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of where errors should be handled as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand where errors should be handled without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for where errors should be handled, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of where errors should be handled rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and where errors should be handled helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for where errors should be handled, and what a sensible failure or empty case would look like. A good habit is to test where errors should be handled with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with where errors should be handled come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how where errors should be handled fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When where errors should be handled feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make where errors should be handled easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does where errors should be handled mean, and when would you use it in a Rust program?</p>
+<h2>Section 24: Where Errors Should Be Propagated</h2>
+<p>The ideas behind where errors should be propagated transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice where errors should be propagated by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for where errors should be propagated, because a small example that runs teaches more than a large example that confuses. When you feel stuck on where errors should be propagated, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about where errors should be propagated is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe where errors should be propagated, write a short working example, and explain why your example behaves as it does. This section explores where errors should be propagated as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of where errors should be propagated as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand where errors should be propagated without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for where errors should be propagated, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of where errors should be propagated rather than on decoration. Rust rewards code that says what it means, and where errors should be propagated helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for where errors should be propagated, and what a sensible failure or empty case would look like. A good habit is to test where errors should be propagated with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with where errors should be propagated come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how where errors should be propagated fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When where errors should be propagated feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make where errors should be propagated easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for where errors should be propagated, since it points out missing cases and type mismatches before the program runs.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does where errors should be propagated mean, and when would you use it in a Rust program?</p>
+<h2>Section 25: Matching Errors at the Boundary</h2>
+<p>Practice matching errors at the boundary by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for matching errors at the boundary, because a small example that runs teaches more than a large example that confuses. When you feel stuck on matching errors at the boundary, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about matching errors at the boundary is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe matching errors at the boundary, write a short working example, and explain why your example behaves as it does. This section explores matching errors at the boundary as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of matching errors at the boundary as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand matching errors at the boundary without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for matching errors at the boundary, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of matching errors at the boundary rather than on decoration. Rust rewards code that says what it means, and matching errors at the boundary helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for matching errors at the boundary, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test matching errors at the boundary with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with matching errors at the boundary come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how matching errors at the boundary fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When matching errors at the boundary feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make matching errors at the boundary easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for matching errors at the boundary, since it points out missing cases and type mismatches before the program runs. Choose names that explain matching errors at the boundary to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does matching errors at the boundary mean, and when would you use it in a Rust program?</p>
+<h2>Section 26: Logging an Error Before Returning It</h2>
+<p>Keep your examples honest and small for logging an error before returning it, because a small example that runs teaches more than a large example that confuses. When you feel stuck on logging an error before returning it, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about logging an error before returning it is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe logging an error before returning it, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores logging an error before returning it as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of logging an error before returning it as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand logging an error before returning it without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for logging an error before returning it, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of logging an error before returning it rather than on decoration. Rust rewards code that says what it means, and logging an error before returning it helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for logging an error before returning it, and what a sensible failure or empty case would look like. A good habit is to test logging an error before returning it with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with logging an error before returning it come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how logging an error before returning it fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When logging an error before returning it feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make logging an error before returning it easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for logging an error before returning it, since it points out missing cases and type mismatches before the program runs. Choose names that explain logging an error before returning it to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, logging an error before returning it often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does logging an error before returning it mean, and when would you use it in a Rust program?</p>
+<h2>Section 27: Adding Context Without Panicking</h2>
+<p>When you feel stuck on adding context without panicking, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about adding context without panicking is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe adding context without panicking, write a short working example, and explain why your example behaves as it does. This section explores adding context without panicking as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of adding context without panicking as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand adding context without panicking without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for adding context without panicking, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of adding context without panicking rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and adding context without panicking helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for adding context without panicking, and what a sensible failure or empty case would look like. A good habit is to test adding context without panicking with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with adding context without panicking come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how adding context without panicking fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When adding context without panicking feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make adding context without panicking easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for adding context without panicking, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain adding context without panicking to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, adding context without panicking often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for adding context without panicking on the first attempt, because a working version can be improved after you understand it. Compare adding context without panicking with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does adding context without panicking mean, and when would you use it in a Rust program?</p>
+<h2>Section 28: Returning Errors from Methods</h2>
+<p>Strong Rust code about returning errors from methods is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe returning errors from methods, write a short working example, and explain why your example behaves as it does. This section explores returning errors from methods as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of returning errors from methods as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand returning errors from methods without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for returning errors from methods, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of returning errors from methods rather than on decoration. Rust rewards code that says what it means, and returning errors from methods helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for returning errors from methods, and what a sensible failure or empty case would look like. A good habit is to test returning errors from methods with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with returning errors from methods come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how returning errors from methods fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When returning errors from methods feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make returning errors from methods easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for returning errors from methods, since it points out missing cases and type mismatches before the program runs. Choose names that explain returning errors from methods to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, returning errors from methods often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for returning errors from methods on the first attempt, because a working version can be improved after you understand it. Compare returning errors from methods with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what returning errors from methods returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does returning errors from methods mean, and when would you use it in a Rust program?</p>
+<h2>Section 29: Errors in Loops</h2>
+<p>By the end of this section, you should be able to describe errors in loops, write a short working example, and explain why your example behaves as it does. This section explores errors in loops as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of errors in loops as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors in loops without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for errors in loops, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of errors in loops rather than on decoration. Rust rewards code that says what it means, and errors in loops helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for errors in loops, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test errors in loops with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with errors in loops come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how errors in loops fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When errors in loops feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make errors in loops easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for errors in loops, since it points out missing cases and type mismatches before the program runs. Choose names that explain errors in loops to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, errors in loops often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for errors in loops on the first attempt, because a working version can be improved after you understand it. Compare errors in loops with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what errors in loops returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain errors in loops aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about errors in loops, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors in loops mean, and when would you use it in a Rust program?</p>
+<h2>Section 30: Errors in Iterators in Outline</h2>
+<p>This section explores errors in iterators in outline as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of errors in iterators in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors in iterators in outline without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for errors in iterators in outline, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of errors in iterators in outline rather than on decoration. Rust rewards code that says what it means, and errors in iterators in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for errors in iterators in outline, and what a sensible failure or empty case would look like. A good habit is to test errors in iterators in outline with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with errors in iterators in outline come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how errors in iterators in outline fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When errors in iterators in outline feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make errors in iterators in outline easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for errors in iterators in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain errors in iterators in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, errors in iterators in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for errors in iterators in outline on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare errors in iterators in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what errors in iterators in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain errors in iterators in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors in iterators in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 31: Short-Circuiting on the First Error</h2>
+<p>Think of short-circuiting on the first error as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand short-circuiting on the first error without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for short-circuiting on the first error, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of short-circuiting on the first error rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and short-circuiting on the first error helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for short-circuiting on the first error, and what a sensible failure or empty case would look like. A good habit is to test short-circuiting on the first error with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with short-circuiting on the first error come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how short-circuiting on the first error fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When short-circuiting on the first error feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make short-circuiting on the first error easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for short-circuiting on the first error, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain short-circuiting on the first error to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, short-circuiting on the first error often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for short-circuiting on the first error on the first attempt, because a working version can be improved after you understand it. Compare short-circuiting on the first error with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what short-circuiting on the first error returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain short-circuiting on the first error aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about short-circuiting on the first error, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does short-circuiting on the first error mean, and when would you use it in a Rust program?</p>
+<h2>Section 32: Collecting Results in Outline</h2>
+<p>A beginner can understand collecting results in outline without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for collecting results in outline, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of collecting results in outline rather than on decoration. Rust rewards code that says what it means, and collecting results in outline helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for collecting results in outline, and what a sensible failure or empty case would look like. A good habit is to test collecting results in outline with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with collecting results in outline come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how collecting results in outline fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When collecting results in outline feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make collecting results in outline easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for collecting results in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain collecting results in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, collecting results in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for collecting results in outline on the first attempt, because a working version can be improved after you understand it. Compare collecting results in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what collecting results in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain collecting results in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about collecting results in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when collecting results in outline is handled in one clear place instead of being repeated in many scattered places. If a test fails around collecting results in outline, read the expected value and the actual value carefully before changing the code at random.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does collecting results in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 33: Testing a Function That Returns Result</h2>
+<p>When you write code for testing a function that returns result, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of testing a function that returns result rather than on decoration. Rust rewards code that says what it means, and testing a function that returns result helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for testing a function that returns result, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test testing a function that returns result with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with testing a function that returns result come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how testing a function that returns result fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When testing a function that returns result feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make testing a function that returns result easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for testing a function that returns result, since it points out missing cases and type mismatches before the program runs. Choose names that explain testing a function that returns result to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, testing a function that returns result often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for testing a function that returns result on the first attempt, because a working version can be improved after you understand it. Compare testing a function that returns result with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what testing a function that returns result returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain testing a function that returns result aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about testing a function that returns result, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when testing a function that returns result is handled in one clear place instead of being repeated in many scattered places. If a test fails around testing a function that returns result, read the expected value and the actual value carefully before changing the code at random.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing a function that returns result mean, and when would you use it in a Rust program?</p>
+<h2>Section 34: Testing Error Paths</h2>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of testing error paths rather than on decoration. Rust rewards code that says what it means, and testing error paths helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for testing error paths, and what a sensible failure or empty case would look like. A good habit is to test testing error paths with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with testing error paths come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how testing error paths fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When testing error paths feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make testing error paths easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for testing error paths, since it points out missing cases and type mismatches before the program runs. Choose names that explain testing error paths to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, testing error paths often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for testing error paths on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare testing error paths with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what testing error paths returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain testing error paths aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about testing error paths, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when testing error paths is handled in one clear place instead of being repeated in many scattered places. If a test fails around testing error paths, read the expected value and the actual value carefully before changing the code at random. Documentation helps testing error paths stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for testing error paths, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind testing error paths transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing error paths mean, and when would you use it in a Rust program?</p>
+<h2>Section 35: Testing the Question Mark Path</h2>
+<p>Rust rewards code that says what it means, and testing the question mark path helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for testing the question mark path, and what a sensible failure or empty case would look like. A good habit is to test testing the question mark path with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with testing the question mark path come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how testing the question mark path fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When testing the question mark path feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make testing the question mark path easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for testing the question mark path, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain testing the question mark path to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, testing the question mark path often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for testing the question mark path on the first attempt, because a working version can be improved after you understand it. Compare testing the question mark path with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what testing the question mark path returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain testing the question mark path aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about testing the question mark path, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when testing the question mark path is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around testing the question mark path, read the expected value and the actual value carefully before changing the code at random. Documentation helps testing the question mark path stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for testing the question mark path, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing the question mark path mean, and when would you use it in a Rust program?</p>
+<h2>Section 36: Common Propagation Mistakes</h2>
+<p>Before you type anything, ask yourself what success looks like for common propagation mistakes, and what a sensible failure or empty case would look like. A good habit is to test common propagation mistakes with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with common propagation mistakes come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how common propagation mistakes fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When common propagation mistakes feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make common propagation mistakes easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for common propagation mistakes, since it points out missing cases and type mismatches before the program runs. Choose names that explain common propagation mistakes to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, common propagation mistakes often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for common propagation mistakes on the first attempt, because a working version can be improved after you understand it. Compare common propagation mistakes with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what common propagation mistakes returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain common propagation mistakes aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about common propagation mistakes, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when common propagation mistakes is handled in one clear place instead of being repeated in many scattered places. If a test fails around common propagation mistakes, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps common propagation mistakes stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for common propagation mistakes, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind common propagation mistakes transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice common propagation mistakes by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for common propagation mistakes, because a small example that runs teaches more than a large example that confuses.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does common propagation mistakes mean, and when would you use it in a Rust program?</p>
+<h2>Section 37: Mismatched Error Types</h2>
+<p>A good habit is to test mismatched error types with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with mismatched error types come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how mismatched error types fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When mismatched error types feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make mismatched error types easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for mismatched error types, since it points out missing cases and type mismatches before the program runs. Choose names that explain mismatched error types to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, mismatched error types often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for mismatched error types on the first attempt, because a working version can be improved after you understand it. Compare mismatched error types with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what mismatched error types returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain mismatched error types aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about mismatched error types, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when mismatched error types is handled in one clear place instead of being repeated in many scattered places. If a test fails around mismatched error types, read the expected value and the actual value carefully before changing the code at random. Documentation helps mismatched error types stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for mismatched error types, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind mismatched error types transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice mismatched error types by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for mismatched error types, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on mismatched error types, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does mismatched error types mean, and when would you use it in a Rust program?</p>
+<h2>Section 38: Forgetting the Question Mark</h2>
+<p>Many mistakes with forgetting the question mark come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how forgetting the question mark fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When forgetting the question mark feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make forgetting the question mark easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for forgetting the question mark, since it points out missing cases and type mismatches before the program runs. Choose names that explain forgetting the question mark to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, forgetting the question mark often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for forgetting the question mark on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare forgetting the question mark with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what forgetting the question mark returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain forgetting the question mark aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about forgetting the question mark, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when forgetting the question mark is handled in one clear place instead of being repeated in many scattered places. If a test fails around forgetting the question mark, read the expected value and the actual value carefully before changing the code at random. Documentation helps forgetting the question mark stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for forgetting the question mark, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind forgetting the question mark transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice forgetting the question mark by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for forgetting the question mark, because a small example that runs teaches more than a large example that confuses. When you feel stuck on forgetting the question mark, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does forgetting the question mark mean, and when would you use it in a Rust program?</p>
+<h2>Section 39: Using unwrap in Library Code</h2>
+<p>Notice how using unwrap in library code fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When using unwrap in library code feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make using unwrap in library code easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for using unwrap in library code, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain using unwrap in library code to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, using unwrap in library code often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for using unwrap in library code on the first attempt, because a working version can be improved after you understand it. Compare using unwrap in library code with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what using unwrap in library code returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain using unwrap in library code aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about using unwrap in library code, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when using unwrap in library code is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around using unwrap in library code, read the expected value and the actual value carefully before changing the code at random. Documentation helps using unwrap in library code stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for using unwrap in library code, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind using unwrap in library code transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice using unwrap in library code by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for using unwrap in library code, because a small example that runs teaches more than a large example that confuses. When you feel stuck on using unwrap in library code, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does using unwrap in library code mean, and when would you use it in a Rust program?</p>
+<h2>Section 40: Choosing a Return Type</h2>
+<p>When choosing a return type feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make choosing a return type easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for choosing a return type, since it points out missing cases and type mismatches before the program runs. Choose names that explain choosing a return type to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, choosing a return type often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for choosing a return type on the first attempt, because a working version can be improved after you understand it. Compare choosing a return type with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what choosing a return type returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain choosing a return type aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about choosing a return type, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when choosing a return type is handled in one clear place instead of being repeated in many scattered places. If a test fails around choosing a return type, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps choosing a return type stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for choosing a return type, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind choosing a return type transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice choosing a return type by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for choosing a return type, because a small example that runs teaches more than a large example that confuses. When you feel stuck on choosing a return type, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about choosing a return type is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe choosing a return type, write a short working example, and explain why your example behaves as it does.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does choosing a return type mean, and when would you use it in a Rust program?</p>
+<h2>Section 41: Documenting Possible Errors</h2>
+<p>Short functions make documenting possible errors easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for documenting possible errors, since it points out missing cases and type mismatches before the program runs. Choose names that explain documenting possible errors to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, documenting possible errors often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for documenting possible errors on the first attempt, because a working version can be improved after you understand it. Compare documenting possible errors with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what documenting possible errors returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain documenting possible errors aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about documenting possible errors, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when documenting possible errors is handled in one clear place instead of being repeated in many scattered places. If a test fails around documenting possible errors, read the expected value and the actual value carefully before changing the code at random. Documentation helps documenting possible errors stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for documenting possible errors, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind documenting possible errors transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice documenting possible errors by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for documenting possible errors, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on documenting possible errors, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about documenting possible errors is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe documenting possible errors, write a short working example, and explain why your example behaves as it does. This section explores documenting possible errors as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of documenting possible errors as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does documenting possible errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 42: Error Handling in Small Scripts</h2>
+<p>The compiler is a helpful partner for error handling in small scripts, since it points out missing cases and type mismatches before the program runs. Choose names that explain error handling in small scripts to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, error handling in small scripts often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for error handling in small scripts on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare error handling in small scripts with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what error handling in small scripts returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error handling in small scripts aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error handling in small scripts, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when error handling in small scripts is handled in one clear place instead of being repeated in many scattered places. If a test fails around error handling in small scripts, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling in small scripts stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error handling in small scripts, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind error handling in small scripts transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error handling in small scripts by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling in small scripts, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error handling in small scripts, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about error handling in small scripts is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe error handling in small scripts, write a short working example, and explain why your example behaves as it does. This section explores error handling in small scripts as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in small scripts mean, and when would you use it in a Rust program?</p>
+<h2>Section 43: Error Handling in Larger Programs</h2>
+<p>Choose names that explain error handling in larger programs to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, error handling in larger programs often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for error handling in larger programs on the first attempt, because a working version can be improved after you understand it. Compare error handling in larger programs with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what error handling in larger programs returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error handling in larger programs aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error handling in larger programs, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling in larger programs is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around error handling in larger programs, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling in larger programs stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error handling in larger programs, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling in larger programs transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice error handling in larger programs by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling in larger programs, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error handling in larger programs, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about error handling in larger programs is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe error handling in larger programs, write a short working example, and explain why your example behaves as it does. This section explores error handling in larger programs as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of error handling in larger programs as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in larger programs mean, and when would you use it in a Rust program?</p>
+<h2>Section 44: Errors and Ownership</h2>
+<p>In real programs, errors and ownership often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for errors and ownership on the first attempt, because a working version can be improved after you understand it. Compare errors and ownership with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what errors and ownership returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain errors and ownership aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about errors and ownership, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when errors and ownership is handled in one clear place instead of being repeated in many scattered places. If a test fails around errors and ownership, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps errors and ownership stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for errors and ownership, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind errors and ownership transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice errors and ownership by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for errors and ownership, because a small example that runs teaches more than a large example that confuses. When you feel stuck on errors and ownership, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about errors and ownership is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe errors and ownership, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores errors and ownership as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of errors and ownership as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors and ownership without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for errors and ownership, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors and ownership mean, and when would you use it in a Rust program?</p>
+<h2>Section 45: Errors and Borrowed Data</h2>
+<p>You do not need a perfect design for errors and borrowed data on the first attempt, because a working version can be improved after you understand it. Compare errors and borrowed data with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what errors and borrowed data returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain errors and borrowed data aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about errors and borrowed data, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when errors and borrowed data is handled in one clear place instead of being repeated in many scattered places. If a test fails around errors and borrowed data, read the expected value and the actual value carefully before changing the code at random. Documentation helps errors and borrowed data stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for errors and borrowed data, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind errors and borrowed data transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice errors and borrowed data by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for errors and borrowed data, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on errors and borrowed data, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about errors and borrowed data is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe errors and borrowed data, write a short working example, and explain why your example behaves as it does. This section explores errors and borrowed data as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of errors and borrowed data as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors and borrowed data without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for errors and borrowed data, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of errors and borrowed data rather than on decoration.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors and borrowed data mean, and when would you use it in a Rust program?</p>
+<h2>Section 46: Refactoring Toward Result</h2>
+<p>Compare refactoring toward result with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what refactoring toward result returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain refactoring toward result aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about refactoring toward result, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when refactoring toward result is handled in one clear place instead of being repeated in many scattered places. If a test fails around refactoring toward result, read the expected value and the actual value carefully before changing the code at random. Documentation helps refactoring toward result stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for refactoring toward result, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind refactoring toward result transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice refactoring toward result by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for refactoring toward result, because a small example that runs teaches more than a large example that confuses. When you feel stuck on refactoring toward result, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about refactoring toward result is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe refactoring toward result, write a short working example, and explain why your example behaves as it does. This section explores refactoring toward result as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of refactoring toward result as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand refactoring toward result without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for refactoring toward result, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of refactoring toward result rather than on decoration. Rust rewards code that says what it means, and refactoring toward result helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for refactoring toward result, and what a sensible failure or empty case would look like.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does refactoring toward result mean, and when would you use it in a Rust program?</p>
+<h2>Section 47: Propagating Errors from Closures in Outline</h2>
+<p>Pay attention to what propagating errors from closures in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain propagating errors from closures in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about propagating errors from closures in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when propagating errors from closures in outline is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around propagating errors from closures in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps propagating errors from closures in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for propagating errors from closures in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind propagating errors from closures in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice propagating errors from closures in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for propagating errors from closures in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on propagating errors from closures in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about propagating errors from closures in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe propagating errors from closures in outline, write a short working example, and explain why your example behaves as it does. This section explores propagating errors from closures in outline as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of propagating errors from closures in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand propagating errors from closures in outline without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for propagating errors from closures in outline, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of propagating errors from closures in outline rather than on decoration.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does propagating errors from closures in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 48: Returning Errors from Tests in Outline</h2>
+<p>A useful exercise is to explain returning errors from tests in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about returning errors from tests in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when returning errors from tests in outline is handled in one clear place instead of being repeated in many scattered places. If a test fails around returning errors from tests in outline, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps returning errors from tests in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for returning errors from tests in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind returning errors from tests in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice returning errors from tests in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for returning errors from tests in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on returning errors from tests in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about returning errors from tests in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe returning errors from tests in outline, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores returning errors from tests in outline as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of returning errors from tests in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand returning errors from tests in outline without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for returning errors from tests in outline, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of returning errors from tests in outline rather than on decoration. Rust rewards code that says what it means, and returning errors from tests in outline helps you say it plainly instead of hiding the meaning in comments.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does returning errors from tests in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 49: Error Handling in Async Code in Outline</h2>
+<p>When you review code about error handling in async code in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling in async code in outline is handled in one clear place instead of being repeated in many scattered places. If a test fails around error handling in async code in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling in async code in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for error handling in async code in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling in async code in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error handling in async code in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling in async code in outline, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on error handling in async code in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about error handling in async code in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe error handling in async code in outline, write a short working example, and explain why your example behaves as it does. This section explores error handling in async code in outline as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of error handling in async code in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand error handling in async code in outline without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for error handling in async code in outline, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of error handling in async code in outline rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and error handling in async code in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for error handling in async code in outline, and what a sensible failure or empty case would look like.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in async code in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 50: Review: Returning Errors Cleanly</h2>
+<p>Rust programs become easier to maintain when review: returning errors cleanly is handled in one clear place instead of being repeated in many scattered places. If a test fails around review: returning errors cleanly, read the expected value and the actual value carefully before changing the code at random. Documentation helps review: returning errors cleanly stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for review: returning errors cleanly, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind review: returning errors cleanly transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice review: returning errors cleanly by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for review: returning errors cleanly, because a small example that runs teaches more than a large example that confuses. When you feel stuck on review: returning errors cleanly, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about review: returning errors cleanly is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe review: returning errors cleanly, write a short working example, and explain why your example behaves as it does. This section explores review: returning errors cleanly as part of returning and propagating errors in Rust, starting from a simple idea you can picture clearly. Think of review: returning errors cleanly as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand review: returning errors cleanly without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for review: returning errors cleanly, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of review: returning errors cleanly rather than on decoration. Rust rewards code that says what it means, and review: returning errors cleanly helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for review: returning errors cleanly, and what a sensible failure or empty case would look like. A good habit is to test review: returning errors cleanly with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with review: returning errors cleanly come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how review: returning errors cleanly fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<pre><code>use std::fs;
+
+fn read_first_line(path: &amp;str) -&gt; Result&lt;String, std::io::Error&gt; {
+    let content = fs::read_to_string(path)?;
+    let first = content.lines().next().unwrap_or(&quot;&quot;).to_string();
+    Ok(first)
+}
+
+fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+    let line = read_first_line(&quot;notes.txt&quot;)?;
+    println!(&quot;{line}&quot;);
+    Ok(())
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does review: returning errors cleanly mean, and when would you use it in a Rust program?</p>
+<h2>Practical Task</h2>
+<p>Build a small Rust program that puts returning and propagating errors into practice: write a complete example using the ideas from this chapter, run it, try an empty or unexpected input, and write a short note explaining what worked, what failed, and what you changed.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Explain one key idea from this chapter about returning and propagating errors and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about returning and propagating errors and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about returning and propagating errors and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about returning and propagating errors and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about returning and propagating errors and give a short example that shows it working.</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-17.html">← Chapter 17</a> <a href="index.html">All chapters</a> <a href="chapter-19.html">Chapter 19 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/rust-developer/chapter-18.html'; this.page.identifier = 'book-rust-developer-chapter-18'; this.page.title = 'Chapter 18: Error Handling: Returning and Propagating Errors'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

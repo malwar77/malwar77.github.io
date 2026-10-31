@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 27 — Fetching Data from APIs — JavaScript Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 27 of the JavaScript Developer teaching book: Fetching Data from APIs.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← JavaScript Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 27: Fetching Data from APIs</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-27.svg" alt="Design for Chapter 27" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What an API Really Is</h2>
+<p>An API, which stands for Application Programming Interface, is simply an agreed way for one program to ask another program for data or for work to be done. When you use a weather app, the app does not measure the weather itself. It asks a weather API for the current conditions in your city, and the API replies with structured data that the app then displays nicely. When you search for a product on a shopping site, the page asks a product API for matching items. In both cases, the API is a waiter between the kitchen and the table: it takes a clear request, passes it to the system that holds the data, and returns a clear answer.</p>
+<p>Most web APIs you will meet use HTTP, the same protocol your browser uses to load pages, and they return data in JSON format, which you will study in detail in the next chapter. A typical API has endpoints, which are URLs that represent a particular kind of data, such as users, posts, or products. To get a list of users, you send a GET request to the users endpoint. To get one specific user, you add their identifier to the URL. To create a new user, you send a POST request with the new data in the body. These conventions, often called REST, make APIs predictable: once you learn the pattern for one API, the next API feels familiar, even if its data is completely different.</p>
+<p>Understanding APIs matters because almost every modern application is built from pieces that talk to each other through APIs. Your front-end code rarely owns all its data. It borrows data from servers, from third-party services, and from other parts of the same system, all through APIs. Learning to fetch data well is therefore not a niche skill for back-end developers. It is a core front-end skill, because the quality of your fetching, including loading states, error handling, and caching, directly determines how fast, reliable, and pleasant your application feels to the people who use it every day.</p>
+<p>A helpful way to think about an API request is as a letter with a clear address, a method, and sometimes a parcel. The address is the URL, which says where the data lives. The method, such as GET or POST, says what you want to do with it. The headers are like the envelope markings, telling the server what format you accept or who you are. The body, for POST and similar methods, is the parcel containing new data. The server replies with a status code, headers, and a body, which is the answer letter. Keeping that letter metaphor in mind makes the technical details of fetch feel less abstract, because each part has a real-world counterpart.</p>
+<p>In this chapter, you will practise the whole letter-writing process with JavaScript&#x27;s fetch function. You will send GET requests, read responses, handle errors, send data with POST, update and delete data, filter with query strings, and build a small project that pulls it all together. By the end, fetching from an API will feel as ordinary as reading a variable, which is exactly how it should feel, because it is one of the most common tasks in everyday JavaScript work.</p>
+<pre><code>async function explainApi() {
+  console.log(&quot;An API is a waiter: request in, structured data out.&quot;);
+  console.log(&quot;GET reads data, POST creates data, PUT updates, DELETE removes.&quot;);
+}
+
+explainApi();</code></pre>
+<p class="check"><strong>Check:</strong> In plain words, what is an API and what does an endpoint represent?</p>
+<h2>Section 2: How fetch Works Step by Step</h2>
+<p>The fetch function is JavaScript&#x27;s built-in way to make HTTP requests from a browser or from modern Node.js. You call fetch with a URL, and it returns a promise that resolves to a Response object when the server replies with headers. That Response object is not the final data itself. It is a wrapper containing the status, headers, and methods for reading the body, such as json or text. To get usable data, you must await the Response, then await a second step that reads and parses its body. This two-step process surprises beginners, but it exists for a good reason: it lets you inspect the status and headers before committing to reading a potentially large body.</p>
+<p>Step by step, a typical fetch looks like this in words. First, you call fetch and await its promise, receiving a Response. Second, you check whether the response is successful, usually by looking at response.ok, which is true for status codes from two hundred to two hundred and ninety-nine. Third, if the response is successful, you await response.json to parse the body into a JavaScript value. Fourth, you use that value in your program, for example by displaying it on a page. If any step fails, you handle the error, distinguishing between a network failure, where fetch itself rejects, and an HTTP error, where fetch resolves but the status indicates a problem. That distinction is crucial and we will return to it in detail soon.</p>
+<p>One reason fetch is designed this way is streaming. A response body can be large, such as a big file or a long list, and reading it takes time and memory. By giving you a Response first, fetch lets you decide how to read the body, whether as JSON, text, or binary data, and lets you handle errors before reading. It also lets advanced code read the body in chunks as it arrives, rather than waiting for the whole body at once. For beginners, the practical takeaway is simpler: always remember the second await. Forgetting to await response.json leaves you with a promise instead of data, which is a close cousin of the forgotten await bug from the previous chapter.</p>
+<p>Another useful fact is that fetch does not throw an error for HTTP error statuses such as four hundred and four or five hundred. It only rejects for network failures, such as no internet connection, a DNS failure, or a request that was aborted. This behaviour is different from some older libraries and from many beginners&#x27; expectations, which is why checking response.ok is not optional. A fetch that returns a four hundred and four page has technically succeeded at the HTTP level, because the server replied, but it has failed at the application level, because the data you wanted is not there. Your code must check for that case explicitly.</p>
+<p>As you practise fetch, write the steps out in order and log the Response object before parsing it, so you can see its status, ok flag, and headers. That habit builds a mental model of the two-step process and makes debugging far easier. When a fetch misbehaves, you will know whether the problem was in reaching the server, in the status code, or in parsing the body, because you will have inspected each step in turn.</p>
+<pre><code>async function fetchStepByStep(url) {
+  const response = await fetch(url);
+  console.log(&quot;Status: &quot; + response.status + &quot;, ok: &quot; + response.ok);
+  if (!response.ok) {
+    console.log(&quot;HTTP error, do not parse as success data&quot;);
+    return;
+  }
+  const data = await response.json();
+  console.log(data);
+}</code></pre>
+<p class="check"><strong>Check:</strong> Why does fetch require two awaits, one for the Response and one for its body?</p>
+<h2>Section 3: Your First GET Request</h2>
+<p>A GET request is the simplest kind of API request: you ask for data, and you do not send any new data with the request. It is the kind of request your browser makes when you visit a page, and it is the kind you will use most often when learning APIs. To make a GET request with fetch, you simply call fetch with the URL of the data you want, await the Response, check that it is ok, and then await response.json to get the data. That short sequence is the foundation of almost every data-loading feature you will build, so it is worth practising until it feels automatic.</p>
+<p>For practice, many learners use a public placeholder API that returns fake posts, users, and comments for testing. These APIs are designed for learning: they accept GET requests, they return predictable JSON, and they do not require authentication for basic reads. Using such an API lets you practise real network fetching without setting up your own server or worrying about keys. When you later switch to a real API, the fetch code stays almost identical; only the URL and the shape of the data change. That transferability is why placeholder APIs are such a valuable learning tool, and why this chapter uses them as examples in words, even though you should always check a practice API&#x27;s current documentation before relying on it.</p>
+<p>When you write your first GET request, start small and verify each step. Log the status code, log the parsed data, and confirm that the data matches what you expected. If you expect an array of posts, check that you actually received an array. If you expect a single user object, check its fields. That verification habit catches mistakes early, such as fetching the wrong endpoint, misreading the data shape, or forgetting an await. It also builds confidence, because you see real data arriving from a real server, which is a satisfying moment for any learner and a solid foundation for more complex fetching.</p>
+<p>A common beginner mistake is to try to use the fetched data outside the async function before it has arrived. Because fetch is asynchronous, the data is only available after the awaits complete, inside the async function or in a then handler. Code that tries to use the data on the next line of a synchronous function will find it undefined. The fix is the same as in the previous chapter: keep data-dependent code inside the async function after the await, or return the data from the async function and await it at the call site. Respecting that timing rule prevents a whole class of confusing bugs.</p>
+<p>Once your first GET request works, try variations: fetch a different endpoint, fetch a single item by adding an id to the URL, and fetch a list and log its length. Each variation reinforces the same core pattern while teaching you something new about endpoints and data shapes. That incremental exploration, one small change at a time, is the fastest way to become comfortable with GET requests and to prepare for the POST, PUT, and DELETE requests that follow.</p>
+<pre><code>async function getFirstPost() {
+  try {
+    const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts/1&quot;);
+    if (!response.ok) {
+      throw new Error(&quot;HTTP error: &quot; + response.status);
+    }
+    const post = await response.json();
+    console.log(post.title);
+  } catch (error) {
+    console.log(&quot;Fetch failed: &quot; + error.message);
+  }
+}
+
+getFirstPost();</code></pre>
+<p class="check"><strong>Check:</strong> What are the four steps in a basic GET request with fetch?</p>
+<h2>Section 4: Reading the Response Object</h2>
+<p>The Response object returned by fetch is richer than many beginners realise, and learning to read it will help you debug fetching problems and build more robust code. Its most useful properties include ok, a boolean that is true for successful status codes, status, the numeric HTTP status code such as two hundred or four hundred and four, statusText, a short message associated with the status, headers, an object-like collection of response headers, and url, the final URL after any redirects. Together, these properties tell you what the server thought of your request, even before you look at the body.</p>
+<p>The methods for reading the body are equally important, and you must choose the right one for the data you expect. The json method parses the body as JSON and returns a JavaScript value. The text method returns the body as a plain string, useful for HTML, plain text, or for debugging when JSON parsing fails. There are also methods for binary data, such as blob and arrayBuffer, which are used for files, images, and other non-text content. You can only read the body once with these methods, because reading consumes the underlying stream. If you try to read it twice, the second read will fail or return empty, which is a subtle bug that catches beginners who log the body and then try to parse it again.</p>
+<p>Headers deserve a brief mention here, because they carry useful metadata. For example, a Content-Type header tells you what format the body is in, a Content-Length header tells you its size, and custom headers might carry pagination information, such as how many total items exist. You can read a header with response.headers.get(&quot;content-type&quot;), noting that header names are case-insensitive. For most beginner tasks, you will not need headers deeply, but knowing they exist prepares you for pagination, caching, and rate limit headers that you will meet in real APIs.</p>
+<p>When debugging a fetch, log the Response properties before parsing the body. Log the status, the ok flag, and the content type. That snapshot often reveals the problem immediately: a four hundred and four status means the endpoint is wrong, a content type of text/html when you expected JSON means the server returned an error page, and a status of two hundred with an empty body means the endpoint succeeded but returned nothing. Without that snapshot, you might waste time guessing whether the problem was in the request, the server, or the parsing, when the Response object already contains the answer.</p>
+<p>As you gain experience, you will develop a habit of checking the Response object deliberately, not just passing it straight to json. That habit is a mark of a careful developer, because it separates the concerns of transport, status, and data. Transport asks whether the server replied at all. Status asks whether the server was happy with the request. Data asks what the server actually sent. Answering those questions in order, using the Response object, makes fetch debugging systematic rather than frantic.</p>
+<pre><code>async function inspectResponse(url) {
+  const response = await fetch(url);
+  console.log(&quot;ok: &quot; + response.ok);
+  console.log(&quot;status: &quot; + response.status);
+  console.log(&quot;content-type: &quot; + response.headers.get(&quot;content-type&quot;));
+  console.log(&quot;url: &quot; + response.url);
+}</code></pre>
+<p class="check"><strong>Check:</strong> Which Response properties tell you whether a request succeeded before you read its body?</p>
+<h2>Section 5: Checking response.ok Before You Trust Data</h2>
+<p>Checking response.ok is a small step with a large payoff, because it is the difference between trusting data that is actually an error page and handling an error properly. As noted earlier, fetch only rejects on network failures. For HTTP errors, such as four hundred and four for not found or five hundred for server error, fetch resolves successfully with a Response whose ok flag is false. If you skip the ok check and go straight to response.json, you may try to parse an error page as JSON, get a parsing error, or worse, display error data as if it were real data. A single if statement prevents all of that confusion.</p>
+<p>The standard pattern is to check ok immediately after awaiting fetch, and to throw an error if it is false, including the status code in the error message. Throwing inside an async function turns the failure into a rejected promise, which your try and catch can handle in one place alongside network errors. That unification is elegant: after the ok check, your catch block handles all fetch failures, whether they came from the network or from the server, and your success path can trust that the data it parses came from a successful response. Without that check, your success path must defensively handle error shapes, which is messier and more error-prone.</p>
+<p>It is also worth handling the error body thoughtfully. Some APIs return useful JSON even for error statuses, such as a message explaining why a request failed. In that case, you might want to read the error body before throwing, so your catch block can show a specific message rather than a generic status code. A common pattern is to try reading the body as JSON in the error branch, extract its message if present, and throw an error containing that message. If reading the body fails, you fall back to a generic message with the status code. That extra care turns cryptic errors into helpful ones, which users appreciate and which make debugging easier.</p>
+<p>For beginners, the rule can be stated simply: never trust fetch data without checking ok first. Make the check a habit, like checking that a door is locked before leaving the house. Write it every time, even for practice APIs that usually succeed, because practice is where habits form. When you later work with real APIs that fail in varied ways, the habit will already be in place, and your code will handle failures gracefully instead of crashing or displaying nonsense.</p>
+<p>Finally, remember that ok covers the range two hundred to two hundred and ninety-nine, which includes two hundred for success, two hundred and one for created, and two hundred and four for no content. A two hundred and four response has no body, so calling json on it would fail. For such cases, you need to handle the empty body specially, either by checking the status or by checking the content length. That edge case is rare for beginners, but knowing it exists prevents a confusing bug when you first encounter a successful delete or update that returns no content.</p>
+<pre><code>async function safeFetch(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(&quot;Request failed with status &quot; + response.status);
+  }
+  return response.json();
+}
+
+safeFetch(&quot;https://jsonplaceholder.typicode.com/posts/1&quot;)
+  .then((data) =&gt; console.log(data.title))
+  .catch((error) =&gt; console.log(error.message));</code></pre>
+<p class="check"><strong>Check:</strong> Why is checking response.ok necessary even though fetch returns a promise?</p>
+<h2>Section 6: Handling Network Errors Versus HTTP Errors</h2>
+<p>Fetch failures fall into two distinct families, and handling them well requires understanding the difference. Network errors occur when the request never reaches the server or the response never arrives: no internet connection, DNS failure, server unreachable, or request aborted. In these cases, fetch rejects, and the rejection reason is an error you can catch. HTTP errors occur when the server does reply, but with a status code indicating a problem, such as four hundred and four or five hundred. In these cases, fetch resolves, and you must detect the problem by checking response.ok or the status code. Confusing these families leads to incomplete error handling, where one kind of failure is handled and the other slips through.</p>
+<p>The practical consequence is that your try and catch must cover both families, but in different places. Network errors are caught by catch, because fetch throws. HTTP errors are caught only if you first check ok and throw yourself, turning an HTTP failure into a thrown error that catch can handle. Without that manual throw, HTTP errors will flow into your success path, where they will cause stranger problems downstream, such as JSON parsing failures or missing fields. A robust fetch helper therefore always does both: it relies on catch for network errors and it explicitly throws for HTTP errors, unifying both families into a single error handling path for callers.</p>
+<p>User messages should also distinguish the families, at least in broad terms, because the user&#x27;s remedy differs. For a network error, the helpful message is about connection: check your internet, try again when you are back online. For an HTTP error, the message depends on the status: four hundred and four means the item does not exist, four hundred means the request was invalid, five hundred means the server had a problem and retrying later may help. Showing the same generic message for both families hides useful information and leaves users guessing whether to check their connection, fix their input, or simply wait. Specific messages, grounded in the error family and status, respect the user&#x27;s time and intelligence.</p>
+<p>For debugging, log the error family and details separately. For network errors, log the error message and the URL that failed. For HTTP errors, log the status, the URL, and any error body the server returned. That detailed logging helps you distinguish a flaky network from a broken endpoint, a wrong id from a server outage, and a temporary problem from a permanent one. Without that distinction, debugging becomes guesswork, and you may fix the wrong thing, such as changing a URL when the real problem was a lost connection.</p>
+<p>As you write fetch code, make a habit of asking, for each fetch, what happens on network failure and what happens on HTTP failure, and ensure both paths lead to a sensible user message and a useful log. That two-question check, applied consistently, will make your fetching code far more reliable than code that only handles the happy path and hopes the network always cooperates, which, in the real world, it never does for long.</p>
+<pre><code>async function fetchWithCare(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(&quot;HTTP &quot; + response.status + &quot; for &quot; + url);
+    }
+    return await response.json();
+  } catch (error) {
+    console.log(&quot;Fetch problem: &quot; + error.message);
+    throw error;
+  }
+}</code></pre>
+<p class="check"><strong>Check:</strong> How do network errors and HTTP errors differ in how fetch reports them?</p>
+<h2>Section 7: Fetching JSON Data in Practice</h2>
+<p>Fetching JSON data is the most common fetch task, because most modern APIs return JSON, and JavaScript works with JSON naturally. The pattern you have already learned, fetch, check ok, await json, use the data, is the whole story at its core. In practice, however, there are a few refinements that make JSON fetching smoother. One is to wrap the pattern in a reusable helper function, so that every fetch in your program does not repeat the same ok check and error handling. Another is to validate the shape of the parsed data before using it, because APIs can change, return unexpected shapes, or return error objects that look like data at first glance.</p>
+<p>A reusable JSON fetch helper might look like a function that takes a URL, fetches it, checks ok, parses JSON, and returns the result, throwing a clear error on failure. Callers then write const posts = await fetchJson(url); and trust that posts is parsed data or that an error was thrown. That helper centralises error handling, so a change to error messages or logging happens in one place, not in every fetch call. It also makes call sites shorter and more readable, which matters as programs grow. When you find yourself copying the same fetch pattern three times, it is time to extract a helper, and JSON fetching is one of the earliest places where that lesson pays off.</p>
+<p>Validating the parsed data is a second refinement. Before you display posts, check that you actually received an array. Before you display a user name, check that the user object has a name field. These checks can be simple, such as Array.isArray(data) or typeof user.name === &quot;string&quot;, and they prevent crashes when data is missing or malformed. They also make error messages clearer, because you can say Expected an array of posts but received something else, rather than letting the program crash later with a cryptic message about map not being a function. Validation is not paranoia; it is defensive programming against a world where APIs evolve and networks corrupt data.</p>
+<p>Another practical point is that JSON parsing can itself fail, for example if the server returns HTML instead of JSON because of an error page or a misconfigured endpoint. In that case, response.json will reject, and your catch block should handle it as a fetch failure, with a message that hints at the cause, such as Expected JSON but received something else. Checking the Content-Type header before parsing can help diagnose this, but a robust catch that treats parsing failures as fetch failures is often enough for beginners. The key is to ensure that a parsing failure does not crash the program silently, but leads to a user-visible message and a useful log.</p>
+<p>In real projects, you will fetch JSON for lists, details, search results, and form submissions, all with the same core pattern and the same refinements. Mastering JSON fetching in practice, with helpers and validation, therefore gives you a reusable skill that applies across almost every feature you build. Practise by fetching a list, validating it is an array, and displaying its length and first item&#x27;s title. That small, complete exercise covers the pattern end to end and prepares you for more complex data handling.</p>
+<pre><code>async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(&quot;HTTP error &quot; + response.status);
+  }
+  return response.json();
+}
+
+fetchJson(&quot;https://jsonplaceholder.typicode.com/posts&quot;)
+  .then((posts) =&gt; {
+    if (Array.isArray(posts)) {
+      console.log(&quot;Got &quot; + posts.length + &quot; posts&quot;);
+    }
+  })
+  .catch((error) =&gt; console.log(error.message));</code></pre>
+<p class="check"><strong>Check:</strong> Why is it helpful to wrap JSON fetching in a reusable helper function?</p>
+<h2>Section 8: Displaying Fetched Data on a Page</h2>
+<p>Fetching data is only half the job; displaying it clearly on a page is the other half, and the two halves must be designed together. A typical display flow has three states: loading, success, and error. While fetching, the page shows a loading message. On success, it replaces the loading message with the fetched data, formatted as a list, cards, or details. On error, it replaces the loading message with a friendly error message and perhaps a retry button. Designing for all three states from the start prevents the common beginner mistake of only designing for success, which leaves users confused when loading is slow or when fetching fails.</p>
+<p>The code for display usually follows a simple structure. You have a container element in your page, such as a div for results, and a status element for messages. Your async function sets the status to Loading, awaits the fetch, and then, on success, builds HTML or text from the data and puts it into the container. On error, it sets the status to an error message and clears or leaves the container empty. Building display strings safely matters: if data contains user-generated text, you should escape it or use text content rather than raw HTML insertion, to avoid security problems. For learning with placeholder data, simple string building is fine, but the habit of treating fetched text as data, not as code, is important for real applications.</p>
+<p>Formatting fetched data for display often involves mapping over an array and creating a string or element for each item. For example, a list of posts might become a list of titles, each on its own line, or a set of cards showing title and body. Keeping the mapping function small and focused, such as a function that turns one post into one display string, makes the display code easier to read and test. You can test that mapping function with fake data, without fetching, which speeds up development and makes bugs easier to locate. That separation, fetch data, then map to display, is a clean architecture that scales well.</p>
+<p>You should also consider what to display when the fetched list is empty. An empty list is not an error, but displaying nothing can look like a broken page. A helpful empty message, such as No posts found, reassures users that the fetch succeeded but there was simply nothing to show. Similarly, for a single item that is missing, a Not found message is clearer than a blank page. These empty-state messages are small details, but they make a large difference to perceived quality, because they show that the program considered the user&#x27;s experience in every case, not just the happy path.</p>
+<p>Practise display by building a tiny page or console display that fetches a list of posts, shows Loading while fetching, then shows the first five titles on success or an error message on failure. That exercise combines fetching, loading states, mapping, and error handling in one realistic feature, and it is the template for search results, product lists, news feeds, and countless other displays you will build in your career.</p>
+<pre><code>async function displayPosts() {
+  console.log(&quot;Status: Loading posts&quot;);
+  try {
+    const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts&quot;);
+    if (!response.ok) {
+      throw new Error(&quot;HTTP &quot; + response.status);
+    }
+    const posts = await response.json();
+    console.log(&quot;Status: Loaded &quot; + posts.length + &quot; posts&quot;);
+    for (const post of posts.slice(0, 5)) {
+      console.log(&quot;- &quot; + post.title);
+    }
+  } catch (error) {
+    console.log(&quot;Status: Failed to load posts: &quot; + error.message);
+  }
+}
+
+displayPosts();</code></pre>
+<p class="check"><strong>Check:</strong> What three display states should a fetching feature handle, and why?</p>
+<h2>Section 9: Fetching a Single Item by Id</h2>
+<p>Fetching a single item by its identifier is a fundamental API pattern, used for detail pages, profiles, and edit forms. The pattern is to build a URL that includes the id, such as users followed by slash and the id, fetch that URL, check ok, parse JSON, and display the single object. If the id does not exist, the server typically returns a four hundred and four status, which your ok check turns into a clear Not found error. Handling that case gracefully, with a message such as User not found, is essential, because users can type wrong ids, follow old links, or click on items that have been deleted.</p>
+<p>Building the URL safely matters, especially when the id comes from user input or from a URL parameter. You should encode the id with encodeURIComponent if it could contain special characters, although numeric ids are usually safe as they are. You should also validate the id before fetching: if it is empty, not a number when a number is expected, or otherwise invalid, show a validation message immediately without fetching. That early validation, as discussed in the previous chapter, saves a round trip and gives faster feedback. It also prevents fetching with a malformed URL, which could cause confusing errors.</p>
+<p>Once you have the single item, displaying it is usually simpler than displaying a list, because you deal with one object&#x27;s fields rather than mapping over many. You might show a user&#x27;s name, email, and city, or a post&#x27;s title and body. The challenge is handling missing fields gracefully. If a field is absent, display a fallback such as Not provided, rather than crashing or showing undefined. That defensive display, combined with validation of the fetched object, makes detail pages robust against API changes and incomplete data, which are common in real systems where fields are added, renamed, or deprecated over time.</p>
+<p>Single-item fetching also appears in sequences, where you first fetch a list, then fetch details for a selected item. That sequence is a good example of dependent fetching: you cannot fetch details until the user selects an item from the list, so the detail fetch must wait for user action. Designing that flow, list first, detail on selection, with loading states for each stage, is a realistic exercise that combines list fetching, single-item fetching, and event handling. It is also the structure of many real applications, from e-commerce product pages to social media profiles.</p>
+<p>Practise single-item fetching by fetching a post with id one, displaying its title and body, then fetching a post with a very large id that does not exist, and confirming that your code shows a Not found message rather than crashing. That pair of experiments covers both the success and the not-found paths, which are the two most important cases for detail pages, and it builds confidence that your fetching code handles real-world edge cases, not just ideal data.</p>
+<pre><code>async function getPostById(id) {
+  const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts/&quot; + id);
+  if (!response.ok) {
+    throw new Error(&quot;Post &quot; + id + &quot; not found, status &quot; + response.status);
+  }
+  return response.json();
+}
+
+getPostById(1)
+  .then((post) =&gt; console.log(post.title))
+  .catch((error) =&gt; console.log(error.message));</code></pre>
+<p class="check"><strong>Check:</strong> What should happen when you fetch a single item whose id does not exist?</p>
+<h2>Section 10: Fetching Lists and Paginating Results</h2>
+<p>Many APIs return lists that are too large to fetch all at once, so they use pagination: they split the list into pages, and you request one page at a time using query parameters such as page and limit, or offset and limit. For example, you might request page one with ten items per page, display those ten, and offer a Next button to fetch page two. Pagination keeps responses small, pages fast, and servers happy, and it is a standard pattern you will meet in almost every list API. Learning to implement it client-side, with page state and navigation controls, is an essential fetching skill.</p>
+<p>The client-side logic for pagination is straightforward but requires careful state management. You keep track of the current page number, the page size, and sometimes the total number of pages or items, if the API provides it. When the user clicks Next, you increment the page, fetch the new page, and replace the displayed list. When they click Previous, you decrement the page, fetch, and display. You should disable Previous on the first page and disable Next when you know there are no more pages, either because the API tells you or because the last fetch returned fewer items than the page size. Those disabled states prevent useless fetches and guide users clearly.</p>
+<p>A subtle issue with pagination is handling rapid navigation. If a user clicks Next twice quickly, two fetches start, and they might finish out of order, displaying an older page after a newer one. Protections include disabling navigation buttons while fetching, ignoring clicks while a fetch is in progress, or tracking the latest requested page and only displaying results for that page. These protections are the same ones you learned for button clicks and search, applied to pagination. They ensure that the displayed page always matches the page number shown to the user, which is essential for trust in a paginated interface.</p>
+<p>Another pagination style is infinite scroll or Load More, where clicking a button appends the next page to the existing list instead of replacing it. That style uses the same fetching logic, but accumulates results rather than replacing them. It is popular for feeds and search results, where users expect to keep scrolling through more items. The state management is slightly different, because you must track all loaded items and avoid duplicates, but the core fetch, append, and page increment pattern is the same. Knowing both styles, page replacement and load more, gives you flexibility to choose the right interaction for each feature.</p>
+<p>Practise pagination by fetching a list with a limit parameter, displaying the first page, then fetching the next page and displaying it, logging the page number each time. Even with a practice API that may use different parameter names, the concept transfers: page state, fetch by page, display, and navigation controls. That concept, more than any specific parameter name, is what you need to carry into real APIs, where you will always check the documentation for the exact pagination parameters.</p>
+<pre><code>async function getPage(page, limit) {
+  const url = &quot;https://jsonplaceholder.typicode.com/posts?_page=&quot; + page + &quot;&amp;_limit=&quot; + limit;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(&quot;HTTP &quot; + response.status);
+  }
+  const posts = await response.json();
+  console.log(&quot;Page &quot; + page + &quot;: &quot; + posts.length + &quot; posts&quot;);
+  return posts;
+}
+
+getPage(1, 5).then(() =&gt; getPage(2, 5));</code></pre>
+<p class="check"><strong>Check:</strong> Why do APIs paginate lists instead of returning every item at once?</p>
+<h2>Section 11: Sending Data with POST</h2>
+<p>Sending data with POST is how you create new resources through an API, such as submitting a form, posting a comment, or creating a task. Unlike GET, which only reads, POST carries a body containing the new data, usually as JSON. To send a POST with fetch, you pass a second argument, an options object, specifying method as POST, headers including Content-Type as application/json, and body as a JSON string created with JSON.stringify. The server replies with a status, often two hundred and one for created, and a body containing the created resource, often with an id assigned by the server. Reading that reply tells you whether creation succeeded and what the new resource looks like.</p>
+<p>The options object deserves careful attention, because each field has a purpose. The method field tells the server what action you want. The headers field tells the server how to interpret your body and what format you accept in return. The body field is the actual data, which must be a string for fetch, hence the need for JSON.stringify. Forgetting to stringify, or forgetting the Content-Type header, are two of the most common POST mistakes, and they lead to servers receiving the string object Object or rejecting the request as malformed. Checking your options object carefully before sending, and logging the stringified body during development, prevents those mistakes.</p>
+<p>Handling POST responses also requires care. A successful POST returns a created resource, but you should still check response.ok before parsing, just as with GET, because a POST can fail for validation reasons, such as a missing required field, or for server reasons. When a POST fails with a four hundred status, the server often returns a JSON body explaining which fields were invalid. Reading that error body and displaying its message, rather than a generic failure message, helps users fix their input quickly. That detailed error handling turns a frustrating form submission into a helpful conversation, where the program tells the user exactly what to correct.</p>
+<p>In practice APIs used for learning, POST requests often do not actually persist data permanently; they simulate creation and return a fake id, but the data disappears on the next fetch. That is fine for learning, because the request and response pattern is real, even if persistence is simulated. When you later use a real API that does persist, the same code will create real resources, so you should be careful in production to avoid duplicate submissions, using button disabling and confirmation as discussed earlier. For learning, however, simulated persistence lets you practise POST freely without polluting a real database.</p>
+<p>Practise POST by sending a fake post with a title and body to a practice API, logging the returned id and status, and confirming that the response shape matches what you sent plus the server-assigned id. Then try sending invalid data, such as an empty title, and observe how the practice API responds. That pair of experiments covers the success path and gives you a sense of how servers handle imperfect input, which is valuable preparation for real form submissions.</p>
+<pre><code>async function createPost(title, body) {
+  const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts&quot;, {
+    method: &quot;POST&quot;,
+    headers: { &quot;Content-Type&quot;: &quot;application/json&quot; },
+    body: JSON.stringify({ title: title, body: body, userId: 1 }),
+  });
+  if (!response.ok) {
+    throw new Error(&quot;POST failed with status &quot; + response.status);
+  }
+  const created = await response.json();
+  console.log(&quot;Created post id: &quot; + created.id);
+  return created;
+}
+
+createPost(&quot;Hello fetch&quot;, &quot;Learning POST requests&quot;);</code></pre>
+<p class="check"><strong>Check:</strong> What three parts must a POST fetch options object include, and why is each needed?</p>
+<h2>Section 12: Setting Headers and Content Type</h2>
+<p>Headers are metadata sent with a request or response, telling the other side how to interpret the data. The most important request header for JSON APIs is Content-Type, which tells the server that your body is JSON. Without it, the server might treat your body as plain text or form data and fail to parse it correctly. Another common header is Accept, which tells the server what format you would like in return, such as application/json. Authentication headers, such as Authorization, tell the server who you are, and we will discuss those separately later. Understanding headers is therefore essential for making requests that servers understand and accept.</p>
+<p>Setting headers with fetch is done through the headers field of the options object, which can be a plain object mapping header names to values, as in most examples in this book, or a Headers object for more advanced use. Header names are case-insensitive, so Content-Type and content-type are equivalent, although the capitalised form is conventional and more readable. Values must be strings, and they should not contain characters that are invalid in headers. When you set a header incorrectly, servers often return a four hundred error or ignore the header silently, leading to confusing behaviour where your request seems correct but the server treats it differently than you expected.</p>
+<p>A useful debugging habit is to log your headers during development, alongside the URL, method, and body, so you can verify that the request you think you are sending is the request you are actually sending. Browser developer tools also show request headers in the Network tab, which is invaluable for comparing your code&#x27;s request with a working example from documentation. If a request works in a tool like curl or Postman but fails from your code, comparing headers often reveals the difference, such as a missing Content-Type or an extra header that the server rejects. That comparison skill will save you hours when integrating with unfamiliar APIs.</p>
+<p>Some headers are set automatically by the browser and should not be set manually, such as Host, Content-Length, and certain security headers. Fetch and the browser manage those for you, and attempting to override them can cause errors or be ignored. For beginners, the safe rule is to set only application headers you understand, such as Content-Type, Accept, and Authorization when required, and to leave transport headers to the browser. As you gain experience, you will learn which headers are safe to set and which are managed for you, but starting with a small, understood set prevents a class of confusing errors.</p>
+<p>Finally, remember that headers are also part of responses, carrying information such as content type, caching instructions, and rate limit status. Reading response headers, as introduced earlier, complements setting request headers, giving you a complete picture of the HTTP conversation. Together, request headers and response headers form the envelope of the letter metaphor from the start of this chapter, and mastering them turns fetch from a black box into a transparent, debuggable conversation with a server.</p>
+<pre><code>async function postWithHeaders() {
+  const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts&quot;, {
+    method: &quot;POST&quot;,
+    headers: {
+      &quot;Content-Type&quot;: &quot;application/json&quot;,
+      Accept: &quot;application/json&quot;,
+    },
+    body: JSON.stringify({ title: &quot;Headers&quot;, body: &quot;Learning headers&quot;, userId: 1 }),
+  });
+  console.log(&quot;Status: &quot; + response.status);
+  console.log(&quot;Response content-type: &quot; + response.headers.get(&quot;content-type&quot;));
+  return response.json();
+}
+
+postWithHeaders();</code></pre>
+<p class="check"><strong>Check:</strong> What does the Content-Type header tell a server, and what happens if you omit it on a POST?</p>
+<h2>Section 13: Updating Data with PUT and PATCH</h2>
+<p>Updating existing data through an API typically uses PUT or PATCH, and understanding the difference between them helps you choose correctly and avoid accidental data loss. PUT is generally used for full replacement: you send a complete representation of the resource, and the server replaces the old version with the new one. If you omit a field in a PUT request, the server may interpret that as setting the field to empty or removing it, depending on the API&#x27;s design. PATCH, by contrast, is used for partial updates: you send only the fields you want to change, and the server merges them into the existing resource, leaving other fields untouched. That distinction is important, because using PUT when you meant PATCH can erase data you intended to keep.</p>
+<p>In fetch code, PUT and PATCH look very similar to POST. You set the method to PUT or PATCH, set Content-Type to application/json, and send a JSON stringified body. For PUT, the body usually contains the full resource, including its id and all fields. For PATCH, the body contains only the changed fields, such as a new title. The URL includes the id of the resource to update, such as posts followed by slash and one. The server replies with the updated resource, or sometimes with just a status, and you should check ok and parse the response just as with other methods. That consistency across methods is one of the strengths of REST: once you learn one method, the others feel familiar.</p>
+<p>Choosing between PUT and PATCH in practice depends on the API&#x27;s documentation and on your use case. If you have a complete edit form where the user can change every field, PUT with the full object is natural. If you have a small toggle, such as marking a task complete, PATCH with only the completed field is more efficient and safer, because it cannot accidentally overwrite other fields that changed elsewhere since you loaded the data. Some APIs support only one of the two methods, so you must check documentation rather than assuming both are available. When documentation is unclear, PATCH for partial changes is usually the safer default, because it is less likely to erase data unintentionally.</p>
+<p>Error handling for updates mirrors that for POST: validation errors return four hundred with details, not-found returns four hundred and four, and server errors return five hundred. Displaying validation details helps users correct their edits, just as with creation. You should also consider optimistic updates, where the interface updates immediately before the server confirms, and rolls back if the server rejects. Optimistic updates make interfaces feel instant, but they add complexity, because you must handle rollback correctly. For beginners, waiting for server confirmation before updating the display is simpler and safer, and it avoids showing data that the server later rejects.</p>
+<p>Practise updates by fetching a post, changing only its title with PATCH, and logging the returned title to confirm the change. Then try a full PUT with a complete post object and compare the response. That comparison will make the full versus partial distinction concrete, and it will prepare you for real edit forms where choosing the right method protects user data from accidental loss.</p>
+<pre><code>async function patchPostTitle(id, newTitle) {
+  const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts/&quot; + id, {
+    method: &quot;PATCH&quot;,
+    headers: { &quot;Content-Type&quot;: &quot;application/json&quot; },
+    body: JSON.stringify({ title: newTitle }),
+  });
+  if (!response.ok) {
+    throw new Error(&quot;PATCH failed with status &quot; + response.status);
+  }
+  const updated = await response.json();
+  console.log(&quot;Updated title: &quot; + updated.title);
+  return updated;
+}
+
+patchPostTitle(1, &quot;New title via PATCH&quot;);</code></pre>
+<p class="check"><strong>Check:</strong> What is the key difference between PUT and PATCH, and why does it matter for data safety?</p>
+<h2>Section 14: Deleting Data with DELETE</h2>
+<p>Deleting data through an API uses the DELETE method, and it shares the fetch pattern of other methods, with a few special considerations. To delete a resource, you send a DELETE request to the URL that identifies it, such as posts followed by slash and the id, usually without a body. The server replies with a status indicating success, often two hundred or two hundred and four, and sometimes with an empty body. Because the body may be empty, you should not blindly call response.json after a delete; you should check the status and content type first, or handle an empty body gracefully. That empty-body detail is a common source of delete bugs, where code that works for GET and POST fails for DELETE because it tries to parse nothing as JSON.</p>
+<p>Safety is paramount for deletes, because deletion is often irreversible. In user interfaces, deletes should almost always require confirmation, as discussed in the previous chapter, with a clear message naming the item to be deleted. After confirmation, the interface should show a loading state, send the DELETE request, and then update the display only after server confirmation, removing the deleted item from the list or navigating away from its detail page. If the delete fails, the item should remain visible, with an error message explaining that deletion did not complete. That careful sequence prevents the worst delete bug: an item disappearing from the screen even though it still exists on the server, or vice versa.</p>
+<p>Another consideration is what delete means in a given API. Some APIs perform hard deletes, permanently removing the resource. Others perform soft deletes, marking the resource as deleted but keeping it in storage for recovery or auditing. Some APIs do not allow delete at all, or require special permissions. You should check documentation and, in real applications, confirm with your team what delete means for your data and whether recovery is possible. For learning with practice APIs, deletes are often simulated and do not actually remove data permanently, which is safe for experimentation but should not be mistaken for real deletion behaviour in production systems.</p>
+<p>Error handling for deletes follows the usual pattern: four hundred and four means the item was already gone or never existed, four hundred and three means you lack permission to delete it, and five hundred means the server had a problem. Each of these deserves a distinct user message, because the user&#x27;s next step differs: for not found, they can move on; for permission denied, they need to contact an administrator or sign in differently; for server error, they can retry later. Generic delete failed messages hide those distinctions and leave users unsure what to do next.</p>
+<p>Practise delete by sending a DELETE request for a practice post id, logging the status, and handling the response without assuming a JSON body. Then try deleting a non-existent id and observe the status. That pair of experiments covers the success and not-found paths, and it teaches you to handle empty bodies correctly, which is a skill that transfers to other methods that return no content, such as some updates and logouts.</p>
+<pre><code>async function deletePost(id) {
+  const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts/&quot; + id, {
+    method: &quot;DELETE&quot;,
+  });
+  if (!response.ok) {
+    throw new Error(&quot;DELETE failed with status &quot; + response.status);
+  }
+  console.log(&quot;Deleted post &quot; + id + &quot;, status &quot; + response.status);
+}
+
+deletePost(1);</code></pre>
+<p class="check"><strong>Check:</strong> Why should you not assume a DELETE response contains a JSON body?</p>
+<h2>Section 15: Using Query Strings to Filter and Search</h2>
+<p>Query strings are the part of a URL after the question mark, consisting of key-value pairs separated by ampersands, and they are the standard way to filter, search, sort, and paginate API requests without changing the endpoint path. For example, a request to posts with userId equals one asks the server for only posts by that user, while a request to posts with a search term asks for matching posts. Query strings keep the endpoint stable, posts, while varying the request, which is cleaner than inventing a new endpoint for every filter combination. Learning to build query strings correctly is therefore essential for working with real list APIs.</p>
+<p>Building query strings by hand with string concatenation is error-prone, because values may contain spaces, ampersands, or other characters that have special meaning in URLs. A search term such as rock and roll, if inserted directly, would be interpreted as separate parameters because of the ampersand. The safe approach is to encode each value with encodeURIComponent, or better, to use URLSearchParams, which handles encoding automatically and is covered in the next section. For now, the principle is clear: never insert raw user input into a query string without encoding, because unencoded input can break the request or, in worse cases, be interpreted as a different request than intended.</p>
+<p>Filtering, searching, and sorting are the three most common uses of query strings. Filtering selects a subset, such as posts by a specific user or products in a specific category. Searching finds items matching a text term, often with a parameter named q or search. Sorting orders results, often with parameters for sort field and order, such as sort by title ascending. Pagination, as discussed earlier, also uses query strings for page and limit. A single request can combine several of these, such as filtered, searched, sorted, and paginated, by including multiple key-value pairs. That composability is the power of query strings: one endpoint, many variations, all expressed in the URL.</p>
+<p>When you design a search or filter interface, the query string becomes the bridge between user input and API request. As the user types a search term or selects a filter, your code builds a query string from those inputs, fetches with that URL, and displays the results. Keeping the building logic in a helper function, which takes filter values and returns a URL, makes the interface code cleaner and easier to test. You can test the helper with various inputs, including empty filters and special characters, without fetching, ensuring that URLs are built correctly before any network request is made.</p>
+<p>Practise query strings by fetching posts filtered by userId, logging how many you received, then fetching with a different userId and comparing. Notice how the same endpoint returns different subsets based solely on the query string. That observation, that the URL is not just an address but also a question, is a key insight for API work, because it shows how much expressive power lives in the part of the URL after the question mark.</p>
+<pre><code>async function getPostsByUser(userId) {
+  const url = &quot;https://jsonplaceholder.typicode.com/posts?userId=&quot; + userId;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(&quot;HTTP &quot; + response.status);
+  }
+  const posts = await response.json();
+  console.log(&quot;User &quot; + userId + &quot; has &quot; + posts.length + &quot; posts&quot;);
+  return posts;
+}
+
+getPostsByUser(1);</code></pre>
+<p class="check"><strong>Check:</strong> What problems can occur if you insert raw user input into a query string without encoding?</p>
+<h2>Section 16: Building URLs Safely with URLSearchParams</h2>
+<p>URLSearchParams is a built-in JavaScript tool for building and reading query strings safely, and it should be your default choice whenever you need to construct a URL with parameters. Instead of concatenating strings and worrying about encoding, question marks, and ampersands, you create a URLSearchParams object, append or set key-value pairs, and then convert it to a string with toString, which handles encoding automatically. The result is cleaner code, fewer bugs, and URLs that correctly handle spaces, special characters, and non-English text. For beginners, adopting URLSearchParams early prevents a whole class of URL bugs that are tedious to debug.</p>
+<p>Using URLSearchParams is straightforward. You can start with an empty object and append parameters one by one, or you can start with an existing query string and modify it. The set method replaces any existing value for a key, while append adds another value for the same key, which is useful for filters that allow multiple values, such as several categories. You can also read parameters with get, check for their presence with has, and iterate over all parameters. That reading ability is useful when you need to parse a URL from the browser&#x27;s address bar or from a link, extracting filter values that a user shared or bookmarked.</p>
+<p>A typical pattern is to build a base URL, create a URLSearchParams object from your filter values, and then combine them with a question mark, but only if there are parameters to add. For example, if a user has selected no filters, you should fetch the base URL without a trailing question mark, rather than fetching a URL with an empty query string. Handling that empty case explicitly keeps URLs clean and avoids confusing servers that might treat an empty query string differently. A helper function that takes a base URL and an object of parameters, filters out empty values, and returns a complete URL, encapsulates all of that logic in one reusable place.</p>
+<p>URLSearchParams also pairs well with the URL object, which represents a complete URL and provides a searchParams property that is itself a URLSearchParams instance. You can create a URL object from a base URL, set its searchParams, and then use its href as the fetch URL. That approach is even more robust, because the URL object handles the base, path, and query together, preventing mistakes such as double question marks or missing slashes. For most beginner tasks, URLSearchParams alone is sufficient, but knowing about the URL object prepares you for more complex URL building in larger applications.</p>
+<p>Practise URLSearchParams by building a query string for a search term containing spaces and an ampersand, logging the encoded result, and confirming that spaces become encoded and ampersands do not break the parameter structure. That single experiment demonstrates the core benefit of URLSearchParams: it does the encoding work for you, so you can focus on what to ask for, rather than on how to escape it safely.</p>
+<pre><code>function buildSearchUrl(term, userId) {
+  const params = new URLSearchParams();
+  if (term) {
+    params.set(&quot;q&quot;, term);
+  }
+  if (userId) {
+    params.set(&quot;userId&quot;, userId);
+  }
+  const query = params.toString();
+  return &quot;https://jsonplaceholder.typicode.com/posts&quot; + (query ? &quot;?&quot; + query : &quot;&quot;);
+}
+
+console.log(buildSearchUrl(&quot;rock &amp; roll&quot;, 1));</code></pre>
+<p class="check"><strong>Check:</strong> Why is URLSearchParams safer than building a query string by concatenating strings?</p>
+<h2>Section 17: Loading States for Fetch Requests</h2>
+<p>Loading states for fetch requests are the interface&#x27;s promise to the user that their request was heard and work is in progress. As with async work in general, the pattern is to show a loading indicator before the fetch, hide it in finally after the fetch settles, and display either data or an error in between. For fetch specifically, loading states are even more important than for local async work, because network requests can take seconds on slow connections, and users have no way to know whether a blank screen means loading, empty, or broken without a clear indicator. A well-designed loading state therefore reduces abandonment and support questions, simply by communicating status.</p>
+<p>The content of a fetch loading state can range from a simple spinner to a detailed skeleton screen that mimics the layout of the eventual content. Skeleton screens, which show grey placeholders shaped like the final cards or list items, are popular because they give users a sense of what is coming and make loading feel faster, even when the actual time is unchanged. For beginners, a simple text message such as Loading posts is sufficient, and it is far better than no message at all. The key is to show something immediately, within a fraction of a second of the user action, so that the interface feels responsive even before data arrives.</p>
+<p>You should also consider per-section loading states for pages that fetch multiple pieces of data. Instead of blocking the whole page with a single spinner until every fetch completes, you can show loading indicators for each section independently, replacing each one as its data arrives. That per-section approach, combined with parallel fetching and allSettled, creates a page that progressively fills in, which feels faster and more resilient than a page that waits for everything. Users can start reading the first section while later sections are still loading, which is a better use of their time and attention.</p>
+<p>A subtle loading state issue is flicker for very fast fetches. If a fetch completes in fifty milliseconds, showing and hiding a spinner in that brief window can feel like a flash. Some developers delay showing the spinner by a short period, such as two hundred milliseconds, so that only genuinely slow fetches display it. That refinement is optional, but it shows attention to polish. For most learning projects, a simple immediate loading message is fine, and you can add the delay refinement later when you are polishing a real application for users.</p>
+<p>Finally, ensure that loading states are cleared on both success and error, using finally, as emphasised throughout this book. A spinner stuck on screen after an error is one of the most frustrating interface bugs, because it traps the user in a state that looks like work is still happening when it has actually failed. Finally guarantees clearance, and pairing it with a clear error message and retry option gives users a path forward instead of a dead end. That combination, loading, success, error, retry, is the complete loading state pattern for fetch.</p>
+<pre><code>async function loadWithIndicator() {
+  console.log(&quot;Loading: please wait&quot;);
+  try {
+    const response = await fetch(&quot;https://jsonplaceholder.typicode.com/posts/1&quot;);
+    if (!response.ok) {
+      throw new Error(&quot;HTTP &quot; + response.status);
+    }
+    const post = await response.json();
+    console.log(&quot;Loaded: &quot; + post.title);
+  } catch (error) {
+    console.log(&quot;Failed: &quot; + error.message);
+  } finally {
+    console.log(&quot;Loading indicator hidden&quot;);
+  }
+}
+
+loadWithIndicator();</code></pre>
+<p class="check"><strong>Check:</strong> Why should a fetch loading indicator be hidden in finally rather than only on success?</p>
+<h2>Section 18: Fetch Errors Users Can Understand</h2>
+<p>Technical error messages are for developers; user-facing error messages are for people, and the two should rarely be identical. A message such as TypeError: Failed to fetch or HTTP 500 Internal Server Error may be accurate, but it tells a typical user nothing about what went wrong or what to do next. A user-friendly message, such as Could not load posts. Check your connection and try again, or The server had a problem. Please try again in a few minutes, gives the user both an explanation in plain language and a next step. Translating technical errors into user language is a core part of fetch error handling, and it deserves as much care as the fetching code itself.</p>
+<p>The translation process starts by categorising the error. Network errors become connection messages. Four hundred and four becomes not found messages. Four hundred becomes invalid input messages, ideally with details about which field was invalid. Five hundred becomes server problem messages with a suggestion to retry later. Parsing errors become data problem messages, suggesting that the service returned unexpected data. By mapping each category to a template message, you ensure that users always see something helpful, regardless of which technical failure occurred. That mapping can live in a helper function that takes an error and returns a user message, centralising the translation logic.</p>
+<p>You should also decide how much detail to show. For most users, a short message plus a retry button is sufficient. For technical users or for support purposes, you might offer a Show details option that reveals the status code or error message, without overwhelming the main interface. That layered approach, simple by default and detailed on request, serves both audiences without compromising either. It also helps support teams, because users can copy the detailed message when reporting a problem, giving developers the information they need without requiring users to understand it.</p>
+<p>Tone matters in error messages too. Blaming the user, such as You did something wrong, or using alarming language, such as Fatal error, increases anxiety and reduces trust. Calm, factual language, such as We could not load your posts, with a clear next step, respects the user and keeps the interaction productive. Error messages are a moment when your application is already failing the user in one way; the least it can do is fail politely, with clarity and a path forward, rather than adding confusion or blame to the experience.</p>
+<p>Practise translation by writing a helper that takes a fetch error and returns a user message, testing it with a network error, a four hundred and four error, and a five hundred error, and checking that each returns a distinct, helpful message. That exercise will give you a reusable pattern for every fetching feature you build, and it will make your applications feel more professional, because users will encounter clear guidance instead of raw technical text whenever something goes wrong.</p>
+<pre><code>function userMessageFor(error, status) {
+  if (status === 404) {
+    return &quot;That item was not found. It may have been removed.&quot;;
+  }
+  if (status &gt;= 500) {
+    return &quot;The server had a problem. Please try again in a few minutes.&quot;;
+  }
+  return &quot;Could not load data. Check your connection and try again.&quot;;
+}
+
+console.log(userMessageFor(new Error(&quot;x&quot;), 404));
+console.log(userMessageFor(new Error(&quot;x&quot;), 500));
+console.log(userMessageFor(new Error(&quot;x&quot;), 0));</code></pre>
+<p class="check"><strong>Check:</strong> Why should user-facing fetch errors differ from technical error messages?</p>
+<h2>Section 19: Retrying Failed Fetches</h2>
+<p>Retrying a failed fetch is often the simplest way to recover from a transient problem, such as a brief network glitch or a momentary server overload. As with async retries in general, the pattern is to try the fetch, and if it fails with a retriable error, wait briefly and try again, up to a maximum number of attempts. Network errors and five hundred server errors are usually retriable, because they may succeed on a later attempt. Four hundred and four and four hundred validation errors are usually not retriable, because repeating the same request will fail the same way. Distinguishing retriable from non-retriable errors prevents wasted retries and gives users faster feedback for permanent failures.</p>
+<p>Implementing fetch retry reuses the retry helper pattern from the previous chapter, adapted for fetch specifics. Your retry function should accept a fetch task, a number of attempts, and a delay strategy, and it should check the error type before retrying. For HTTP errors, you need to inspect the status code, which means your fetch task should throw an error that carries the status, or your retry logic should handle Response objects directly. That status-carrying design is a good example of how error objects should include the information callers need to make decisions, not just a message string. Without the status, retry logic cannot distinguish a retriable five hundred from a non-retriable four hundred and four.</p>
+<p>Backoff, waiting longer between successive retries, is especially important for fetches, because immediate retries can worsen server overload. If a server is struggling, hammering it with rapid retries from many clients can turn a brief overload into a sustained outage. Exponential backoff, where delays double with each attempt, gives the server breathing room to recover, while still giving the user a result reasonably quickly if the problem was brief. A common pattern is to wait one second, then two seconds, then four seconds, with a maximum cap, so that total retry time stays reasonable and users are not left waiting indefinitely.</p>
+<p>You should also give users control during retries. Showing a message such as Retrying, attempt two of three, keeps users informed that work is still happening, rather than leaving them on a spinner with no explanation. Allowing users to cancel a retry sequence, or to retry manually after automatic retries are exhausted, respects their time and agency. Automatic retries should be a convenience, not a trap that locks the interface for a long time without feedback. Balancing automatic recovery with user control is a hallmark of thoughtful fetch design.</p>
+<p>Practise fetch retry with a fake fetch function that fails twice and succeeds on the third try, wrapping it in retry logic and confirming success. Then make it fail always and confirm that retry gives up after the maximum attempts with a clear error. Those two experiments, happy and sad paths, will give you confidence that your retry logic behaves correctly when real networks misbehave, which they inevitably will.</p>
+<pre><code>function delay(ms) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function retryFetch(task, attempts) {
+  for (let i = 1; i &lt;= attempts; i++) {
+    try {
+      return await task();
+    } catch (error) {
+      if (i === attempts) {
+        throw error;
+      }
+      await delay(200 * i);
+    }
+  }
+}
+
+let tries = 0;
+async function flakyFetch() {
+  tries += 1;
+  if (tries &lt; 3) {
+    throw new Error(&quot;Flaky fetch &quot; + tries);
+  }
+  return { title: &quot;Success after retry&quot; };
+}
+
+retryFetch(flakyFetch, 4).then((data) =&gt; console.log(data.title));</code></pre>
+<p class="check"><strong>Check:</strong> Which fetch errors are worth retrying, and which should fail immediately?</p>
+<h2>Section 20: Caching Fetch Results Simply</h2>
+<p>Caching fetch results, as introduced for async results generally, is especially valuable for fetch because network requests are slow and expensive compared to memory access. A simple fetch cache stores responses by URL, so that a second request for the same URL returns the cached data instantly without a new network round trip. This speeds up navigation, reduces server load, and makes applications feel responsive, especially when users move back and forth between pages that share data, such as a list page and a detail page that both need user information. For learning, a simple in-memory Map cache is sufficient to demonstrate the benefits and trade-offs.</p>
+<p>Implementing a fetch cache follows the same pattern as the async cache from the previous chapter: check the cache by URL before fetching, return the cached promise or value if present, otherwise fetch, store the result, and return it. Storing the promise, rather than the parsed data, deduplicates in-flight requests, so that two simultaneous requests for the same URL result in only one network fetch. That deduplication is a significant optimisation for components that independently request the same data on mount, a common pattern in modern front-end frameworks where multiple components may need the same user or configuration data.</p>
+<p>Freshness and invalidation are the challenges, as before. A cached post list from an hour ago may be stale if new posts were created since. Strategies include time-based expiry, where entries expire after a few minutes, manual invalidation after a write, such as clearing the posts cache after creating a new post, and user-initiated refresh, where a refresh button bypasses the cache. For beginners, a simple approach is to cache only data that changes rarely, such as categories or configuration, and to always fetch fresh data for frequently changing lists. That conservative approach gains caching benefits where they are safest, without risking stale data where it matters most.</p>
+<p>You should also be aware that browsers already cache HTTP responses according to Cache-Control headers, and fetch respects those headers by default in many cases. Your in-memory cache sits on top of that browser cache, giving you explicit control for application-level caching, such as deduplication and instant navigation, while the browser cache handles network-level efficiency. Understanding both layers helps you avoid double-caching confusion and helps you decide when an application cache is needed versus when browser caching is sufficient. For most learning projects, an explicit Map cache is clearer to reason about than relying on browser cache headers, which vary by server.</p>
+<p>Practise fetch caching by wrapping a fake fetch in a Map cache, calling it twice with the same URL, and logging whether each call fetched or hit the cache. Then clear the cache after a simulated write and confirm that the next call fetches fresh data. That exercise demonstrates the core cache behaviours, hit, miss, and invalidation, in a compact form that you can adapt to real fetch code by replacing the fake fetch with a real one.</p>
+<pre><code>const fetchCache = new Map();
+
+async function fakeFetch(url) {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  return &quot;Data for &quot; + url;
+}
+
+async function cachedFetch(url) {
+  if (fetchCache.has(url)) {
+    console.log(&quot;Cache hit: &quot; + url);
+    return fetchCache.get(url);
+  }
+  console.log(&quot;Fetching: &quot; + url);
+  const promise = fakeFetch(url);
+  fetchCache.set(url, promise);
+  return promise;
+}
+
+cachedFetch(&quot;/posts&quot;).then(() =&gt; cachedFetch(&quot;/posts&quot;));</code></pre>
+<p class="check"><strong>Check:</strong> Why does caching by URL work well for GET requests but not for POST requests?</p>
+<h2>Section 21: Fetching in Parallel for a Dashboard</h2>
+<p>Dashboards are a classic case for parallel fetching, because they gather independent data from several endpoints and display it together. A dashboard might need a user profile, recent activity, notifications, and statistics, none of which depend on each other. Fetching them in parallel with Promise.all or allSettled, as learned in the previous chapter, reduces total loading time from the sum of all fetches to roughly the slowest single fetch. That speed improvement is noticeable to users, especially on slow networks where each fetch might take a second or more. Parallel dashboard fetching is therefore standard practice, not an optimisation for later.</p>
+<p>The implementation combines several patterns you already know. You start all fetches without awaiting them individually, collect their promises in an array, and await them together. If every section is required, use Promise.all. If partial sections are acceptable, use allSettled and handle each result&#x27;s status separately, displaying successful sections and warnings for failed ones. After fetching, you merge the results into a single dashboard object, as discussed for parallel results generally, and display that object. That merging step gives display code a consistent shape, regardless of which fetches succeeded, which simplifies rendering and testing.</p>
+<p>Loading states for parallel dashboards deserve special attention. You can show a single loading indicator for the whole dashboard until all fetches settle, which is simple but forces users to wait for the slowest fetch before seeing anything. Alternatively, you can show per-section loading indicators, replacing each one as its fetch settles, which lets users start reading early sections while later ones are still loading. The per-section approach feels faster and more resilient, because a slow section does not block the others. It requires slightly more display code, because each section needs its own status, but the user experience benefit is usually worth the extra code, especially for dashboards with many sections.</p>
+<p>Error handling for parallel dashboards should be per-section, as with partial failures generally. A failing notifications fetch should not hide a successful profile section. Using allSettled and displaying warnings per section achieves that. You should also offer per-section retry, so users can retry just the failed section without reloading the whole dashboard. That combination, parallel fetching, per-section loading, per-section errors, and per-section retry, is the complete dashboard fetching pattern, and it appears in production applications across industries, from analytics to social media to e-commerce admin panels.</p>
+<p>Practise parallel dashboard fetching with three fake fetches, one of which sometimes fails, using allSettled, merging successes, and displaying warnings for failures. Time the parallel version against a sequential version and notice the speed difference. That hands-on comparison, combined with the partial failure handling, will cement parallel fetching as a tool you reach for whenever a screen needs independent data from multiple sources.</p>
+<pre><code>function fakeFetch(name, ms, shouldFail) {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; {
+      if (shouldFail) {
+        reject(new Error(name + &quot; failed&quot;));
+      } else {
+        resolve(name + &quot; data&quot;);
+      }
+    }, ms);
+  });
+}
+
+async function loadDashboard() {
+  const results = await Promise.allSettled([
+    fakeFetch(&quot;Profile&quot;, 200, false),
+    fakeFetch(&quot;Activity&quot;, 300, false),
+    fakeFetch(&quot;Notifications&quot;, 200, true),
+  ]);
+  for (const result of results) {
+    if (result.status === &quot;fulfilled&quot;) {
+      console.log(&quot;Show: &quot; + result.value);
+    } else {
+      console.log(&quot;Warning: &quot; + result.reason.message);
+    }
+  }
+}
+
+loadDashboard();</code></pre>
+<p class="check"><strong>Check:</strong> Why is parallel fetching especially valuable for dashboards?</p>
+<h2>Section 22: Fetching in Sequence When Data Depends</h2>
+<p>Sequential fetching is required when one fetch needs data from another, and it is important to recognise those dependencies rather than forcing parallel fetching where it does not fit. A classic example is fetching a user, then fetching that user&#x27;s posts using the user id from the first response. You cannot fetch the posts before you know the id, so the second fetch must wait for the first. Another example is fetching a list of categories, letting the user choose one, then fetching items in that category. The second fetch depends on a user choice that depends on the first fetch&#x27;s data, so sequence is unavoidable and correct.</p>
+<p>The code for sequential fetching is simply a series of awaits, each using the result of the previous one. That code is easy to read, because the order in the file matches the order of dependencies in the real world. It is also easy to debug, because if the second fetch fails, you know the first succeeded, and you can log its result to verify. The total time is the sum of all fetches, which is unavoidable for dependent work, but it is not wasteful, because no time is spent waiting unnecessarily; each wait is required for the next step to be possible. That distinction, necessary waiting versus wasted waiting, is the key to judging sequential fetching fairly.</p>
+<p>A common mistake is to sequentialise fetches that are actually independent, out of habit or because sequential code is easier to write. That mistake costs performance for no benefit, and it is worth checking for whenever you see a series of awaits. Ask, for each pair, does the second need the first result. If the answer is no, consider parallelising that pair, even if other pairs in the sequence remain sequential. Real fetching plans are often mixed: a first fetch, then two parallel fetches that both depend on the first result, then a final fetch that depends on both. That mixed plan, sequential where needed and parallel where possible, is the most efficient correct plan, and it is worth designing deliberately.</p>
+<p>Sequential fetching also interacts with error handling in a specific way. If an early fetch fails, later fetches should not run, because they lack the data they need. Your try and catch structure should reflect that: if you catch an error from the first fetch and continue to the second fetch anyway, the second fetch will likely fail with a confusing error about a missing id, masking the original failure. Instead, let the error stop the sequence, or handle it by providing a fallback that makes later fetches possible, such as a default id. That disciplined error propagation keeps sequential fetching predictable and debuggable.</p>
+<p>Practise sequential fetching by writing a function that fetches a user, then fetches that user&#x27;s posts using the user&#x27;s id, logging both results. Then try to parallelise the same two fetches and notice why it fails or produces wrong results without the id. That contrast will make dependency thinking concrete, and it will help you design fetch plans that are both correct and efficient in real applications.</p>
+<pre><code>async function fakeGetUser() {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  return { id: 7, name: &quot;Ada&quot; };
+}
+
+async function fakeGetPosts(userId) {
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  return [&quot;Post for user &quot; + userId];
+}
+
+async function sequentialFetch() {
+  const user = await fakeGetUser();
+  const posts = await fakeGetPosts(user.id);
+  console.log(user.name + &quot;: &quot; + posts.length + &quot; posts&quot;);
+}
+
+sequentialFetch();</code></pre>
+<p class="check"><strong>Check:</strong> Give an example where fetching in sequence is required, not just a choice.</p>
+<h2>Section 23: Aborting a Fetch with AbortController</h2>
+<p>AbortController is a built-in tool for cancelling a fetch request that is no longer needed, such as when a user navigates away, types a new search term, or clicks a different item before the previous fetch finishes. Without aborting, the old fetch continues in the background, wastes bandwidth, and may display stale results when it finally completes, overwriting newer data. With aborting, you can cancel the old request as soon as it becomes irrelevant, freeing resources and preventing stale displays. That cancellation is a professional touch that makes applications feel responsive and correct under rapid user interaction.</p>
+<p>Using AbortController involves three steps. First, you create a controller with new AbortController. Second, you pass its signal to fetch via the options object, as signal: controller.signal. Third, when you want to cancel, you call controller.abort, which causes the fetch promise to reject with an AbortError. Your catch block should handle AbortError specially, usually by ignoring it silently or logging it, rather than showing a user-facing error, because an abort is not a failure from the user&#x27;s perspective; it is a deliberate cancellation because they moved on to something else. Distinguishing abort errors from real errors prevents confusing messages such as Failed to load when the user simply typed a new search term.</p>
+<p>A common pattern is to keep a reference to the current controller, abort it before starting a new fetch, and create a fresh controller for the new fetch. That pattern ensures that only the latest fetch can display results, because older fetches are aborted before they can complete. It is especially useful for search-as-you-type, where each keystroke triggers a fetch, and only the latest search term&#x27;s results should be shown. Without aborting, a slow fetch for an early term could finish after a fast fetch for a later term, displaying outdated results and confusing the user. Aborting eliminates that race condition at its source.</p>
+<p>It is important to note that aborting a fetch does not guarantee that the server stops processing the request; it primarily stops the client from waiting for and using the response. For read-only GET requests, that is sufficient, because no server state is changed. For writes, aborting is more complex, because the server might still complete the write even though the client stopped waiting. As with timeouts, you should think carefully before aborting writes, and design server interactions to handle delayed or duplicate writes safely where possible. For reads, however, aborting is safe and recommended.</p>
+<p>Practise aborting by starting a slow fake fetch with a controller, aborting it after a short delay, and confirming that the fetch rejects with an abort error that you handle quietly. Then start a second fetch without aborting the first and observe the stale result problem that aborting solves. That pair of experiments will make the value of AbortController tangible, and it will prepare you for search and navigation features where aborting is essential for correctness.</p>
+<pre><code>async function abortDemo() {
+  const controller = new AbortController();
+  const fetchPromise = fetch(&quot;https://jsonplaceholder.typicode.com/posts/1&quot;, {
+    signal: controller.signal,
+  });
+  controller.abort();
+  try {
+    await fetchPromise;
+  } catch (error) {
+    console.log(&quot;Fetch aborted: &quot; + error.name);
+  }
+}
+
+abortDemo();</code></pre>
+<p class="check"><strong>Check:</strong> Why should an aborted fetch not show a user-facing error message?</p>
+<h2>Section 24: Timeouts for Fetch Requests</h2>
+<p>Fetch does not have a built-in timeout option, so a request to a slow or hung server can wait indefinitely, leaving users stuck on a loading screen. Adding a timeout, using AbortController or Promise.race as learned earlier, gives you control over maximum waiting time. With AbortController, you set a timer that calls controller.abort after the timeout period, causing the fetch to reject with an AbortError that you handle as a timeout. With Promise.race, you race the fetch against a timeout promise that rejects after the period. Both approaches achieve the same goal: bounded waiting with a clear timeout error that users can act on.</p>
+<p>Choosing a timeout value requires judgement, as with async timeouts generally. Too short, and legitimate requests on slow networks will fail unnecessarily, frustrating users who could have waited a little longer. Too long, and users will still wait too long before getting feedback. A common starting point is ten seconds for ordinary data fetches, with shorter timeouts for searches and longer timeouts for large uploads. You can also adjust timeouts by network conditions or by request type, giving critical requests more time and optional requests less. The key is to choose deliberately, test on a slow connection, and display a helpful timeout message with a retry option, rather than leaving users in uncertainty.</p>
+<p>Timeout handling should distinguish timeout errors from other errors in user messages. A timeout message such as This is taking longer than usual. Check your connection or try again, is more helpful than a generic failure message, because it suggests that the server might still be working and that retrying later could succeed. It also reassures users that the program is not broken, just slow, which reduces support contacts and abandonment. For developers, logging timeouts separately from other errors helps identify slow endpoints that need optimisation, versus endpoints that fail outright and need fixing.</p>
+<p>Combining timeout with retry requires care. If a fetch times out, retrying it immediately with the same timeout may simply time out again, wasting time. A better approach is to retry with a longer timeout, or to retry only once, then show a manual retry option. That restraint prevents timeout-retry loops that lock the interface for a long time. As with other fetch patterns, the goal is to balance automatic recovery with user control, giving the program a chance to recover from transient slowness without trapping the user in an endless cycle of waiting and retrying.</p>
+<p>Practise fetch timeouts by racing a slow fake fetch against a short timeout, confirming that the timeout wins and produces a clear error, then racing a fast fetch against the same timeout and confirming success. That contrast demonstrates that timeouts do not slow down fast requests; they only bound slow ones, which is exactly the behaviour you want for a responsive application that respects users&#x27; time.</p>
+<pre><code>function withFetchTimeout(promise, ms) {
+  const timeout = new Promise((_, reject) =&gt; {
+    setTimeout(() =&gt; reject(new Error(&quot;Fetch timed out after &quot; + ms + &quot;ms&quot;)), ms);
+  });
+  return Promise.race([promise, timeout]);
+}
+
+function slowFetch() {
+  return new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(&quot;Slow data&quot;), 1000));
+}
+
+withFetchTimeout(slowFetch(), 300)
+  .then((data) =&gt; console.log(data))
+  .catch((error) =&gt; console.log(error.message));</code></pre>
+<p class="check"><strong>Check:</strong> Why does fetch need a manual timeout when it already handles network errors?</p>
+<h2>Section 25: Handling Slow Networks Gracefully</h2>
+<p>Slow networks are a reality for many users, whether they are on mobile data, in rural areas, or on congested Wi-Fi, and handling them gracefully is a matter of respect for those users. Graceful slow-network handling starts with the patterns you already know: loading states that appear immediately, timeouts that bound waiting, retries for transient failures, and per-section loading so that fast sections appear while slow ones are still loading. Together, these patterns ensure that a slow network degrades the experience gradually, rather than turning it into a blank screen or a frozen interface. Users on slow networks should still be able to use your application, albeit more slowly, not be locked out entirely.</p>
+<p>Beyond those basics, you can design for slow networks by reducing the amount of data fetched. Fetching only the fields you need, paginating lists so that each page is small, and deferring non-essential data until after essential data has loaded, all reduce the load on a slow connection. For example, a product page might load the product name, price, and image first, and defer reviews and related products until afterwards, or until the user scrolls to them. That prioritisation, essential first and optional later, is a form of graceful degradation that benefits all users, but especially those on slow networks, because they see useful content sooner and can start interacting while secondary content is still loading.</p>
+<p>Caching also helps slow networks dramatically, because cached data loads instantly without any network request. For returning users, a cache can make the difference between an instant page and a slow reload, especially for data that changes rarely. Combining caching with a background refresh, where cached data is shown immediately and fresh data replaces it when it arrives, gives users both speed and freshness. That pattern, often called stale-while-revalidate, is advanced, but its core idea, show what you have while you fetch what is new, is intuitive and worth understanding even before you implement it fully.</p>
+<p>You should test your fetching code on a slow network, not just on fast Wi-Fi, to experience what your users experience. Browser developer tools offer network throttling options that simulate slow connections, letting you see loading states, timeouts, and progressive rendering in action. Testing with throttling often reveals problems that are invisible on fast networks, such as spinners that never appear because loading is too fast in development, or layouts that jump when data arrives late. Fixing those problems before launch shows care for all users, not just those with ideal connections, and it is a mark of a thoughtful developer.</p>
+<p>Finally, communicate honestly on slow networks. If a fetch is taking a long time, update the loading message to say Still loading, this may take a moment on a slow connection, rather than leaving a static spinner that could be mistaken for a frozen program. That honest communication, combined with a cancel or retry option, gives users agency and patience, because they understand what is happening and can choose to wait or to try again. Graceful slow-network handling is therefore not just technical; it is also communicative, and it reflects a mindset that puts user experience first, even when conditions are imperfect.</p>
+<pre><code>async function slowNetworkDemo() {
+  console.log(&quot;Loading, please wait&quot;);
+  await new Promise((resolve) =&gt; setTimeout(resolve, 1000));
+  console.log(&quot;Still loading on a slow connection, thanks for waiting&quot;);
+  await new Promise((resolve) =&gt; setTimeout(resolve, 500));
+  console.log(&quot;Loaded&quot;);
+}
+
+slowNetworkDemo();</code></pre>
+<p class="check"><strong>Check:</strong> How does prioritising essential data first help users on slow networks?</p>
+<h2>Section 26: Fetching from a Public Practice API</h2>
+<p>Public practice APIs are a gift for learners, because they let you practise real fetching without setting up a server, managing keys, or worrying about breaking production data. A well-known example is a placeholder API that returns fake posts, comments, users, and todos, designed specifically for tutorials and prototyping. These APIs typically support GET, POST, PUT, PATCH, and DELETE, with predictable data and no authentication for basic use, making them ideal for learning the full range of fetch methods in a safe environment. When you use a practice API, you should still read its documentation, because each API has its own endpoints, parameters, and limitations, and documentation is the authoritative source for those details.</p>
+<p>Using a practice API well involves more than just fetching its default endpoint. Explore its different resources, try filtering by query parameters, try pagination, and try creating, updating, and deleting resources to see how the API responds. That exploration builds a mental model of REST APIs in general, because the patterns you see in one practice API, resource URLs, query filters, status codes, and JSON bodies, recur in real APIs with different data. It also teaches you to read documentation critically, checking which methods are supported, which fields are required, and what the API does with writes, since practice APIs often simulate writes without persisting them, as noted earlier.</p>
+<p>You should also be aware of practice API limitations. They may rate limit requests, return limited data sets, or be unavailable at times, because they are free services maintained for learning. Those limitations are actually useful, because they teach you to handle rate limits, empty results, and service outages gracefully, which are real-world skills. If a practice API is down when you are learning, that is an opportunity to practise error handling, not just an inconvenience. It also teaches you not to hard-code a practice API into a production application, where its limitations and unavailability would become a liability.</p>
+<p>When you move from practice APIs to real APIs, the fetch code you wrote will transfer almost unchanged, but the surrounding concerns will grow. Real APIs often require authentication, enforce stricter rate limits, return more complex data shapes, and have versioning and deprecation policies. Those concerns are covered in later sections of this chapter and in the security chapter, but the core fetching skills, GET, POST, headers, query strings, and error handling, remain the same. Practice APIs are therefore a safe training ground for skills that you will use with real APIs throughout your career.</p>
+<p>As a learning exercise, pick a practice API, read its documentation, and build a small explorer that lists resources, shows details for a selected item, and allows creating a new item. That explorer, built with the patterns in this chapter, will be a portfolio piece demonstrating fetch skills, and it will give you a concrete project to discuss in interviews, where explaining how you handled loading, errors, and pagination is more impressive than simply showing that you can call fetch.</p>
+<pre><code>async function explorePracticeApi() {
+  const response = await fetch(&quot;https://jsonplaceholder.typicode.com/users&quot;);
+  if (!response.ok) {
+    throw new Error(&quot;HTTP &quot; + response.status);
+  }
+  const users = await response.json();
+  console.log(&quot;Practice API users: &quot; + users.length);
+  for (const user of users.slice(0, 3)) {
+    console.log(&quot;- &quot; + user.name);
+  }
+}
+
+explorePracticeApi();</code></pre>
+<p class="check"><strong>Check:</strong> Why are practice APIs useful for learning fetch, and what are their limitations?</p>
+<h2>Section 27: Working with Nested API Data</h2>
+<p>API data is often nested, with objects inside objects and arrays inside objects, reflecting real-world relationships. A user object might contain an address object, which contains a city and a zip code. A post object might contain a list of comments, each with its own author object. Working with nested data requires careful access, because a missing intermediate object can cause a crash if you try to read a property from undefined. Learning to access nested data safely, with optional chaining and fallback values, is therefore an essential fetch skill, because real API data is rarely flat and simple.</p>
+<p>Optional chaining, written as question mark followed by a dot, lets you safely access nested properties without crashing if an intermediate value is null or undefined. For example, user.address?.city returns the city if address exists, and undefined if it does not, instead of throwing an error. That safety is invaluable for API data, where fields may be missing for some records but present for others. Combining optional chaining with a fallback, such as user.address?.city ?? &quot;Unknown city&quot;, gives you a display value that is always safe, even when data is incomplete. That combination, optional chaining plus nullish coalescing, is a standard pattern for rendering API data defensively.</p>
+<p>Nested arrays also require care. A post&#x27;s comments might be an array, but for some posts it might be missing or empty. Before mapping over comments, check that the value is an array, or default to an empty array with a fallback. That check prevents map errors and lets you display an appropriate empty message, such as No comments yet, instead of crashing. Similarly, when you need a specific nested item, such as the first comment&#x27;s author, use optional chaining and indexing together, such as post.comments?.[0]?.author ?? &quot;Anonymous&quot;, to handle all missing cases in one expression. Those defensive patterns may look verbose at first, but they prevent a large class of runtime errors in production code.</p>
+<p>Transforming nested data into a flat display shape is another useful technique. Instead of letting display code navigate deep nesting everywhere, you can write a mapping function that takes a raw API object and returns a flat object with only the fields your display needs, with safe defaults for missing values. That mapping function becomes a single place where nesting is handled, tested, and documented, and display code works with a simple, predictable shape. If the API changes its nesting, you update the mapping function in one place, rather than hunting through display code for every nested access. That separation is a clean architecture habit that scales well.</p>
+<p>Practise nested data by fetching a user object from a practice API, logging its nested address city using optional chaining, and handling a user with a missing address gracefully. Then write a mapping function that flattens the user into name, city, and company name, with fallbacks for missing values. That exercise covers safe access, fallbacks, and transformation, which are the three core skills for working with nested API data in real applications.</p>
+<pre><code>const user = {
+  name: &quot;Ada&quot;,
+  address: { city: &quot;Lagos&quot;, zipcode: &quot;100001&quot; },
+};
+
+console.log(user.address?.city ?? &quot;Unknown city&quot;);
+
+const userWithoutAddress = { name: &quot;Ben&quot; };
+console.log(userWithoutAddress.address?.city ?? &quot;Unknown city&quot;);</code></pre>
+<p class="check"><strong>Check:</strong> How does optional chaining prevent crashes when accessing nested API data?</p>
+<h2>Section 28: Mapping API Data to Display Shapes</h2>
+<p>Mapping API data to display shapes is the process of transforming raw server data into the exact shape your user interface needs, and it is a crucial step between fetching and displaying. Raw API data often contains more fields than you need, uses field names that are not user-friendly, or nests data in ways that are inconvenient for display. A mapping function takes that raw data and returns a clean object with only the needed fields, renamed and formatted for display. For example, it might turn a post with userId, title, and body into a display object with authorName, heading, and summary, where summary is a truncated version of the body. That transformation keeps display code simple and focused on presentation, rather than on data wrangling.</p>
+<p>The benefits of mapping are clarity, testability, and resilience to API changes. Clarity comes from display code working with named fields that match the interface, not with raw API field names that may be cryptic. Testability comes from being able to test the mapping function in isolation with fake API data, verifying that it handles missing fields, formats dates, and truncates text correctly, without fetching. Resilience comes from isolating API shape changes to the mapping function: if the API renames a field, you update the mapping in one place, and display code continues to work unchanged. That isolation is especially valuable in large applications where the same API data is displayed in many places.</p>
+<p>A good mapping function should be pure, meaning it takes input and returns output without side effects, and it should handle missing data defensively, with fallbacks for every field it produces. It should also be explicit about formatting: if a date needs formatting, the mapping function should format it, or call a formatting helper, rather than leaving raw timestamps for display code to format inconsistently. That explicitness ensures that every place displaying the same data shows it in the same format, which is important for consistency and professionalism. Inconsistent date formats across a site, for example, look sloppy and confuse users, while consistent formatting, enforced by mapping, looks polished.</p>
+<p>Mapping can also involve combining data from multiple sources, such as joining posts with their authors by userId, to produce a display object that contains both post and author information. That joining logic, like other mapping logic, belongs in a mapping step, not scattered through display code. When joining, be careful about performance for large lists, and consider using a lookup Map for authors by id, rather than searching the authors array for each post. That performance consideration is a bonus benefit of centralising mapping: you can optimise it in one place, and every display that uses it benefits.</p>
+<p>Practise mapping by writing a function that takes a raw post object and returns a display object with title, excerpt of the first fifty characters of the body, and author label, handling missing body gracefully. Test it with a complete post and with a post missing its body, confirming that both produce safe display objects. That small exercise demonstrates the mapping pattern in miniature, and it gives you a template for larger mappings in real features, where raw API data is rarely display-ready without transformation.</p>
+<pre><code>function mapPostForDisplay(post) {
+  return {
+    title: post.title ?? &quot;Untitled&quot;,
+    excerpt: (post.body ?? &quot;&quot;).slice(0, 50),
+    authorLabel: &quot;User &quot; + (post.userId ?? &quot;unknown&quot;),
+  };
+}
+
+console.log(mapPostForDisplay({ title: &quot;Hello&quot;, body: &quot;This is a long body text for testing.&quot;, userId: 1 }));
+console.log(mapPostForDisplay({ title: &quot;No body&quot; }));</code></pre>
+<p class="check"><strong>Check:</strong> Why should mapping from raw API data to display data happen in one dedicated function?</p>
+<h2>Section 29: Handling Empty Results and Missing Fields</h2>
+<p>Empty results and missing fields are normal API outcomes, not errors, and handling them well distinguishes a polished application from a fragile one. An empty result occurs when a search finds nothing, a filter excludes everything, or a user has no posts yet. A missing field occurs when an API object lacks a field you expected, because the field is optional, because data is incomplete, or because the API version changed. Both cases should lead to helpful display, not to crashes, blank pages, or misleading messages. Designing for emptiness and missingness from the start is therefore an essential part of fetch display design.</p>
+<p>For empty lists, the best display is an explicit empty message that explains why the list is empty and what the user can do next. For a search, that message might be No results for your search. Try different keywords. For a user&#x27;s posts, it might be No posts yet. Create your first post. Those messages are far better than a blank area, which users may interpret as a loading failure or a bug. They also guide users towards a next action, turning a dead end into a helpful prompt. The empty message should be shown only after fetching completes successfully with an empty array, not while loading, so that users do not mistake a loading state for an empty result.</p>
+<p>For missing fields, the best approach is defensive display with fallbacks, as discussed for nested data. If a user&#x27;s name is missing, display Anonymous or Unknown instead of undefined. If a post&#x27;s body is missing, display No content available instead of an empty card that looks broken. If an image URL is missing, display a placeholder image or hide the image area gracefully, rather than showing a broken image icon. Those fallbacks should be consistent across your application, so that missing data always looks intentional, not accidental. A mapping function with fallbacks, as in the previous section, is an excellent place to enforce that consistency.</p>
+<p>You should also distinguish empty results from errors in your code and in your messages. An empty array from a successful fetch is not an error, and it should not trigger error handling or error messages. A fetch that fails to return data at all is an error, and it should trigger error handling. Confusing these two cases leads to messages such as Failed to load when the real situation is simply No results, which misleads users and makes debugging harder. Keeping success-with-empty separate from failure, in both code structure and user messages, is a clarity habit that pays off in every list and detail feature you build.</p>
+<p>Practise empty and missing handling by fetching a filtered list that returns no items, displaying an empty message, and by mapping an object with missing fields to display fallbacks. Confirm that neither case crashes and that both produce helpful messages. That pair of tests covers the most common non-error edge cases for fetching, and it will make your applications feel complete, because they handle not just the ideal data, but also the real data that is sometimes empty or incomplete.</p>
+<pre><code>function displayList(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    console.log(&quot;No items found. Try a different search.&quot;);
+    return;
+  }
+  for (const item of items) {
+    console.log(&quot;- &quot; + (item.title ?? &quot;Untitled&quot;));
+  }
+}
+
+displayList([]);
+displayList([{ title: &quot;First&quot; }, {}]);</code></pre>
+<p class="check"><strong>Check:</strong> How should an empty search result be displayed differently from a fetch error?</p>
+<h2>Section 30: Sorting and Filtering Fetched Data Locally</h2>
+<p>Sorting and filtering fetched data locally, in the browser after fetching, is often simpler and faster than requesting sorted or filtered data from the server, especially for small to medium lists. Local sorting means you fetch the full list once, then use JavaScript&#x27;s sort method to order it by a field, such as title alphabetically or date newest first, without another network request. Local filtering means you use filter to select a subset based on user input, such as a search term or a category, again without fetching. These local operations feel instant to users, because they do not wait for the network, and they reduce server load, because one fetch serves many views.</p>
+<p>Implementing local sorting requires care with sort&#x27;s behaviour, because sort mutates the original array by default. To avoid mutating your fetched data, which could cause confusing bugs if you later need the original order, you should copy the array before sorting, using slice or spread. You should also handle different data types correctly: strings sort alphabetically with localeCompare, numbers sort numerically with subtraction, and dates sort by converting to timestamps. A sorting helper that takes a list, a field, and a direction, and returns a new sorted list without mutating the original, encapsulates those details and makes sorting reusable across features. That helper is a good example of a small, well-designed utility that improves many features at once.</p>
+<p>Local filtering follows a similar pattern: you keep the original fetched list untouched, and you derive a filtered list from it based on current filter values. When the user changes a filter, you recompute the filtered list from the original, rather than filtering an already filtered list, which would lose items that should reappear when the filter changes. That recompute-from-original discipline is essential for correct filtering, and it is a common beginner bug to filter incrementally and lose data. Keeping the original list as the source of truth, and deriving views from it, is a clean architecture that applies to sorting, filtering, and searching alike.</p>
+<p>Combining sorting and filtering locally is straightforward if you apply them in order: first filter the original list to a subset, then sort that subset, then display it. That pipeline, filter then sort then display, is easy to reason about and easy to test, because each step is a pure transformation of an array. You can test filtering and sorting separately with fake data, confirming that each works correctly, before combining them in a feature. That testability is another benefit of local operations: they do not depend on the network, so they can be tested quickly and deterministically, unlike server-side sorting and filtering, which require a running API.</p>
+<p>For large lists, local sorting and filtering can become slow, and server-side operations may be more appropriate, because the server can use indexes and return only the needed page. For lists of hundreds or fewer items, however, local operations are usually fast enough and provide a better user experience, because they are instant. Knowing when to use local versus server-side operations is a judgement call based on list size, data freshness, and user expectations, but starting with local operations for small lists is a sensible default that keeps code simple and responsive.</p>
+<pre><code>const posts = [
+  { title: &quot;Banana&quot;, views: 10 },
+  { title: &quot;Apple&quot;, views: 30 },
+  { title: &quot;Cherry&quot;, views: 20 },
+];
+
+const sortedByTitle = [...posts].sort((a, b) =&gt; a.title.localeCompare(b.title));
+console.log(sortedByTitle.map((post) =&gt; post.title));
+
+const popular = posts.filter((post) =&gt; post.views &gt;= 20);
+console.log(popular.map((post) =&gt; post.title));</code></pre>
+<p class="check"><strong>Check:</strong> Why should you copy an array before sorting it locally?</p>
+<h2>Section 31: Searching as You Type with Fetch</h2>
+<p>Searching as you type, where results update while the user is still typing, is a popular interaction that combines fetch with event handling and debouncing. As the user types in a search box, each keystroke could trigger a fetch, but fetching on every keystroke is wasteful and can overwhelm the server. The standard solution is debouncing: wait until the user pauses typing for a short period, such as three hundred milliseconds, then fetch once for the final term. That delay is short enough to feel responsive, but long enough to avoid fetching for every intermediate term, such as fetching for h, he, hel, and hell when the user meant hello. Debouncing therefore balances responsiveness with efficiency.</p>
+<p>Implementing debounced search involves a timer that resets on each keystroke. When the user types, you clear any existing timer and start a new one. If the user types again before the timer fires, you clear it again and start another, so the fetch only happens after a pause. When the timer finally fires, you fetch with the current search term and display results. If a debounced fetch for an early term is still in flight when a later term&#x27;s fetch starts, the early fetch should be aborted, or its results should be ignored if they arrive after the later fetch&#x27;s results. Combining debouncing with aborting gives you a search that is both efficient and correct.</p>
+<p>You should also handle empty search terms specially. If the user clears the search box, you should not fetch with an empty term, which might return everything or nothing depending on the API. Instead, you should clear the results and show a prompt such as Type to search, or show the default list. That empty-term handling prevents useless fetches and gives users a clear state when they are not searching. Similarly, for very short terms, such as one character, you might wait until the term is at least two or three characters before fetching, to avoid returning huge, unhelpful result sets for overly broad queries. Those thresholds depend on your data and your users, but the principle is to avoid fetching when the query is too vague to be useful.</p>
+<p>Displaying search results as you type also requires careful loading states. Because searches happen frequently, a full-page spinner for each search would be distracting. A subtle indicator, such as a small spinner in the search box or a dimming of previous results, communicates that new results are loading without disrupting the user&#x27;s typing. When new results arrive, they should replace old results smoothly, without jumping the page or losing the user&#x27;s place. Those polish details, subtle loading and smooth replacement, make search-as-you-type feel professional rather than jittery, and they are worth attending to once the basic debounced fetch works.</p>
+<p>Practise search-as-you-type by simulating typing with delayed calls to a debounced fetch function, logging which terms actually trigger fetches and which are debounced away. That simulation, without a real page, teaches the timer logic clearly, and you can then apply it to a real input element with confidence. Search-as-you-type is a feature users love when it works well, and it is a showcase for combining fetch, timers, aborting, and loading states into a single, polished interaction.</p>
+<pre><code>function debounce(fn, delayMs) {
+  let timer = null;
+  return (...args) =&gt; {
+    clearTimeout(timer);
+    timer = setTimeout(() =&gt; fn(...args), delayMs);
+  };
+}
+
+const debouncedSearch = debounce((term) =&gt; {
+  console.log(&quot;Searching for: &quot; + term);
+}, 300);
+
+debouncedSearch(&quot;h&quot;);
+debouncedSearch(&quot;he&quot;);
+debouncedSearch(&quot;hello&quot;);</code></pre>
+<p class="check"><strong>Check:</strong> Why is debouncing important for search-as-you-type fetching?</p>
+<h2>Section 32: Preventing Stale Search Results</h2>
+<p>Stale search results occur when an older fetch finishes after a newer fetch, overwriting fresh results with outdated ones. This happens because network requests do not always finish in the order they started: a request for an early search term might be slow, while a request for a later term might be fast, so the early term&#x27;s results arrive last and incorrectly replace the later term&#x27;s results. Users then see results for a term they no longer care about, which is confusing and can lead them to click the wrong item. Preventing stale results is therefore essential for any feature where multiple fetches can be in flight at once, especially search, pagination, and tab navigation.</p>
+<p>There are three main techniques for preventing stale results, and they can be combined. The first is aborting, using AbortController to cancel older fetches when a new fetch starts, so older results never arrive at all. The second is request tracking, where you assign an increasing id to each fetch, and only display results if the id matches the latest fetch&#x27;s id, ignoring results from older ids even if they arrive late. The third is disabling or ignoring triggers while a fetch is in flight, which prevents multiple fetches from overlapping in the first place, although it is less suitable for search where users expect to type freely. Each technique has trade-offs, but together they cover most stale-result scenarios.</p>
+<p>Request tracking is worth understanding in detail because it works even when aborting is not possible or not sufficient, such as when a fetch cannot be aborted because it has already reached the server, or when you are using a library that does not support aborting. The pattern is simple: keep a variable latestRequestId, increment it before each fetch, capture its value in a local variable for that fetch, and after awaiting, check whether the local value still equals latestRequestId. If it does, display the results. If it does not, ignore them, because a newer fetch has started since. That check, placed right after the await, is a small addition that prevents a large class of race condition bugs, and it is easy to add to any fetching function.</p>
+<p>Aborting and request tracking complement each other: aborting saves bandwidth by cancelling unnecessary work, while tracking provides a safety net for results that slip through despite aborting, or for fetches that cannot be aborted. Using both gives you defence in depth, which is a good principle for race conditions, because races are notoriously hard to reproduce and debug. A bug that appears only when network timing aligns in a particular way can slip through testing and appear in production, so layered protections are worth the extra code, especially for user-facing features like search where stale results directly harm trust.</p>
+<p>Practise stale prevention by starting two fake fetches, a slow one for an old term and a fast one for a new term, with request tracking, and confirming that only the new term&#x27;s results are displayed, even though the slow fetch finishes last. That experiment, with controlled delays, makes the race condition reproducible and the fix verifiable, which is exactly how you should approach race conditions in general: reproduce with delays, fix with tracking or aborting, and verify that the fix holds under the same delays.</p>
+<pre><code>let latestId = 0;
+
+async function search(term, delayMs) {
+  const myId = ++latestId;
+  await new Promise((resolve) =&gt; setTimeout(resolve, delayMs));
+  if (myId !== latestId) {
+    console.log(&quot;Ignoring stale results for: &quot; + term);
+    return;
+  }
+  console.log(&quot;Showing results for: &quot; + term);
+}
+
+search(&quot;old&quot;, 400);
+search(&quot;new&quot;, 100);</code></pre>
+<p class="check"><strong>Check:</strong> How does request tracking prevent an older fetch from overwriting newer results?</p>
+<h2>Section 33: Uploading Simple Data with Fetch</h2>
+<p>Uploading data with fetch, beyond simple JSON POSTs, often involves sending form data or files, and the pattern differs in important ways from JSON requests. For simple structured data, JSON POST is sufficient and preferred, because it is easy to construct and easy for servers to parse. For data that includes files, or for forms that mimic traditional HTML form submissions, you use FormData, a built-in object that represents form fields and files as multipart data. When you send FormData with fetch, you should not set Content-Type manually, because the browser sets it automatically with a boundary string that separates the parts. Setting it manually without the boundary will break the upload, which is a common beginner mistake.</p>
+<p>Creating FormData is straightforward: you create a new FormData object, append fields with names and values, and pass it as the body of a fetch POST request, without a Content-Type header. For text fields, values are strings. For files, values are File objects obtained from an input element. The server receives the fields as it would from a traditional form submission, and it can process files and text together. That compatibility with traditional forms makes FormData a bridge between old and new web development, allowing modern fetch code to work with servers designed for form submissions without requiring JSON support on the server side.</p>
+<p>For JSON-only uploads, the pattern remains POST with JSON.stringify and Content-Type application/json, as covered earlier. The choice between JSON and FormData depends on what you are uploading and what the server expects. If you are sending structured data without files, JSON is usually cleaner. If you are sending files, or if the server expects multipart form data, FormData is required. Checking the API documentation for the expected content type, before writing upload code, prevents wasted effort and confusing server errors. Documentation should state whether an endpoint accepts JSON, form data, or both, and what field names it expects.</p>
+<p>Upload progress is another consideration for larger uploads, such as files. Fetch does not provide built-in upload progress events, unlike the older XMLHttpRequest, which is a limitation to be aware of. For small uploads, progress is not critical, because the upload completes quickly. For large file uploads, you may need XMLHttpRequest or a library that supports progress, or you may accept a simple loading state without detailed progress. That trade-off, fetch simplicity versus XMLHttpRequest progress, is a real design decision, and knowing it exists helps you choose the right tool for each upload feature, rather than assuming fetch handles every case perfectly.</p>
+<p>Practise simple uploads by creating a FormData object with a text field, logging its entries, and sending it as a POST body without setting Content-Type, to a practice API if available, or simply logging the request structure. That exercise teaches the FormData construction and the no-manual-Content-Type rule, which are the two most important points for form uploads, and it prepares you for file uploads, where the same FormData pattern applies with File objects instead of strings.</p>
+<pre><code>function buildFormData() {
+  const formData = new FormData();
+  formData.append(&quot;title&quot;, &quot;Hello upload&quot;);
+  formData.append(&quot;userId&quot;, &quot;1&quot;);
+  for (const [key, value] of formData.entries()) {
+    console.log(key + &quot;: &quot; + value);
+  }
+  return formData;
+}
+
+buildFormData();</code></pre>
+<p class="check"><strong>Check:</strong> Why should you not set Content-Type manually when sending FormData with fetch?</p>
+<h2>Section 34: Working with Response Headers</h2>
+<p>Response headers carry metadata about a response, beyond the body itself, and learning to read them opens up useful information for pagination, caching, rate limiting, and debugging. Common response headers include Content-Type, which tells you the body&#x27;s format, Content-Length, which tells you its size, Cache-Control, which tells you how the response may be cached, and custom headers that APIs use for their own purposes, such as X-Total-Count for total items in a paginated list, or X-RateLimit-Remaining for how many requests you have left. Reading these headers with response.headers.get allows your code to adapt to server information, rather than guessing or hard-coding values that the server could provide.</p>
+<p>Pagination headers are a good example of header usefulness. Some APIs return the total number of items in a header, rather than in the body, so that the body stays a pure list of items. Your pagination code can read that header, parse it as a number, and calculate total pages, enabling or disabling Next and Previous buttons accurately. Without reading the header, you would need to guess total pages from the last page&#x27;s size, which is less accurate and can lead to an extra, empty fetch at the end. That header-driven pagination is more precise and more professional, and it demonstrates why headers deserve attention beyond the body.</p>
+<p>Rate limit headers are another example. Many public APIs limit how many requests you can make per hour or per minute, and they communicate remaining allowance through headers. By reading those headers and logging or displaying them during development, you can understand when you are approaching a limit and adjust your fetching strategy, such as caching more aggressively or reducing polling frequency. In production, you might use rate limit headers to show a warning when allowance is low, or to back off automatically before hitting the limit and receiving errors. That proactive handling, driven by headers, prevents sudden failures that surprise users.</p>
+<p>Headers are case-insensitive, and the Headers object returned by fetch normalises them, so you can request content-type or Content-Type interchangeably. Values are always strings, so numeric headers must be parsed with Number or parseInt before arithmetic. Some headers may be absent, in which case get returns null, so you should handle null gracefully with a fallback, rather than assuming every header is present. Those small defensive habits, case-insensitivity, string parsing, and null handling, make header reading robust across different servers, which may send headers in different cases or omit optional headers entirely.</p>
+<p>As a debugging tool, logging all response headers during development can reveal server behaviour that is invisible in the body alone, such as caching directives, server software, or custom debugging headers. Browser developer tools also show headers in the Network tab, which is useful for comparing your code&#x27;s view of headers with the raw network view. Together, code-level header reading and tool-level inspection give you a complete picture of the HTTP conversation, beyond just the data payload, and that completeness is what separates careful API integration from blind fetching.</p>
+<pre><code>async function inspectHeaders(url) {
+  const response = await fetch(url);
+  console.log(&quot;content-type: &quot; + response.headers.get(&quot;content-type&quot;));
+  console.log(&quot;total count header: &quot; + response.headers.get(&quot;x-total-count&quot;));
+  for (const [key, value] of response.headers.entries()) {
+    console.log(key + &quot;: &quot; + value);
+  }
+}</code></pre>
+<p class="check"><strong>Check:</strong> Give two examples of useful information that can come from response headers rather than the body.</p>
+<h2>Section 35: Understanding Status Codes in Plain Words</h2>
+<p>HTTP status codes are three-digit numbers that tell you the outcome of a request, grouped by their first digit into five families. Two hundred codes mean success: the request worked and the server returns data or confirmation. Three hundred codes mean redirection: the resource moved and the client should follow a new location, which browsers and fetch handle automatically in most cases. Four hundred codes mean client error: the request was wrong in some way, such as not found, unauthorised, or invalid input, and fixing the request is the client&#x27;s responsibility. Five hundred codes mean server error: the server failed to fulfil a valid request, and retrying later may help. Understanding these families, rather than memorising every code, gives you a framework for interpreting any status you encounter.</p>
+<p>Within the families, a few specific codes are worth knowing by heart. Two hundred means OK, the most common success. Two hundred and one means Created, for successful POSTs that create a resource. Two hundred and four means No Content, for successful requests that return no body, such as some deletes. Four hundred means Bad Request, for malformed or invalid requests. Four hundred and one means Unauthorised, for missing or invalid authentication. Four hundred and three means Forbidden, for authenticated but not permitted requests. Four hundred and four means Not Found, for missing resources. Five hundred means Internal Server Error, for server failures. Five hundred and three means Service Unavailable, for temporary overload or maintenance. Knowing these codes lets you read logs and error messages quickly, without looking each one up.</p>
+<p>Status codes should drive your error handling logic, not just your logging. A four hundred and four should lead to a Not found message, not a retry, because retrying a missing resource will fail again. A five hundred should lead to a retry-later message, because the problem is temporary and server-side. A four hundred and one should lead to a sign-in prompt, because authentication is missing. A four hundred and twenty-nine, which means Too Many Requests, should lead to backing off and retrying after a delay, respecting the server&#x27;s rate limit.</p>
+<p>For beginners, a practical approach is to handle status codes in groups first, then refine for specific codes as needed. Start by checking ok for success versus failure, then branching on status ranges: four hundred range for client errors and five hundred range for server errors, with special cases for four hundred and four and four hundred and one as you encounter them. That grouped approach is manageable and covers most cases, and you can add specific handling for other codes when a feature requires it, such as handling four hundred and twenty-nine for a rate-limited API. Over time, your status handling will grow more specific, but it will always be grounded in the family framework.</p>
+<p>Finally, remember that status codes are part of the API contract, and APIs should document which codes they return for which situations. When you integrate with a new API, read its status code documentation alongside its endpoint documentation, so you know what to expect for success, validation failures, authentication failures, and server errors. That reading habit prevents surprises and lets you design error handling before you encounter errors in production, which is far better than discovering a new status code through a user complaint.</p>
+<pre><code>function describeStatus(status) {
+  if (status &gt;= 200 &amp;&amp; status &lt; 300) {
+    return &quot;Success&quot;;
+  }
+  if (status &gt;= 400 &amp;&amp; status &lt; 500) {
+    return &quot;Client error: fix the request&quot;;
+  }
+  if (status &gt;= 500) {
+    return &quot;Server error: try again later&quot;;
+  }
+  return &quot;Other status: &quot; + status;
+}
+
+console.log(describeStatus(200));
+console.log(describeStatus(404));
+console.log(describeStatus(500));</code></pre>
+<p class="check"><strong>Check:</strong> How should your handling differ for a 404 status versus a 500 status?</p>
+<h2>Section 36: When Fetch Returns HTML Instead of JSON</h2>
+<p>Fetching JSON and receiving HTML instead is a confusing experience, because your code expects a JavaScript object but gets a string of markup, and response.json fails with a parsing error. This usually happens for one of a few reasons: the endpoint URL is wrong and returns a website&#x27;s not-found page, the server is misconfigured and returns an error page instead of JSON, the request was redirected to a login page because authentication was required, or the API is down and a proxy returns a maintenance page. In all cases, the symptom is the same: the Content-Type header says text/html, the body starts with angle brackets, and JSON parsing fails. Recognising that symptom quickly saves debugging time.</p>
+<p>Diagnosing the problem starts with inspecting the Response before parsing, as emphasised earlier. Log the status, the ok flag, and the Content-Type header. If the content type is text/html when you expected application/json, do not call json; instead, call text and log the first part of the body to see what page you actually received. That body preview often reveals the cause immediately: a login page means authentication is missing, a not-found page means the URL is wrong, and a maintenance page means the server is temporarily down. Without that preview, you might waste time guessing whether the problem is in your parsing code, when the real problem is in the request or the server.</p>
+<p>Handling HTML responses gracefully in production code means catching JSON parsing failures and translating them into user-friendly messages, rather than crashing. A catch block that handles parsing errors can show a message such as The service returned unexpected data. Please try again later, and log the status and content type for developers. That handling does not fix the underlying server problem, but it prevents a technical parsing error from becoming a user-facing crash, and it gives developers the information they need to fix the endpoint or authentication. For beginners, the key lesson is to never assume that a successful fetch means JSON; always verify content type or handle parsing failures explicitly.</p>
+<p>Preventing HTML responses involves checking your request carefully: verify the endpoint URL against documentation, ensure authentication headers are included if required, and test the endpoint in a browser or API tool to see what it returns. If an endpoint works in a tool but returns HTML from your code, compare headers, methods, and URLs between the two requests, because a small difference, such as a missing trailing slash or a wrong method, can cause a server to return an HTML page instead of JSON. That comparison skill, applied systematically, resolves most HTML-instead-of-JSON mysteries without needing to change parsing code.</p>
+<p>As you gain experience, you will learn to spot HTML responses instantly from their error messages and content types, and you will build fetch helpers that check content type before parsing, or that handle parsing failures with clear logs. Those helpers turn a confusing bug into a routine diagnostic, which is the goal of good fetch design: not to prevent every server misconfiguration, which is impossible, but to make failures visible, understandable, and recoverable when they inevitably occur.</p>
+<pre><code>async function safeJsonFetch(url) {
+  const response = await fetch(url);
+  const contentType = response.headers.get(&quot;content-type&quot;) || &quot;&quot;;
+  if (!contentType.includes(&quot;application/json&quot;)) {
+    throw new Error(&quot;Expected JSON but got &quot; + contentType);
+  }
+  if (!response.ok) {
+    throw new Error(&quot;HTTP &quot; + response.status);
+  }
+  return response.json();
+}</code></pre>
+<p class="check"><strong>Check:</strong> What are three common reasons a fetch expecting JSON returns HTML instead?</p>
+<h2>Section 37: Debugging Fetch in the Console</h2>
+<p>Debugging fetch effectively starts with logging, but it extends to browser developer tools, which offer a Network tab that shows every request your page makes, with its URL, method, status, headers, timing, and response body. Learning to use the Network tab is essential for fetch debugging, because it shows you what actually happened on the network, independent of your code&#x27;s interpretation. If your code logs an error but the Network tab shows a successful response, the problem is in your parsing or handling. If the Network tab shows a failed request, the problem is in the request itself or on the server. That separation, network versus code, is the first diagnostic step for any fetch problem.</p>
+<p>Console logging complements the Network tab by showing your code&#x27;s view of the fetch: the URL you requested, the Response properties you inspected, the parsed data you received, and the error you caught. A good debugging log sequence for a fetch includes the URL before fetching, the status and ok flag after fetching, and either the parsed data or the error message after parsing. That sequence creates a timeline that you can compare with the Network tab&#x27;s timeline, revealing discrepancies such as a URL that differs from what you intended, or a response that differs from what the server actually sent. Without that logging, you are debugging blind, guessing at which step failed.</p>
+<p>Common fetch debugging questions include: Did the request reach the server at all? What status did the server return? What was the content type? What was the body? Did parsing succeed? Did my code handle the result correctly? Answering those questions in order, using both console logs and the Network tab, systematically narrows down the problem. If the request never appears in the Network tab, the problem is before fetch, such as a function never being called or a URL never being built. If it appears but with the wrong URL or method, the problem is in request construction. If it appears with an error status, the problem is in the request parameters or on the server. That ordered questioning prevents random changes and leads to a precise fix.</p>
+<p>You should also use the console to test fetch snippets interactively. Browser consoles allow you to run fetch calls directly, inspect Responses, and experiment with URLs and options without editing files. That interactive testing is fast for hypothesis checking: if you suspect a URL is wrong, you can fetch it in the console and see its response immediately, without rebuilding your application. Similarly, you can test a fix in the console before applying it to your code, confirming that it works before committing to a change. That interactive workflow, hypothesise, test in console, apply to code, is a powerful debugging habit for API work.</p>
+<p>Finally, remember to remove or reduce verbose fetch logging before shipping production code, or to gate it behind a debug flag, so that users&#x27; consoles are not flooded with internal details. Development logging is invaluable, but production logging should be concise and focused on errors that need investigation, not on every successful fetch. That distinction, verbose in development and quiet in production, is a professional habit that keeps debugging effective without compromising user experience or privacy.</p>
+<pre><code>async function debugFetch(url) {
+  console.log(&quot;Fetching: &quot; + url);
+  try {
+    const response = await fetch(url);
+    console.log(&quot;Status: &quot; + response.status + &quot;, ok: &quot; + response.ok);
+    const data = await response.json();
+    console.log(&quot;Data received:&quot;, data);
+    return data;
+  } catch (error) {
+    console.log(&quot;Fetch debug error: &quot; + error.message);
+    throw error;
+  }
+}</code></pre>
+<p class="check"><strong>Check:</strong> How do console logs and the browser Network tab complement each other when debugging fetch?</p>
+<h2>Section 38: Avoiding CORS Surprises in Plain Words</h2>
+<p>CORS, which stands for Cross-Origin Resource Sharing, is a browser security feature that controls whether a web page from one origin, such as your site, can fetch data from another origin, such as a different domain, protocol, or port. By default, browsers block cross-origin fetches unless the server explicitly allows them by sending CORS headers, such as Access-Control-Allow-Origin. This blocking is a security protection, preventing malicious sites from reading data from other sites on your behalf, but it can surprise beginners who fetch from a different domain and receive a CORS error, even though the same URL works when opened directly in a browser or fetched from a server. Understanding CORS in plain words prevents hours of confusion.</p>
+<p>The key insight is that CORS is enforced by the browser, not by fetch or by the server&#x27;s willingness to respond. When you fetch a cross-origin URL, the browser first checks whether the server allows your origin. If it does not, the browser blocks your code from reading the response, even if the server actually sent data. The error message in the console will mention CORS and Access-Control-Allow-Origin, which is your clue that the problem is a permission issue, not a network failure or a wrong URL. Fetching the same URL from a server-side program, which does not enforce CORS, would succeed, which is why a URL can work in one context and fail in another, confusing beginners who expect consistent behaviour everywhere.</p>
+<p>For learning, the practical implications are simple. When you use a practice API, choose one that sends permissive CORS headers, allowing browser fetches from any origin, so that your learning is not blocked by security policy. When you build your own API, you will need to configure CORS to allow your front-end origin, which is a server-side task covered in back-end learning. When you encounter a CORS error with a third-party API, you cannot fix it from front-end code alone by changing fetch options, except in limited cases; you need the API provider to allow your origin, or you need to fetch through your own server proxy that adds the appropriate headers. Trying to bypass CORS with hacks is not recommended, because CORS exists for security reasons, and bypassing it can expose users to risks.</p>
+<p>A related concept is preflight requests, which browsers send automatically for certain cross-origin requests, such as those with custom headers or non-simple methods like PUT and DELETE. A preflight is an OPTIONS request asking the server whether the actual request is allowed, and the server must respond with appropriate CORS headers for the actual request to proceed. If preflight fails, the actual request never happens, and the error mentions CORS. Knowing that preflights exist helps you understand why a simple GET might work but a POST with a custom header might fail with CORS, even to the same server: the preflight adds an extra permission check that the simple request did not require.</p>
+<p>In summary, treat CORS errors as permission errors, not as fetch bugs. Check the console message for CORS, check whether the API allows browser origins, and if it does not, use a different API for learning, configure your own server correctly, or use a server proxy.</p>
+<pre><code>async function corsAwareFetch(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(&quot;HTTP &quot; + response.status);
+    }
+    return await response.json();
+  } catch (error) {
+    console.log(&quot;If this is a CORS error, check the server&#x27;s Allow-Origin headers: &quot; + error.message);
+    throw error;
+  }
+}</code></pre>
+<p class="check"><strong>Check:</strong> Why can a URL work when opened directly but fail with a CORS error when fetched from a page?</p>
+<h2>Section 39: Storing Fetched Data for Later Use</h2>
+<p>Fetching data every time you need it is wasteful if the data has not changed, so storing fetched data for later use, in memory, in localStorage, or in another client-side store, is a common optimisation. In-memory storage, such as a variable or Map that holds fetched data for the duration of a page session, is the simplest form: you fetch once, store the result, and reuse it on subsequent navigations within the same page load, without refetching. That in-memory cache is fast, easy to implement, and automatically cleared when the page reloads, which prevents stale data from persisting too long. For many applications, in-memory storage is sufficient and is the first caching layer to implement.</p>
+<p>LocalStorage offers longer persistence, surviving page reloads and browser restarts, which is useful for data that changes rarely, such as user preferences, categories, or configuration. To store fetched data in localStorage, you stringify it with JSON.stringify and save it under a key, along with a timestamp if you want expiry. To retrieve it, you parse it with JSON.parse and check its age, fetching fresh data if it is too old or missing. That timestamp check is essential, because localStorage does not expire automatically, and without it, users could see data that is days or weeks old, mistaking it for current information. Labelling cached data with its age, or refreshing it in the background after showing cached data, mitigates that staleness risk.</p>
+<p>Choosing between memory and localStorage depends on data characteristics. Frequently changing data, such as live scores or stock prices, should not be stored long-term, because staleness would be misleading. Rarely changing data, such as a list of countries or a user&#x27;s profile that changes infrequently, can be stored longer with periodic refresh. Sensitive data, such as authentication tokens or personal information, should be stored carefully, with consideration for security, and generally not in localStorage, where it is accessible to any script on the page. For learning, the key is to match storage duration to data volatility and sensitivity, rather than caching everything indefinitely by default.</p>
+<p>You should also consider storage size limits. LocalStorage typically allows a few megabytes per origin, which is enough for small data sets but not for large lists or images. Storing too much can cause quota errors, which your code should handle gracefully by catching storage errors and falling back to fetching fresh data. In-memory storage is limited by available RAM, but for typical page data sets, it is rarely a problem. Being mindful of size, and storing only the fields you need rather than entire raw responses, keeps storage efficient and avoids quota problems. Mapping fetched data to a minimal display shape before storing, as discussed earlier, helps with both size and clarity.</p>
+<p>Practise storage by fetching a list, storing it in a variable for reuse, then storing a small version in localStorage with a timestamp, retrieving it on a simulated reload, and checking its age before deciding whether to refetch. That exercise covers the core storage patterns, memory, persistence, and expiry, in a compact form that you can adapt to real features where repeated fetching would otherwise slow down navigation and waste bandwidth.</p>
+<pre><code>const memoryStore = new Map();
+
+function storeInMemory(key, data) {
+  memoryStore.set(key, data);
+}
+
+function getFromMemory(key) {
+  return memoryStore.get(key);
+}
+
+storeInMemory(&quot;posts&quot;, [{ title: &quot;Hello&quot; }]);
+console.log(getFromMemory(&quot;posts&quot;));</code></pre>
+<p class="check"><strong>Check:</strong> When is in-memory storage preferable to localStorage for fetched data, and vice versa?</p>
+<h2>Section 40: Refreshing Data Without Reloading the Page</h2>
+<p>Refreshing data without reloading the page is one of the main benefits of fetch, because it allows a page to stay interactive while its content updates in the background. Instead of navigating to a new page or reloading the whole document, your code fetches fresh data, updates the relevant part of the page, and leaves the rest untouched, including scroll position, form inputs, and other state. That seamless update is the foundation of modern web applications, from social media feeds that load new posts to dashboards that update statistics, and it is why fetch is so central to front-end development. Users experience it as a living page, rather than a static document that must be reloaded to change.</p>
+<p>Implementing refresh is straightforward: you write a function that fetches data and updates the display, and you call that function whenever refresh is needed, such as on a Refresh button click, after a form submission that changes data, or on a timer for periodic updates. The function should handle loading states for the refreshed section, ideally with a subtle indicator rather than a full-page spinner, because the user is already looking at old data and does not need to be blocked while new data loads. It should also handle errors by keeping old data visible and showing a message that refresh failed, rather than clearing the display and leaving a blank page. That preservation of old data on refresh failure is important, because it means a failed refresh does not destroy useful content the user was already viewing.</p>
+<p>A common refresh trigger is after a write operation. For example, after creating a new post with POST, you should refresh the post list to include the new post, either by refetching the list or by optimistically adding the new post to the displayed list and then refetching to confirm. Refetching is simpler and more reliable, because it ensures the displayed list matches the server&#x27;s state, including any server-assigned fields or ordering. Optimistic updating is faster, because it shows the new post immediately, but it requires rollback if the server rejects the write. For beginners, refetch-after-write is the safer pattern, and it teaches the core refresh loop: write, then read fresh, then display.</p>
+<p>Another refresh trigger is user navigation within a single-page application, where changing views should fetch fresh data for the new view without reloading the page. That pattern is covered in later chapters on routing and single-page apps, but its fetch core is the same: on view change, fetch the view&#x27;s data, update the display, and handle loading and errors. Mastering refresh as a standalone pattern, with a button that refetches and updates a list, prepares you for those larger patterns, because the fetch-and-update loop remains identical, only the trigger changes.</p>
+<p>Practise refresh by building a function that fetches a list, displays it, and can be called again to fetch and display a fresh list, logging each refresh. Call it twice with a fake fetch that returns different data each time, and confirm that the display updates without any page reload simulation. That simple loop, fetch, display, fetch again, display again, is the heartbeat of dynamic web applications, and understanding it deeply will make every interactive feature you build feel more alive and responsive.</p>
+<pre><code>let refreshCount = 0;
+
+async function fakeRefreshFetch() {
+  refreshCount += 1;
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  return &quot;Data version &quot; + refreshCount;
+}
+
+async function refreshData() {
+  console.log(&quot;Refreshing&quot;);
+  const data = await fakeRefreshFetch();
+  console.log(&quot;Displaying: &quot; + data);
+}
+
+refreshData().then(() =&gt; refreshData());</code></pre>
+<p class="check"><strong>Check:</strong> Why should a failed refresh keep old data visible instead of clearing the display?</p>
+<h2>Section 41: Polling for Updates on a Timer</h2>
+<p>Polling is a technique for keeping data fresh by fetching it repeatedly on a timer, such as every thirty seconds, rather than waiting for the user to click refresh. It is used for live scores, chat messages, stock prices, and any data that changes frequently and where users expect updates without manual action. Implementing polling with fetch involves setInterval or a recursive setTimeout loop that calls your fetch-and-display function at regular intervals. That loop must handle errors gracefully, so that a single failed poll does not stop future polls, and it must be stoppable, so that polling does not continue after the user navigates away or closes the feature.</p>
+<p>A recursive setTimeout loop is often preferable to setInterval for polling, because it waits for the previous fetch to complete before scheduling the next one, preventing overlapping fetches if a fetch takes longer than the interval. With setInterval, a slow fetch could overlap with the next scheduled fetch, causing duplicate requests and stale result races. With recursive setTimeout, the next poll is scheduled in finally after the current fetch settles, guaranteeing that polls never overlap, regardless of how slow the network becomes. That guarantee is worth the slightly more complex code, because it prevents a whole class of polling bugs that are hard to reproduce under fast network conditions in development but common under slow conditions in production.</p>
+<p>Polling frequency is a trade-off between freshness and resource use. Polling every five seconds gives very fresh data but generates many requests, increasing server load and battery use on mobile devices. Polling every minute is gentler but may miss rapid changes. The right frequency depends on how quickly the data changes and how important freshness is to users. For a live score, frequent polling makes sense. For a news feed, less frequent polling is sufficient. You should also consider backing off polling when the page is hidden, using the Page Visibility API, or when the user has been idle, to save resources. Those refinements show respect for both server resources and user devices, which is part of responsible polling design.</p>
+<p>Stopping polling is as important as starting it. When a user navigates away from a polling feature, or when the component that polls is removed, you should clear the timer and abort any in-flight fetch, to prevent wasted requests and attempts to update a display that no longer exists. In simple scripts, you can store the timer id and clear it when needed. In larger applications, polling lifecycle management becomes part of component lifecycle, with start on mount and stop on unmount. Forgetting to stop polling is a common memory and network leak, where a background timer continues fetching long after its feature is gone, draining resources silently.</p>
+<p>Practise polling by writing a recursive setTimeout loop that fetches fake data every second for five polls, logging each poll&#x27;s result and handling a simulated failure on one poll without stopping the loop. Then stop the loop after five polls and confirm that no further fetches occur. That exercise covers the core polling behaviours, regular fetching, error resilience, and clean stopping, in a compact form that you can adapt to real features where fresh data matters more than manual refresh.</p>
+<pre><code>let pollCount = 0;
+
+async function pollOnce() {
+  pollCount += 1;
+  await new Promise((resolve) =&gt; setTimeout(resolve, 200));
+  console.log(&quot;Poll &quot; + pollCount + &quot;: fresh data&quot;);
+  if (pollCount &lt; 3) {
+    setTimeout(pollOnce, 500);
+  } else {
+    console.log(&quot;Polling stopped&quot;);
+  }
+}
+
+pollOnce();</code></pre>
+<p class="check"><strong>Check:</strong> Why is recursive setTimeout often safer than setInterval for polling with fetch?</p>
+<h2>Section 42: Fetch and Forms Together</h2>
+<p>Fetch and forms together form the core of interactive web applications, because forms collect user input and fetch sends that input to a server. The standard pattern is to listen for a form&#x27;s submit event, prevent the browser&#x27;s default submission, which would reload the page, gather input values from the form fields, validate them, and then send them with a POST or PUT fetch request. On success, you display a confirmation and perhaps refresh related data. On failure, you display validation or server errors next to the relevant fields, without clearing the user&#x27;s input, so they can correct and resubmit without retyping everything. That preservation of input on failure is a crucial usability detail that beginners often overlook.</p>
+<p>Gathering form values can be done by reading individual input elements by id, or by using FormData to collect all fields at once. FormData is convenient for forms with many fields, because it automatically includes every named input, including checkboxes and selects, without manual reading. For JSON APIs, you then convert FormData entries into a plain object and stringify it, rather than sending FormData directly, unless the server expects multipart data. That conversion step, FormData to object to JSON, is a common pattern that bridges HTML forms and JSON APIs, and it is worth learning because it appears in many real projects where forms were designed for HTML but APIs expect JSON.</p>
+<p>Validation before fetch, as discussed earlier, is especially important for forms, because it gives instant feedback without a network round trip. Client-side validation should check required fields, formats such as email patterns, and simple rules such as minimum length, displaying messages next to the offending fields. Server-side validation remains necessary, because client-side checks can be bypassed, and server errors should also be displayed next to fields where possible, using the server&#x27;s field-specific error details if available. That two-layer validation, instant client checks plus authoritative server checks, with field-level messages for both, creates a form experience that feels helpful rather than punitive.</p>
+<p>Handling form submission states completes the pattern. While the fetch is in progress, the submit button should be disabled and show a submitting state, to prevent duplicate submissions. After success, the form might clear, show a success message, or navigate to a new view, depending on the feature. After failure, the form should remain filled, the button should re-enable, and errors should be displayed clearly. Those state transitions, idle, submitting, success, error, with appropriate button and message changes for each, are the complete form submission lifecycle, and mastering it will make every form you build feel polished and reliable, from simple contact forms to complex multi-step workflows.</p>
+<p>Practise fetch and forms by simulating a form submission with a fake form object containing a title field, validating that the title is not empty, sending it with a fake POST, and logging success or validation failure without clearing the input on failure. That simulation, without a real page, teaches the submission flow clearly, and you can then apply it to a real HTML form with confidence, knowing that the logic, validate, fetch, handle success or error, preserve input on failure, remains identical.</p>
+<pre><code>async function submitForm(formValues) {
+  if (!formValues.title || formValues.title.trim() === &quot;&quot;) {
+    console.log(&quot;Error: title is required, form not cleared&quot;);
+    return;
+  }
+  await new Promise((resolve) =&gt; setTimeout(resolve, 300));
+  console.log(&quot;Form submitted: &quot; + formValues.title);
+}
+
+submitForm({ title: &quot;&quot; });
+submitForm({ title: &quot;Hello form&quot; });</code></pre>
+<p class="check"><strong>Check:</strong> Why should a failed form submission preserve the user&#x27;s input?</p>
+<h2>Section 43: Validating Before Sending a Fetch</h2>
+<p>Validating before sending a fetch, as introduced for async work generally, is especially valuable for fetch because it prevents unnecessary network requests and gives users instant feedback. Before you send a POST, PUT, or search request, you should check that required fields are present, that formats are plausible, and that values are within expected ranges. If validation fails, show a clear message immediately and return without fetching. That instant feedback feels fast, because users do not wait for a server round trip to learn that a field was empty, and it reduces server load, because invalid requests never reach the server. It also reduces the chance of creating invalid data on the server, which could require cleanup later.</p>
+<p>Validation rules should be specific to the data being sent, not generic. For a post creation, validation might require a non-empty title and a body of at least a few characters. For a user registration, it might require a valid email format and a password of minimum length. For a search, it might require at least two characters before fetching, to avoid overly broad queries. Those specific rules, communicated clearly in error messages, help users fix problems quickly, whereas generic messages such as Invalid input leave users guessing. Writing validation as a separate function that returns a list of errors, rather than scattering checks through fetch code, makes rules easier to test and reuse across forms that share the same data.</p>
+<p>Client-side validation does not replace server-side validation, as emphasised before, because client code can be bypassed and because only the server knows certain rules, such as whether a username is already taken. A robust application validates in both places, with client validation for speed and user experience, and server validation for correctness and security. When server validation fails, your fetch error handling should display server messages, ideally field by field, so users understand what the server objected to, even if client validation passed. That two-layer approach, client for speed and server for authority, is the standard for professional form and API work.</p>
+<p>You should also validate data that comes from non-form sources before fetching, such as ids from URL parameters, search terms from user input, and filter values from controls. An invalid id, such as an empty string or a non-numeric value where a number is expected, should be caught before fetching, with a message or a redirect to a valid state, rather than fetching with a malformed URL and handling a confusing server error. That pre-fetch validation, applied consistently to all fetch inputs, not just forms, prevents a wide range of fetch bugs and makes your code&#x27;s assumptions explicit: by the time fetch is called, inputs have already been checked and are known to be plausible.</p>
+<p>Practise pre-fetch validation by writing a function that validates a post object before sending it, returning errors for missing title or body, and only fetching if validation passes. Test it with valid, partially invalid, and completely invalid inputs, confirming that invalid inputs never trigger a fetch. That test, with logging to show whether fetch was called, demonstrates the core benefit of validation: it acts as a gatekeeper, allowing only plausible requests through to the network, which is a simple but powerful reliability pattern.</p>
+<pre><code>function validatePost(post) {
+  const errors = [];
+  if (!post.title || post.title.trim() === &quot;&quot;) {
+    errors.push(&quot;Title is required&quot;);
+  }
+  if (!post.body || post.body.trim() === &quot;&quot;) {
+    errors.push(&quot;Body is required&quot;);
+  }
+  return errors;
+}
+
+async function createPostIfValid(post) {
+  const errors = validatePost(post);
+  if (errors.length &gt; 0) {
+    console.log(&quot;Validation failed: &quot; + errors.join(&quot;, &quot;));
+    return;
+  }
+  console.log(&quot;Validation passed, would fetch now for: &quot; + post.title);
+}
+
+createPostIfValid({ title: &quot;&quot;, body: &quot;&quot; });
+createPostIfValid({ title: &quot;Valid&quot;, body: &quot;Content&quot; });</code></pre>
+<p class="check"><strong>Check:</strong> Why does client-side validation not replace server-side validation?</p>
+<h2>Section 44: Handling Authentication Headers Simply</h2>
+<p>Authentication headers tell a server who you are, so that it can decide whether to allow your request, and the most common form is the Authorization header with a Bearer token. A token is a string issued by the server after you sign in, which you include in subsequent requests as Authorization: Bearer followed by the token. The server checks the token, identifies you, and either allows the request or returns four hundred and one for missing or invalid tokens, or four hundred and three for valid tokens without permission. That token pattern is the foundation of most modern API authentication, and understanding it at a basic level prepares you for real authenticated APIs, even though full authentication flows, including sign-in, token storage, and refresh, are covered in more depth in security learning.</p>
+<p>Using an Authorization header with fetch is simple: you add it to the headers object, alongside Content-Type, with the value Bearer plus a space plus your token. You must obtain the token through a proper sign-in flow, not by hard-coding it in front-end code for production, because hard-coded tokens in client code are visible to anyone who views the page source and can be stolen. For learning with practice APIs that do not require authentication, you can use a fake token to practise the header shape, but you should understand that real tokens must be handled securely, stored appropriately, and never committed to public code repositories. That security awareness, even at a basic level, is essential for responsible API work.</p>
+<p>Handling authentication errors requires specific user flows. A four hundred and one response usually means the token is missing, expired, or invalid, and the appropriate action is to prompt the user to sign in again, or to refresh the token if your application supports refresh. A four hundred and three response means the user is authenticated but lacks permission for that specific resource, and the appropriate action is to show a permission message, not a sign-in prompt, because signing in again with the same account will not help. Distinguishing these two codes, and responding appropriately, prevents frustrating loops where users are asked to sign in repeatedly for a permission problem that sign-in cannot fix.</p>
+<p>Token storage is a topic where beginners should be cautious. Storing tokens in localStorage is simple but exposes them to cross-site scripting attacks, where malicious scripts could read them. Storing them in secure, HttpOnly cookies, set by the server, is safer but requires server configuration and understanding of cookie attributes. For this chapter, the takeaway is conceptual: know that tokens exist, know how to send them in headers, know how to handle four hundred and one and four hundred and three differently, and know that storage choices have security implications that deserve careful thought before production use.</p>
+<p>Practise authentication headers by writing a fetch function that includes a fake Bearer token in its headers, logging the headers, and handling a simulated four hundred and one by logging a sign-in prompt message. That exercise teaches the header shape and the error distinction without requiring a real authenticated API, and it gives you a pattern you can adapt when you first work with an API that requires sign-in, where the same header and error handling will apply with real tokens.</p>
+<pre><code>async function fetchWithAuth(url, token) {
+  const response = await fetch(url, {
+    headers: { Authorization: &quot;Bearer &quot; + token },
+  });
+  if (response.status === 401) {
+    console.log(&quot;Please sign in again, your session expired&quot;);
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(&quot;HTTP &quot; + response.status);
+  }
+  return response.json();
+}</code></pre>
+<p class="check"><strong>Check:</strong> How should your code respond differently to a 401 versus a 403 status?</p>
+<h2>Section 45: Keeping API Keys Out of Front-End Code</h2>
+<p>API keys are secrets that identify your application to a third-party service, and keeping them out of front-end code is a critical security habit. Front-end JavaScript runs in the user&#x27;s browser, where anyone can view the source, inspect network requests, and extract any key embedded in the code. If you put a real API key in front-end code, you are effectively publishing it to the world, where it can be stolen, abused to run up charges on your account, or used to access data you did not intend to share. That is why documentation for most paid APIs warns explicitly against exposing keys in client-side code, and why professional applications keep keys on a server that acts as a proxy between the front-end and the third-party API.</p>
+<p>The server proxy pattern works like this: your front-end fetches from your own server, which holds the API key securely, adds it to the request to the third-party API, receives the response, and forwards relevant data back to the front-end, without ever exposing the key to the browser. The front-end never sees the key, the key never appears in network requests from the browser to the third party, and abuse is limited because attackers would need to compromise your server, not just view your page source. That pattern adds a server component to your architecture, but it is the correct architecture for any API that requires a secret key, and it is worth understanding even before you build servers yourself, because it explains why many tutorials use practice APIs without keys, while real paid APIs require server-side handling.</p>
+<p>For learning, you can practise with APIs that do not require keys, or with demo keys that are explicitly designed for public use and rate-limited, where exposure is acceptable because the key is not tied to billing or sensitive data. Even with demo keys, you should avoid committing real personal keys to public repositories, and you should rotate any key that was accidentally exposed, treating exposure as a security incident, not a minor mistake. Those habits, using demo keys for learning, keeping real keys server-side, and rotating exposed keys promptly, form the foundation of responsible key management that will protect you and your users throughout your career.</p>
+<p>Another related habit is to never log API keys, even in development console logs, because logs can be copied, shared, or persisted in ways you do not anticipate. When debugging authenticated fetches, log that authentication was included, or log a masked version of the token showing only its last few characters, rather than logging the full key. That masking habit prevents accidental exposure through screenshots, shared logs, or debugging sessions, which are common ways keys leak even when code itself does not contain them directly. Security is often about small, consistent habits like masking, not just about large architectural decisions like proxies.</p>
+<p>In summary, treat API keys as secrets that belong on servers, not in browsers. If an API requires a key and you are building a front-end-only project, look for a practice version without a key, or build a small server proxy as your next learning step, rather than embedding the key in client code and hoping no one notices.</p>
+<pre><code>function fetchFromOwnServer() {
+  console.log(&quot;Front-end fetches from your own server, which holds the key securely.&quot;);
+  console.log(&quot;Never put a real API key in browser JavaScript.&quot;);
+}
+
+fetchFromOwnServer();</code></pre>
+<p class="check"><strong>Check:</strong> Why is putting a real API key in front-end JavaScript effectively publishing it?</p>
+<h2>Section 46: Fetch in Node and Browser Differences</h2>
+<p>Fetch works in both browsers and modern Node.js, but there are differences in environment, capabilities, and defaults that are worth knowing, especially as you move between front-end and back-end JavaScript. In browsers, fetch is built in and subject to CORS, as discussed earlier, because browsers enforce origin security for pages. In Node.js, fetch is also built in since recent versions, but it is not subject to CORS, because Node programs are not web pages and do not have origins in the same sense. That difference explains why a fetch that fails with CORS in a browser might succeed from Node, and it reinforces that CORS is a browser security feature, not a fetch limitation.</p>
+<p>Other differences include available globals and defaults. Browsers provide document, window, and localStorage, which Node does not, while Node provides file system access, process information, and server capabilities, which browsers do not. Fetch itself behaves similarly in both, with the same Response, headers, and body methods, but the surrounding code differs: browser fetch code often updates the DOM after fetching, while Node fetch code often writes to files, logs to consoles, or serves data to other programs. Understanding that fetch is the common core, while display and storage differ by environment, helps you transfer fetch skills between front-end and back-end work without confusion.</p>
+<p>Version differences also matter. Older Node versions did not include fetch natively and required a library, while modern Node versions include it as a global, similar to browsers. If you work with an older Node version or an older browser, you may need a polyfill or library, but for current learning, assuming fetch is available in both is reasonable. When you encounter an environment where fetch is undefined, check the version first, rather than assuming your code is wrong, because environment differences are a common cause of fetch is not defined errors, especially when moving code between browser and Node or between Node versions.</p>
+<p>Error handling and networking defaults are largely similar, but Node fetch may behave differently for certain features, such as cookies, redirects, and agent configuration, which are more relevant to server-side code. For beginners, those differences are edge cases, and the core pattern, fetch, check ok, parse, handle errors, remains identical. The practical advice is to learn fetch once, in the browser where you can see results on a page, and then apply the same pattern in Node, adjusting only the surrounding display or storage code for the new environment. That transferability is a strength of modern JavaScript, where one language and one fetch API serve both front-end and back-end needs.</p>
+<p>As you progress, you will write fetch code in both environments, and you will learn to check environment-specific details, such as CORS in browsers and file access in Node, as needed for each project. For now, remember the core similarity and the key difference: same fetch, same promises, same error handling, but browsers enforce CORS and Node does not, and display code differs because browsers have a DOM and Node does not. That summary will guide you through your first cross-environment fetch projects without surprise.</p>
+<pre><code>async function universalFetch(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(&quot;HTTP &quot; + response.status);
+  }
+  return response.json();
+}
+
+console.log(&quot;Fetch works in browsers and modern Node with the same pattern.&quot;);</code></pre>
+<p class="check"><strong>Check:</strong> What is the main security difference between fetch in a browser and fetch in Node?</p>
+<h2>Section 47: Testing Fetch with Fake Responses</h2>
+<p>Testing fetch code with real network requests is slow, unreliable, and dependent on external services, so professional developers test fetch code with fake responses, often called mocks or stubs. A fake response is a function that returns a promise resolving to an object shaped like a Response, or simply to parsed data, without making a network request. By injecting a fake fetch function into your code, you can test success, failure, empty results, and slow responses deterministically, without waiting for a server or worrying about rate limits. That determinism makes tests fast and reliable, which means they get run often, which means they catch bugs early, which is the whole point of testing.</p>
+<p>Implementing fake fetch testing starts with designing your fetch code to accept a fetch function as a parameter, or to use a global fetch that can be replaced in tests. For example, instead of calling fetch directly inside a function, you might write a function that takes a fetcher argument, defaulting to global fetch in production, but accepting a fake in tests. That dependency injection pattern, passing dependencies as arguments rather than hard-coding them, makes code testable without changing its core logic. It is a small design change with large testing benefits, and it is worth adopting early, even for learning projects, because it teaches you to write code that is testable by construction, not just by luck.</p>
+<p>Fake responses should mimic real Response behaviour closely enough to test your code&#x27;s handling, including ok, status, and json methods. A simple fake might be an object with ok true, status two hundred, and a json method returning a promise for test data. A failure fake might have ok false, status four hundred and four, and a json method returning an error object. By creating fakes for each case, you can test that your code checks ok, handles errors, displays empty messages, and maps data correctly, all without a network. Those tests cover the logic of your fetch code, which is what you own, while trusting that the real fetch implementation, which you do not own, works correctly, which is a sensible division of testing responsibility.</p>
+<p>You should also test timing behaviours with fakes, such as timeouts and retries, by making fake fetches that delay, fail a set number of times, or succeed after retries. Those timing tests, with controlled delays, verify that your retry and timeout logic works as intended, without waiting for real network timeouts, which would make tests slow and flaky. Fast, deterministic timing tests are a hallmark of well-tested async code, and they build confidence that your code will handle real network variability, because it has already handled simulated variability in tests.</p>
+<p>Practise fake fetch testing by writing a function that fetches posts using an injected fetcher, then testing it with a success fake, a not-found fake, and a network-error fake, logging pass or fail for each. That exercise, without any testing framework, demonstrates the core mocking pattern and gives you a template for testing fetch code in larger projects, where frameworks will formalise the same pattern with better reporting but the same underlying idea: replace the network with a fake, control its behaviour, and verify your code&#x27;s response.</p>
+<pre><code>async function getPosts(fetcher) {
+  const response = await fetcher(&quot;https://example.com/posts&quot;);
+  if (!response.ok) {
+    throw new Error(&quot;HTTP &quot; + response.status);
+  }
+  return response.json();
+}
+
+async function fakeSuccess() {
+  return {
+    ok: true,
+    status: 200,
+    json: async () =&gt; [{ title: &quot;Fake post&quot; }],
+  };
+}
+
+getPosts(fakeSuccess).then((posts) =&gt; console.log(&quot;Test posts: &quot; + posts.length));</code></pre>
+<p class="check"><strong>Check:</strong> Why is testing fetch code with fake responses better than testing with real network requests?</p>
+<h2>Section 48: Common Fetch Mistakes and Fixes</h2>
+<p>Common fetch mistakes fall into a handful of categories, and learning to recognise them quickly will save you considerable debugging time. The first category is forgotten awaits, where code uses a Response promise as if it were data, or uses a json promise as if it were parsed data, leading to undefined properties or promise objects in logs. The fix is to await both steps, fetch and json, and to check logs for Promise objects as a clue. The second category is missing ok checks, where HTTP errors flow into success paths and cause parsing errors or misleading displays. The fix is to check ok immediately after fetch and throw on failure, unifying network and HTTP errors in catch.</p>
+<p>The third category is incorrect POST options, where the method, headers, or body are wrong, leading to server rejections or malformed data. Common variants include forgetting Content-Type, forgetting to stringify the body, using GET instead of POST, or sending a body with GET, which servers may ignore. The fix is to log the options object during development and compare it with API documentation, checking method, headers, and stringified body one by one. That systematic comparison resolves most POST problems without guessing, because the options object contains the entire request description in one place.</p>
+<p>The fourth category is URL mistakes, including wrong endpoints, missing ids, unencoded query values, and double slashes or missing slashes. These mistakes often manifest as four hundred and four errors or as HTML error pages instead of JSON, which are clues to check the URL first. The fix is to log the full URL before fetching, compare it with documentation, and use URLSearchParams for query strings to handle encoding automatically. That URL-first debugging habit, log and compare, is faster than changing fetch logic when the real problem is an address typo.</p>
+<p>The fifth category is stale results and duplicate requests, where rapid user actions cause overlapping fetches that display out of order or create duplicates. The fixes are debouncing, aborting, request tracking, and button disabling, as covered in earlier sections, applied together as needed for the feature. Recognising that a bug is a race condition, rather than a logic error in a single fetch, is the key insight, because race fixes differ from logic fixes. If results appear correct sometimes and wrong other times, suspect a race, reproduce it with controlled delays, and apply aborting or tracking to stabilise it.</p>
+<p>Finally, CORS mistakes form a category of their own, where code is correct but the server does not allow the browser origin, leading to CORS errors that cannot be fixed from front-end code alone. The fix is to check the console for CORS, verify the API&#x27;s CORS policy, and either use an API that allows browser origins, configure your own server, or use a server proxy, rather than changing fetch options in hopes of bypassing a security policy. Keeping this checklist of mistake categories in mind, forgotten awaits, missing ok, POST options, URLs, races, and CORS, turns fetch debugging from trial and error into systematic elimination, which is faster and less frustrating.</p>
+<pre><code>async function commonMistakesDemo() {
+  console.log(&quot;Mistake: forgetting await on response.json gives a promise, not data.&quot;);
+  console.log(&quot;Fix: const data = await response.json(); after checking response.ok.&quot;);
+  console.log(&quot;Mistake: missing Content-Type on POST gives server parsing errors.&quot;);
+  console.log(&quot;Fix: headers { Content-Type: application/json } and JSON.stringify body.&quot;);
+}
+
+commonMistakesDemo();</code></pre>
+<p class="check"><strong>Check:</strong> What are the five common fetch mistake categories, and what is the fix for each?</p>
+<h2>Section 49: A Complete Fetch Mini Project: Post Viewer</h2>
+<p>To bring this chapter together, let us design a complete mini project: a post viewer that lists posts, shows details for a selected post, allows creating a new post, and handles loading, errors, and empty states throughout. The viewer starts by fetching a list of posts, displaying loading while fetching, then showing titles as a clickable list. Clicking a title fetches that post&#x27;s details by id and displays them, with loading for the detail section. A simple form allows creating a new post, with validation before sending, a submitting state while posting, and a refresh of the list after successful creation. That combination, list, detail, and create, covers the core fetch patterns in one realistic feature.</p>
+<p>Building the viewer step by step reinforces the chapter&#x27;s lessons in order. First, implement list fetching with ok checks, error handling, and empty messages. Test it with success and failure cases, using fake fetches if needed for failure testing. Next, implement detail fetching by id, with not-found handling and per-section loading, so that the list remains visible while details load. Test it with a valid id and an invalid id. Next, implement creation with POST, validation, button disabling, and list refresh after success. Test it with valid and invalid inputs, confirming that invalid inputs never fetch and that valid creation refreshes the list. Each step builds on the previous one, and each step can be tested independently before moving on, which is a disciplined building approach that prevents large, untestable leaps.</p>
+<p>The viewer&#x27;s architecture should separate concerns: fetch helpers for list, detail, and create, mapping functions for display shapes, and display functions for list, detail, and form states. That separation, fetch, map, display, makes the code easier to read, test, and change, because each layer has a single responsibility. If the API changes, you update fetch and mapping layers, not display code. If the design changes, you update display code, not fetch code. That separation is a professional habit that scales from mini projects to large applications, where layers become modules and teams, but the principle remains the same: keep fetching, transforming, and displaying distinct.</p>
+<p>Testing the complete viewer involves scenarios that combine features: load the list, click a post, create a new post, and confirm the list refreshes; try to create with an empty title and confirm validation prevents fetching; disconnect the network simulation and confirm error messages appear without clearing existing data; and navigate rapidly between posts and confirm that stale detail results do not overwrite fresh ones, using aborting or request tracking. Those scenarios, happy path, validation, error, and race, cover the most important behaviours of a fetching feature, and passing them gives you confidence that the viewer is not just a demo, but a robust mini application.</p>
+<p>As you finish this project, reflect on how many patterns from this chapter and the previous one you used: async and await, Promise.all for parallel sections if any, try and catch for errors, finally for loading states, validation before fetching, aborting or tracking for races, and mapping for display. That compositional understanding is what makes you a capable JavaScript developer, able to combine small, well-understood patterns into larger, reliable features.</p>
+<pre><code>async function postViewerDemo() {
+  console.log(&quot;Post Viewer: list, detail, and create in one feature.&quot;);
+  const listResponse = await fetch(&quot;https://jsonplaceholder.typicode.com/posts?_limit=3&quot;);
+  if (!listResponse.ok) {
+    throw new Error(&quot;HTTP &quot; + listResponse.status);
+  }
+  const posts = await listResponse.json();
+  console.log(&quot;List loaded: &quot; + posts.length + &quot; posts&quot;);
+  for (const post of posts) {
+    console.log(&quot;- &quot; + post.title);
+  }
+}
+
+postViewerDemo().catch((error) =&gt; console.log(error.message));</code></pre>
+<p class="check"><strong>Check:</strong> Which fetch patterns does the post viewer combine, and why is separating fetch, map, and display helpful?</p>
+<h2>Section 50: What to Learn Next About APIs</h2>
+<p>Having mastered basic fetching, you are ready to explore deeper API topics that build directly on this chapter&#x27;s foundations. One next step is learning about REST design in more depth, including resource modelling, versioning, and hypermedia, which will help you design APIs as well as consume them. Another is learning about GraphQL, an alternative API style where clients request exactly the fields they need in a single query, rather than fetching fixed resources from REST endpoints. GraphQL changes the fetching pattern, because you send queries to a single endpoint, but the underlying skills, async handling, error handling, and display, remain the same, so your fetch knowledge transfers.</p>
+<p>Another next step is authentication and authorisation in depth, including OAuth flows, token refresh, and secure storage, which are essential for real applications where users sign in and access private data. That learning builds on the simple Bearer token introduction in this chapter, adding flows for obtaining tokens, refreshing expired tokens, and handling sign-in states across a whole application. It also connects to security learning, where you will study cross-site scripting, cross-site request forgery, and other threats that affect authenticated fetching. That security context is crucial, because authenticated APIs handle sensitive data, and mistakes there have real consequences for users.</p>
+<p>You should also explore real-time APIs, such as WebSockets and Server-Sent Events, which push updates from server to client without polling, for features like chat, live scores, and collaborative editing. Real-time APIs complement fetch, which is request-response based, by allowing servers to initiate updates when data changes. Learning when to use fetch polling versus real-time pushing, and how to combine them, such as fetching initial data with fetch and then receiving updates via WebSocket, is a valuable architectural skill for modern applications where freshness matters and polling would be wasteful.</p>
+<p>Finally, consider learning about API testing and documentation tools, such as tools for exploring APIs interactively, generating client code from API specifications, and testing endpoints automatically. Those tools make API integration faster and more reliable, because they let you explore an API&#x27;s behaviour before writing code, generate type-safe clients that catch errors at build time, and test your integration against a specification rather than against ad-hoc assumptions. Combined with the fetch skills in this chapter, those tools will make you a confident API consumer, able to integrate with new services quickly, handle their failures gracefully, and build features that users trust.</p>
+<p>As you close this chapter, take stock of what you can now do: fetch lists and single items, create, update, and delete data, filter and paginate, handle loading and errors, abort and timeout, cache and refresh, and build a complete viewer that combines those skills. That is a substantial, practical skill set, and it is the foundation for almost every data-driven feature you will build. In the next chapter, you will deepen your understanding of the data format that most APIs return, JSON, learning to parse, stringify, validate, and transform it with confidence.</p>
+<pre><code>async function nextSteps() {
+  console.log(&quot;Next: REST design, GraphQL, OAuth, real-time APIs, and API tools.&quot;);
+  console.log(&quot;Your fetch foundation transfers to all of them.&quot;);
+}
+
+nextSteps();</code></pre>
+<p class="check"><strong>Check:</strong> Which deeper API topics build directly on the fetch skills from this chapter?</p>
+<h2>Practical Task</h2>
+<p>Build a post viewer in a single JavaScript file: fetch a list of posts from a practice API, display their titles with loading and error states, fetch and display details for a selected post by id with a not-found message for invalid ids, add a form-style function that validates a new post before sending it with POST, and refresh the list after a successful creation. Test list loading, detail loading, validation failure, and a failed fetch, confirming that errors show friendly messages and old data is preserved on refresh failure.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Explain why fetch requires checking response.ok in addition to catching network errors, and give an example of each error type.</li>
+<li>Describe how you would implement a search-as-you-type feature that avoids excessive requests and stale results.</li>
+<li>Compare PUT and PATCH, and explain when you would use each for updating API data.</li>
+<li>How do query strings, URLSearchParams, pagination, and local filtering work together in a list feature?</li>
+<li>Why must API keys be kept out of front-end code, and what architecture should you use instead for key-based APIs?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-26.html">← Chapter 26</a> <a href="index.html">All chapters</a> <a href="chapter-28.html">Chapter 28 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/javascript-developer/chapter-27.html'; this.page.identifier = 'book-javascript-developer-chapter-27'; this.page.title = 'Chapter 27: Fetching Data from APIs'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

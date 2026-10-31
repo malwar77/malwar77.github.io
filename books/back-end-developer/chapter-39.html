@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 39 — Microservices and Monoliths in Plain Words — Back-End Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 39 of the Back-End Developer teaching book: Microservices and Monoliths in Plain Words.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Back-End Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 39: Microservices and Monoliths in Plain Words</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-39.svg" alt="Design for Chapter 39" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What a Monolith Really Is</h2>
+<p>In this section you will meet what a monolith really is, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does what a monolith really is solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like what a monolith really is because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, what a monolith really is usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of what a monolith really is using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with what a monolith really is is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does what a monolith really is matter for a back-end system that real people depend on?</p>
+<h2>Section 2: What a Microservice Really Is</h2>
+<p>Learning what a microservice really is is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason what a microservice really is matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands what a microservice really is can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through what a microservice really is is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where what a microservice really is changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows what a microservice really is in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with what a microservice really is is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of what a microservice really is you could build yourself, and what would you add next?</p>
+<h2>Section 3: One Codebase, Many Teams</h2>
+<p>This section is about one codebase, many teams. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain one codebase, many teams to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of one codebase, many teams as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply one codebase, many teams, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of one codebase, many teams using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with one codebase, many teams, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and one codebase, many teams will feel far less mysterious. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is one codebase, many teams, and when would you use it?</p>
+<h2>Section 4: Drawing Boundaries Between Services</h2>
+<p>In this section you will meet drawing boundaries between services, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does drawing boundaries between services solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like drawing boundaries between services because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, drawing boundaries between services usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows drawing boundaries between services in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with drawing boundaries between services is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain drawing boundaries between services to a friend who has never built a back end before?</p>
+<h2>Section 5: When a Monolith Is the Right Choice</h2>
+<p>Learning when a monolith is the right choice is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason when a monolith is the right choice matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands when a monolith is the right choice can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through when a monolith is the right choice is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where when a monolith is the right choice changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of when a monolith is the right choice using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with when a monolith is the right choice is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with when a monolith is the right choice, and how would you avoid it?</p>
+<h2>Section 6: When Splitting Starts to Help</h2>
+<p>This section is about when splitting starts to help. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain when splitting starts to help to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of when splitting starts to help as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply when splitting starts to help, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows when splitting starts to help in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with when splitting starts to help, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and when splitting starts to help will feel far less mysterious. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of when splitting starts to help failed, and how would you notice?</p>
+<h2>Section 7: The Cost of Splitting Too Early</h2>
+<p>In this section you will meet the cost of splitting too early, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does the cost of splitting too early solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like the cost of splitting too early because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, the cost of splitting too early usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of the cost of splitting too early using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with the cost of splitting too early is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> Why does the cost of splitting too early matter for a back-end system that real people depend on?</p>
+<h2>Section 8: Services Talking Over HTTP</h2>
+<p>Learning services talking over http is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason services talking over http matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands services talking over http can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through services talking over http is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where services talking over http changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows services talking over http in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with services talking over http is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of services talking over http you could build yourself, and what would you add next?</p>
+<h2>Section 9: Services Talking Through Queues</h2>
+<p>This section is about services talking through queues. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain services talking through queues to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of services talking through queues as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply services talking through queues, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of services talking through queues using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with services talking through queues, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and services talking through queues will feel far less mysterious. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is services talking through queues, and when would you use it?</p>
+<h2>Section 10: Shared Databases Versus Own Databases</h2>
+<p>In this section you will meet shared databases versus own databases, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does shared databases versus own databases solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like shared databases versus own databases because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, shared databases versus own databases usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows shared databases versus own databases in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with shared databases versus own databases is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain shared databases versus own databases to a friend who has never built a back end before?</p>
+<h2>Section 11: Data That Lives in Two Places</h2>
+<p>Learning data that lives in two places is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason data that lives in two places matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands data that lives in two places can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through data that lives in two places is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where data that lives in two places changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of data that lives in two places using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with data that lives in two places is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with data that lives in two places, and how would you avoid it?</p>
+<h2>Section 12: Keeping Data Consistent Across Services</h2>
+<p>This section is about keeping data consistent across services. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain keeping data consistent across services to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of keeping data consistent across services as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply keeping data consistent across services, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows keeping data consistent across services in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with keeping data consistent across services, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and keeping data consistent across services will feel far less mysterious. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of keeping data consistent across services failed, and how would you notice?</p>
+<h2>Section 13: Transactions That Span Services</h2>
+<p>In this section you will meet transactions that span services, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does transactions that span services solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like transactions that span services because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, transactions that span services usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of transactions that span services using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with transactions that span services is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> Why does transactions that span services matter for a back-end system that real people depend on?</p>
+<h2>Section 14: The Saga Pattern in Plain Words</h2>
+<p>Learning the saga pattern in plain words is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason the saga pattern in plain words matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands the saga pattern in plain words can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through the saga pattern in plain words is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where the saga pattern in plain words changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows the saga pattern in plain words in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with the saga pattern in plain words is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of the saga pattern in plain words you could build yourself, and what would you add next?</p>
+<h2>Section 15: Idempotency: Safe to Retry</h2>
+<p>This section is about idempotency: safe to retry. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain idempotency: safe to retry to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of idempotency: safe to retry as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply idempotency: safe to retry, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of idempotency: safe to retry using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with idempotency: safe to retry, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and idempotency: safe to retry will feel far less mysterious. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is idempotency: safe to retry, and when would you use it?</p>
+<h2>Section 16: Service Discovery in Plain Words</h2>
+<p>In this section you will meet service discovery in plain words, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does service discovery in plain words solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like service discovery in plain words because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, service discovery in plain words usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows service discovery in plain words in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with service discovery in plain words is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain service discovery in plain words to a friend who has never built a back end before?</p>
+<h2>Section 17: API Gateways and One Front Door</h2>
+<p>Learning api gateways and one front door is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason api gateways and one front door matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands api gateways and one front door can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through api gateways and one front door is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where api gateways and one front door changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of api gateways and one front door using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with api gateways and one front door is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with api gateways and one front door, and how would you avoid it?</p>
+<h2>Section 18: Authentication Across Services</h2>
+<p>This section is about authentication across services. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain authentication across services to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of authentication across services as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply authentication across services, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows authentication across services in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with authentication across services, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and authentication across services will feel far less mysterious. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of authentication across services failed, and how would you notice?</p>
+<h2>Section 19: Passing User Identity Safely</h2>
+<p>In this section you will meet passing user identity safely, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does passing user identity safely solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like passing user identity safely because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, passing user identity safely usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of passing user identity safely using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with passing user identity safely is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> Why does passing user identity safely matter for a back-end system that real people depend on?</p>
+<h2>Section 20: Configuration Across Many Services</h2>
+<p>Learning configuration across many services is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason configuration across many services matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands configuration across many services can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through configuration across many services is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where configuration across many services changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows configuration across many services in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with configuration across many services is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of configuration across many services you could build yourself, and what would you add next?</p>
+<h2>Section 21: Logging Across Many Services</h2>
+<p>This section is about logging across many services. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain logging across many services to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of logging across many services as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply logging across many services, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of logging across many services using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with logging across many services, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and logging across many services will feel far less mysterious. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is logging across many services, and when would you use it?</p>
+<h2>Section 22: Tracing a Request Through Services</h2>
+<p>In this section you will meet tracing a request through services, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does tracing a request through services solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like tracing a request through services because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, tracing a request through services usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows tracing a request through services in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with tracing a request through services is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain tracing a request through services to a friend who has never built a back end before?</p>
+<h2>Section 23: Monitoring Many Moving Parts</h2>
+<p>Learning monitoring many moving parts is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason monitoring many moving parts matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands monitoring many moving parts can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through monitoring many moving parts is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where monitoring many moving parts changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of monitoring many moving parts using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with monitoring many moving parts is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with monitoring many moving parts, and how would you avoid it?</p>
+<h2>Section 24: Deploying One Service at a Time</h2>
+<p>This section is about deploying one service at a time. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain deploying one service at a time to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of deploying one service at a time as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply deploying one service at a time, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows deploying one service at a time in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with deploying one service at a time, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and deploying one service at a time will feel far less mysterious. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of deploying one service at a time failed, and how would you notice?</p>
+<h2>Section 25: Versioning Between Services</h2>
+<p>In this section you will meet versioning between services, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does versioning between services solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like versioning between services because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, versioning between services usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of versioning between services using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with versioning between services is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> Why does versioning between services matter for a back-end system that real people depend on?</p>
+<h2>Section 26: Breaking Changes Between Teams</h2>
+<p>Learning breaking changes between teams is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason breaking changes between teams matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands breaking changes between teams can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through breaking changes between teams is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where breaking changes between teams changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows breaking changes between teams in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with breaking changes between teams is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of breaking changes between teams you could build yourself, and what would you add next?</p>
+<h2>Section 27: Contracts Between Services</h2>
+<p>This section is about contracts between services. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain contracts between services to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of contracts between services as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply contracts between services, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of contracts between services using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with contracts between services, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and contracts between services will feel far less mysterious. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is contracts between services, and when would you use it?</p>
+<h2>Section 28: Testing a Single Service Alone</h2>
+<p>In this section you will meet testing a single service alone, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does testing a single service alone solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like testing a single service alone because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, testing a single service alone usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows testing a single service alone in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with testing a single service alone is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain testing a single service alone to a friend who has never built a back end before?</p>
+<h2>Section 29: Testing Services Together</h2>
+<p>Learning testing services together is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason testing services together matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands testing services together can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through testing services together is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where testing services together changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of testing services together using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with testing services together is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with testing services together, and how would you avoid it?</p>
+<h2>Section 30: Local Development with Many Services</h2>
+<p>This section is about local development with many services. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain local development with many services to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of local development with many services as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply local development with many services, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows local development with many services in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with local development with many services, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and local development with many services will feel far less mysterious. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of local development with many services failed, and how would you notice?</p>
+<h2>Section 31: Shared Libraries: Help or Trap</h2>
+<p>In this section you will meet shared libraries: help or trap, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does shared libraries: help or trap solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like shared libraries: help or trap because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, shared libraries: help or trap usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of shared libraries: help or trap using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with shared libraries: help or trap is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does shared libraries: help or trap matter for a back-end system that real people depend on?</p>
+<h2>Section 32: Duplication Versus Shared Code</h2>
+<p>Learning duplication versus shared code is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason duplication versus shared code matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands duplication versus shared code can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through duplication versus shared code is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where duplication versus shared code changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows duplication versus shared code in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with duplication versus shared code is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of duplication versus shared code you could build yourself, and what would you add next?</p>
+<h2>Section 33: Ownership: Who Fixes a Service</h2>
+<p>This section is about ownership: who fixes a service. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain ownership: who fixes a service to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of ownership: who fixes a service as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply ownership: who fixes a service, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of ownership: who fixes a service using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with ownership: who fixes a service, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and ownership: who fixes a service will feel far less mysterious. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is ownership: who fixes a service, and when would you use it?</p>
+<h2>Section 34: Teams Aligned to Services</h2>
+<p>In this section you will meet teams aligned to services, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does teams aligned to services solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like teams aligned to services because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, teams aligned to services usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows teams aligned to services in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with teams aligned to services is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain teams aligned to services to a friend who has never built a back end before?</p>
+<h2>Section 35: Scaling Only the Busy Service</h2>
+<p>Learning scaling only the busy service is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason scaling only the busy service matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands scaling only the busy service can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through scaling only the busy service is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where scaling only the busy service changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of scaling only the busy service using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with scaling only the busy service is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with scaling only the busy service, and how would you avoid it?</p>
+<h2>Section 36: Failure in One Service</h2>
+<p>This section is about failure in one service. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain failure in one service to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of failure in one service as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply failure in one service, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows failure in one service in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with failure in one service, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and failure in one service will feel far less mysterious. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of failure in one service failed, and how would you notice?</p>
+<h2>Section 37: Timeouts Between Services</h2>
+<p>In this section you will meet timeouts between services, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does timeouts between services solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like timeouts between services because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, timeouts between services usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of timeouts between services using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with timeouts between services is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> Why does timeouts between services matter for a back-end system that real people depend on?</p>
+<h2>Section 38: Retries and Cascading Failures</h2>
+<p>Learning retries and cascading failures is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason retries and cascading failures matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands retries and cascading failures can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through retries and cascading failures is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where retries and cascading failures changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows retries and cascading failures in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with retries and cascading failures is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of retries and cascading failures you could build yourself, and what would you add next?</p>
+<h2>Section 39: Circuit Breakers in Plain Words</h2>
+<p>This section is about circuit breakers in plain words. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain circuit breakers in plain words to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of circuit breakers in plain words as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply circuit breakers in plain words, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of circuit breakers in plain words using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with circuit breakers in plain words, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and circuit breakers in plain words will feel far less mysterious. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is circuit breakers in plain words, and when would you use it?</p>
+<h2>Section 40: Fallbacks When a Service Is Down</h2>
+<p>In this section you will meet fallbacks when a service is down, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does fallbacks when a service is down solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like fallbacks when a service is down because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, fallbacks when a service is down usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows fallbacks when a service is down in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with fallbacks when a service is down is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain fallbacks when a service is down to a friend who has never built a back end before?</p>
+<h2>Section 41: Queues That Absorb Spikes</h2>
+<p>Learning queues that absorb spikes is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason queues that absorb spikes matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands queues that absorb spikes can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through queues that absorb spikes is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where queues that absorb spikes changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of queues that absorb spikes using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with queues that absorb spikes is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with queues that absorb spikes, and how would you avoid it?</p>
+<h2>Section 42: Event-Driven Thinking</h2>
+<p>This section is about event-driven thinking. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain event-driven thinking to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of event-driven thinking as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply event-driven thinking, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows event-driven thinking in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with event-driven thinking, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and event-driven thinking will feel far less mysterious. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of event-driven thinking failed, and how would you notice?</p>
+<h2>Section 43: Events Versus Commands</h2>
+<p>In this section you will meet events versus commands, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does events versus commands solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like events versus commands because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, events versus commands usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of events versus commands using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with events versus commands is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> Why does events versus commands matter for a back-end system that real people depend on?</p>
+<h2>Section 44: Moving from Monolith to Services Gradually</h2>
+<p>Learning moving from monolith to services gradually is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason moving from monolith to services gradually matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands moving from monolith to services gradually can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through moving from monolith to services gradually is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where moving from monolith to services gradually changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows moving from monolith to services gradually in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with moving from monolith to services gradually is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of moving from monolith to services gradually you could build yourself, and what would you add next?</p>
+<h2>Section 45: The Strangler Fig Pattern</h2>
+<p>This section is about the strangler fig pattern. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain the strangler fig pattern to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of the strangler fig pattern as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply the strangler fig pattern, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of the strangler fig pattern using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with the strangler fig pattern, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and the strangler fig pattern will feel far less mysterious. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is the strangler fig pattern, and when would you use it?</p>
+<h2>Section 46: Extracting the First Service</h2>
+<p>In this section you will meet extracting the first service, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does extracting the first service solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like extracting the first service because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, extracting the first service usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows extracting the first service in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with extracting the first service is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import threading
+
+
+def make_handler(name):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({&quot;service&quot;: name, &quot;status&quot;: &quot;ok&quot;}).encode()
+            self.send_response(200)
+            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+    return Handler
+
+
+catalog = HTTPServer((&quot;localhost&quot;, 0), make_handler(&quot;catalog&quot;))
+print(&quot;catalog service on port&quot;, catalog.server_address[1])
+threading.Thread(target=catalog.serve_forever, daemon=True).start()
+catalog.shutdown()
+catalog.server_close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain extracting the first service to a friend who has never built a back end before?</p>
+<h2>Section 47: Modular Monoliths: A Middle Path</h2>
+<p>Learning modular monoliths: a middle path is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason modular monoliths: a middle path matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands modular monoliths: a middle path can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through modular monoliths: a middle path is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where modular monoliths: a middle path changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of modular monoliths: a middle path using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with modular monoliths: a middle path is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import json
+import urllib.request
+
+
+def gateway(path):
+    routes = {&quot;/catalog&quot;: &quot;catalog&quot;, &quot;/orders&quot;: &quot;orders&quot;}
+    for prefix, service in routes.items():
+        if path.startswith(prefix):
+            return {&quot;routed_to&quot;: service, &quot;path&quot;: path}
+    return {&quot;error&quot;: &quot;no such service&quot;}
+
+
+print(gateway(&quot;/catalog/items&quot;))
+print(gateway(&quot;/unknown&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with modular monoliths: a middle path, and how would you avoid it?</p>
+<h2>Section 48: Costs: Servers, Time and Complexity</h2>
+<p>This section is about costs: servers, time and complexity. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain costs: servers, time and complexity to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of costs: servers, time and complexity as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply costs: servers, time and complexity, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows costs: servers, time and complexity in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with costs: servers, time and complexity, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and costs: servers, time and complexity will feel far less mysterious. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import time
+
+
+class CircuitBreaker:
+    def __init__(self, limit=3, cool_off=1.0):
+        self.limit = limit
+        self.cool_off = cool_off
+        self.failures = 0
+        self.opened_at = None
+
+    def call(self, work):
+        if self.opened_at and time.monotonic() - self.opened_at &lt; self.cool_off:
+            return &quot;circuit open: fallback used&quot;
+        try:
+            result = work()
+            self.failures = 0
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.limit:
+                self.opened_at = time.monotonic()
+            return &quot;fallback used&quot;
+
+
+breaker = CircuitBreaker()
+print(breaker.call(lambda: 1 / 0))
+print(breaker.call(lambda: &quot;real answer&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of costs: servers, time and complexity failed, and how would you notice?</p>
+<h2>Section 49: Choosing for Your Team, Not the Trend</h2>
+<p>In this section you will meet choosing for your team, not the trend, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does choosing for your team, not the trend solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like choosing for your team, not the trend because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, choosing for your team, not the trend usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of choosing for your team, not the trend using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with choosing for your team, not the trend is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>def handle_with_idempotency(store, request_id, work):
+    if request_id in store:
+        return store[request_id], False
+    result = work()
+    store[request_id] = result
+    return result, True
+
+
+seen = {}
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 42}))
+print(handle_with_idempotency(seen, &quot;req-1&quot;, lambda: {&quot;order&quot;: 99}))</code></pre>
+<p class="check"><strong>Check:</strong> Why does choosing for your team, not the trend matter for a back-end system that real people depend on?</p>
+<h2>Section 50: Review: Picking an Architecture You Can Run</h2>
+<p>Learning review: picking an architecture you can run is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason review: picking an architecture you can run matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands review: picking an architecture you can run can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through review: picking an architecture you can run is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where review: picking an architecture you can run changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows review: picking an architecture you can run in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with review: picking an architecture you can run is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>def run_saga(steps):
+    done = []
+    try:
+        for name, action, undo in steps:
+            action()
+            done.append((name, undo))
+            print(&quot;step done:&quot;, name)
+    except Exception as error:
+        print(&quot;saga failed:&quot;, error, &quot;- undoing in reverse&quot;)
+        for name, undo in reversed(done):
+            undo()
+            print(&quot;undone:&quot;, name)
+
+
+run_saga([
+    (&quot;reserve stock&quot;, lambda: print(&quot;stock reserved&quot;), lambda: print(&quot;stock released&quot;)),
+    (&quot;charge card&quot;, lambda: (_ for _ in ()).throw(ValueError(&quot;card declined&quot;)), lambda: print(&quot;charge refunded&quot;)),
+])</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of review: picking an architecture you can run you could build yourself, and what would you add next?</p>
+<h2>Practical Task</h2>
+<p>Compare two designs for the same small system on paper and in code: first as one monolith module with two functions, then as two tiny services with a gateway function that routes by path prefix. Add a circuit breaker around one service call and an idempotency check for a repeated request, then write a short decision note explaining which design you would choose for a team of two and which for a team of twenty, and why.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>In plain words, what is a monolith, what is a microservice, and what problem does each one solve best?</li>
+<li>Why can splitting a system too early cost more than it saves, and what warning signs would you watch for?</li>
+<li>How do services keep data consistent when there is no single database transaction across them?</li>
+<li>What do circuit breakers, timeouts and idempotency protect a system of services against?</li>
+<li>How would you move from a monolith toward services gradually, without a risky big-bang rewrite?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-38.html">← Chapter 38</a> <a href="index.html">All chapters</a> <a href="chapter-40.html">Chapter 40 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/back-end-developer/chapter-39.html'; this.page.identifier = 'book-back-end-developer-chapter-39'; this.page.title = 'Chapter 39: Microservices and Monoliths in Plain Words'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

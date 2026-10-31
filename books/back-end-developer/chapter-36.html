@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 36 — Databases in Production in Plain Words — Back-End Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 36 of the Back-End Developer teaching book: Databases in Production in Plain Words.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Back-End Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 36: Databases in Production in Plain Words</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-36.svg" alt="Design for Chapter 36" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What Production Means for a Database</h2>
+<p>In this section you will meet what production means for a database, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does what production means for a database solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like what production means for a database because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, what production means for a database usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of what production means for a database using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with what production means for a database is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain what production means for a database to a friend who has never built a back end before?</p>
+<h2>Section 2: From a Local File to a Live Server</h2>
+<p>Learning from a local file to a live server is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason from a local file to a live server matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands from a local file to a live server can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through from a local file to a live server is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where from a local file to a live server changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows from a local file to a live server in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with from a local file to a live server is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with from a local file to a live server, and how would you avoid it?</p>
+<h2>Section 3: Choosing a Database for Production</h2>
+<p>This section is about choosing a database for production. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain choosing a database for production to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of choosing a database for production as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply choosing a database for production, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of choosing a database for production using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with choosing a database for production, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and choosing a database for production will feel far less mysterious. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of choosing a database for production failed, and how would you notice?</p>
+<h2>Section 4: Connection Strings Without Leaking Secrets</h2>
+<p>In this section you will meet connection strings without leaking secrets, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does connection strings without leaking secrets solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like connection strings without leaking secrets because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, connection strings without leaking secrets usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows connection strings without leaking secrets in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with connection strings without leaking secrets is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> Why does connection strings without leaking secrets matter for a back-end system that real people depend on?</p>
+<h2>Section 5: Connection Pools in Plain Words</h2>
+<p>Learning connection pools in plain words is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason connection pools in plain words matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands connection pools in plain words can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through connection pools in plain words is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where connection pools in plain words changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of connection pools in plain words using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with connection pools in plain words is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of connection pools in plain words you could build yourself, and what would you add next?</p>
+<h2>Section 6: Too Many Connections and What Happens</h2>
+<p>This section is about too many connections and what happens. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain too many connections and what happens to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of too many connections and what happens as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply too many connections and what happens, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows too many connections and what happens in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with too many connections and what happens, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and too many connections and what happens will feel far less mysterious. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is too many connections and what happens, and when would you use it?</p>
+<h2>Section 7: Indexes and Why They Matter Live</h2>
+<p>In this section you will meet indexes and why they matter live, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does indexes and why they matter live solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like indexes and why they matter live because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, indexes and why they matter live usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of indexes and why they matter live using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with indexes and why they matter live is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain indexes and why they matter live to a friend who has never built a back end before?</p>
+<h2>Section 8: Slow Queries and How to Spot Them</h2>
+<p>Learning slow queries and how to spot them is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason slow queries and how to spot them matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands slow queries and how to spot them can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through slow queries and how to spot them is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where slow queries and how to spot them changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows slow queries and how to spot them in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with slow queries and how to spot them is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with slow queries and how to spot them, and how would you avoid it?</p>
+<h2>Section 9: Reading Data Without Slowing Writes</h2>
+<p>This section is about reading data without slowing writes. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain reading data without slowing writes to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of reading data without slowing writes as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply reading data without slowing writes, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of reading data without slowing writes using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with reading data without slowing writes, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and reading data without slowing writes will feel far less mysterious. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of reading data without slowing writes failed, and how would you notice?</p>
+<h2>Section 10: Backups You Can Actually Restore</h2>
+<p>In this section you will meet backups you can actually restore, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does backups you can actually restore solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like backups you can actually restore because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, backups you can actually restore usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows backups you can actually restore in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with backups you can actually restore is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does backups you can actually restore matter for a back-end system that real people depend on?</p>
+<h2>Section 11: Testing a Restore Before You Need It</h2>
+<p>Learning testing a restore before you need it is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason testing a restore before you need it matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands testing a restore before you need it can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through testing a restore before you need it is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where testing a restore before you need it changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of testing a restore before you need it using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with testing a restore before you need it is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of testing a restore before you need it you could build yourself, and what would you add next?</p>
+<h2>Section 12: Replication in Plain Words</h2>
+<p>This section is about replication in plain words. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain replication in plain words to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of replication in plain words as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply replication in plain words, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows replication in plain words in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with replication in plain words, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and replication in plain words will feel far less mysterious. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is replication in plain words, and when would you use it?</p>
+<h2>Section 13: Read Replicas and Where They Help</h2>
+<p>In this section you will meet read replicas and where they help, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does read replicas and where they help solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like read replicas and where they help because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, read replicas and where they help usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of read replicas and where they help using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with read replicas and where they help is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain read replicas and where they help to a friend who has never built a back end before?</p>
+<h2>Section 14: Failover: When the Main Database Falls Over</h2>
+<p>Learning failover: when the main database falls over is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason failover: when the main database falls over matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands failover: when the main database falls over can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through failover: when the main database falls over is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where failover: when the main database falls over changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows failover: when the main database falls over in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with failover: when the main database falls over is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with failover: when the main database falls over, and how would you avoid it?</p>
+<h2>Section 15: Transactions in Production</h2>
+<p>This section is about transactions in production. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain transactions in production to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of transactions in production as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply transactions in production, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of transactions in production using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with transactions in production, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and transactions in production will feel far less mysterious. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of transactions in production failed, and how would you notice?</p>
+<h2>Section 16: Locks and Waiting in Line</h2>
+<p>In this section you will meet locks and waiting in line, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does locks and waiting in line solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like locks and waiting in line because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, locks and waiting in line usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows locks and waiting in line in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with locks and waiting in line is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> Why does locks and waiting in line matter for a back-end system that real people depend on?</p>
+<h2>Section 17: Deadlocks in Plain Words</h2>
+<p>Learning deadlocks in plain words is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason deadlocks in plain words matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands deadlocks in plain words can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through deadlocks in plain words is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where deadlocks in plain words changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of deadlocks in plain words using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with deadlocks in plain words is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of deadlocks in plain words you could build yourself, and what would you add next?</p>
+<h2>Section 18: Data Growth and Disk Space</h2>
+<p>This section is about data growth and disk space. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain data growth and disk space to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of data growth and disk space as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply data growth and disk space, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows data growth and disk space in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with data growth and disk space, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and data growth and disk space will feel far less mysterious. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is data growth and disk space, and when would you use it?</p>
+<h2>Section 19: Archiving Old Data Safely</h2>
+<p>In this section you will meet archiving old data safely, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does archiving old data safely solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like archiving old data safely because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, archiving old data safely usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of archiving old data safely using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with archiving old data safely is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain archiving old data safely to a friend who has never built a back end before?</p>
+<h2>Section 20: Monitoring a Database Every Day</h2>
+<p>Learning monitoring a database every day is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason monitoring a database every day matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands monitoring a database every day can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through monitoring a database every day is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where monitoring a database every day changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows monitoring a database every day in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with monitoring a database every day is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with monitoring a database every day, and how would you avoid it?</p>
+<h2>Section 21: Alerts That Wake the Right Person</h2>
+<p>This section is about alerts that wake the right person. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain alerts that wake the right person to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of alerts that wake the right person as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply alerts that wake the right person, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of alerts that wake the right person using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with alerts that wake the right person, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and alerts that wake the right person will feel far less mysterious. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of alerts that wake the right person failed, and how would you notice?</p>
+<h2>Section 22: Query Logs Without Storing Secrets</h2>
+<p>In this section you will meet query logs without storing secrets, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does query logs without storing secrets solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like query logs without storing secrets because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, query logs without storing secrets usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows query logs without storing secrets in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with query logs without storing secrets is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> Why does query logs without storing secrets matter for a back-end system that real people depend on?</p>
+<h2>Section 23: Schema Changes Need a Plan</h2>
+<p>Learning schema changes need a plan is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason schema changes need a plan matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands schema changes need a plan can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through schema changes need a plan is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where schema changes need a plan changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of schema changes need a plan using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with schema changes need a plan is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of schema changes need a plan you could build yourself, and what would you add next?</p>
+<h2>Section 24: Zero-Downtime Thinking</h2>
+<p>This section is about zero-downtime thinking. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain zero-downtime thinking to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of zero-downtime thinking as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply zero-downtime thinking, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows zero-downtime thinking in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with zero-downtime thinking, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and zero-downtime thinking will feel far less mysterious. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is zero-downtime thinking, and when would you use it?</p>
+<h2>Section 25: Caching in Front of the Database</h2>
+<p>In this section you will meet caching in front of the database, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does caching in front of the database solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like caching in front of the database because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, caching in front of the database usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of caching in front of the database using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with caching in front of the database is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain caching in front of the database to a friend who has never built a back end before?</p>
+<h2>Section 26: The Cache and the Database Disagreeing</h2>
+<p>Learning the cache and the database disagreeing is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason the cache and the database disagreeing matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands the cache and the database disagreeing can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through the cache and the database disagreeing is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where the cache and the database disagreeing changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows the cache and the database disagreeing in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with the cache and the database disagreeing is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with the cache and the database disagreeing, and how would you avoid it?</p>
+<h2>Section 27: Connection Timeouts and Retries</h2>
+<p>This section is about connection timeouts and retries. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain connection timeouts and retries to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of connection timeouts and retries as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply connection timeouts and retries, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of connection timeouts and retries using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with connection timeouts and retries, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and connection timeouts and retries will feel far less mysterious. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of connection timeouts and retries failed, and how would you notice?</p>
+<h2>Section 28: Handling a Database That Is Temporarily Down</h2>
+<p>In this section you will meet handling a database that is temporarily down, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does handling a database that is temporarily down solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like handling a database that is temporarily down because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, handling a database that is temporarily down usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows handling a database that is temporarily down in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with handling a database that is temporarily down is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does handling a database that is temporarily down matter for a back-end system that real people depend on?</p>
+<h2>Section 29: Read-Only Mode During Trouble</h2>
+<p>Learning read-only mode during trouble is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason read-only mode during trouble matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands read-only mode during trouble can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through read-only mode during trouble is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where read-only mode during trouble changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of read-only mode during trouble using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with read-only mode during trouble is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of read-only mode during trouble you could build yourself, and what would you add next?</p>
+<h2>Section 30: Scaling Up Before Scaling Out</h2>
+<p>This section is about scaling up before scaling out. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain scaling up before scaling out to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of scaling up before scaling out as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply scaling up before scaling out, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows scaling up before scaling out in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with scaling up before scaling out, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and scaling up before scaling out will feel far less mysterious. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is scaling up before scaling out, and when would you use it?</p>
+<h2>Section 31: Sharding in Plain Words</h2>
+<p>In this section you will meet sharding in plain words, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does sharding in plain words solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like sharding in plain words because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, sharding in plain words usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of sharding in plain words using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with sharding in plain words is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain sharding in plain words to a friend who has never built a back end before?</p>
+<h2>Section 32: Keeping Data Consistent Across Copies</h2>
+<p>Learning keeping data consistent across copies is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason keeping data consistent across copies matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands keeping data consistent across copies can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through keeping data consistent across copies is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where keeping data consistent across copies changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows keeping data consistent across copies in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with keeping data consistent across copies is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with keeping data consistent across copies, and how would you avoid it?</p>
+<h2>Section 33: Time Zones and Dates in Stored Data</h2>
+<p>This section is about time zones and dates in stored data. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain time zones and dates in stored data to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of time zones and dates in stored data as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply time zones and dates in stored data, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of time zones and dates in stored data using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with time zones and dates in stored data, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and time zones and dates in stored data will feel far less mysterious. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of time zones and dates in stored data failed, and how would you notice?</p>
+<h2>Section 34: Storing Money Safely</h2>
+<p>In this section you will meet storing money safely, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does storing money safely solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like storing money safely because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, storing money safely usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows storing money safely in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with storing money safely is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> Why does storing money safely matter for a back-end system that real people depend on?</p>
+<h2>Section 35: Storing Passwords and Secrets Properly</h2>
+<p>Learning storing passwords and secrets properly is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason storing passwords and secrets properly matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands storing passwords and secrets properly can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through storing passwords and secrets properly is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where storing passwords and secrets properly changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of storing passwords and secrets properly using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with storing passwords and secrets properly is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of storing passwords and secrets properly you could build yourself, and what would you add next?</p>
+<h2>Section 36: Personal Data and Privacy Rules</h2>
+<p>This section is about personal data and privacy rules. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain personal data and privacy rules to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of personal data and privacy rules as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply personal data and privacy rules, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows personal data and privacy rules in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with personal data and privacy rules, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and personal data and privacy rules will feel far less mysterious. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is personal data and privacy rules, and when would you use it?</p>
+<h2>Section 37: Deleting Data When Asked</h2>
+<p>In this section you will meet deleting data when asked, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does deleting data when asked solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like deleting data when asked because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, deleting data when asked usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of deleting data when asked using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with deleting data when asked is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain deleting data when asked to a friend who has never built a back end before?</p>
+<h2>Section 38: Auditing Who Changed What</h2>
+<p>Learning auditing who changed what is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason auditing who changed what matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands auditing who changed what can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through auditing who changed what is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where auditing who changed what changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows auditing who changed what in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with auditing who changed what is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with auditing who changed what, and how would you avoid it?</p>
+<h2>Section 39: Database Users and Least Privilege</h2>
+<p>This section is about database users and least privilege. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain database users and least privilege to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of database users and least privilege as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply database users and least privilege, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of database users and least privilege using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with database users and least privilege, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and database users and least privilege will feel far less mysterious. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of database users and least privilege failed, and how would you notice?</p>
+<h2>Section 40: Rotating Credentials Without Downtime</h2>
+<p>In this section you will meet rotating credentials without downtime, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does rotating credentials without downtime solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like rotating credentials without downtime because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, rotating credentials without downtime usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows rotating credentials without downtime in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with rotating credentials without downtime is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does rotating credentials without downtime matter for a back-end system that real people depend on?</p>
+<h2>Section 41: Testing Against a Copy of Real Data</h2>
+<p>Learning testing against a copy of real data is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason testing against a copy of real data matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands testing against a copy of real data can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through testing against a copy of real data is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where testing against a copy of real data changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of testing against a copy of real data using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with testing against a copy of real data is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of testing against a copy of real data you could build yourself, and what would you add next?</p>
+<h2>Section 42: Seed Data for Development</h2>
+<p>This section is about seed data for development. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain seed data for development to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of seed data for development as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply seed data for development, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows seed data for development in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with seed data for development, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and seed data for development will feel far less mysterious. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is seed data for development, and when would you use it?</p>
+<h2>Section 43: Load Testing a Database Gently</h2>
+<p>In this section you will meet load testing a database gently, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does load testing a database gently solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like load testing a database gently because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, load testing a database gently usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of load testing a database gently using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with load testing a database gently is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain load testing a database gently to a friend who has never built a back end before?</p>
+<h2>Section 44: When to Add a Second Database</h2>
+<p>Learning when to add a second database is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason when to add a second database matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands when to add a second database can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through when to add a second database is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where when to add a second database changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows when to add a second database in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with when to add a second database is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with when to add a second database, and how would you avoid it?</p>
+<h2>Section 45: Queues That Protect the Database</h2>
+<p>This section is about queues that protect the database. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain queues that protect the database to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of queues that protect the database as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply queues that protect the database, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of queues that protect the database using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with queues that protect the database, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and queues that protect the database will feel far less mysterious. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of queues that protect the database failed, and how would you notice?</p>
+<h2>Section 46: Health Checks for the Database</h2>
+<p>In this section you will meet health checks for the database, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does health checks for the database solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like health checks for the database because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, health checks for the database usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows health checks for the database in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with health checks for the database is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+def connect(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)&quot;)
+    db.execute(&quot;CREATE INDEX IF NOT EXISTS idx_users_name ON users (name)&quot;)
+    db.commit()
+    db.close()
+
+
+setup()
+print(&quot;production-shaped tables ready&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> Why does health checks for the database matter for a back-end system that real people depend on?</p>
+<h2>Section 47: Graceful Shutdowns and Restarts</h2>
+<p>Learning graceful shutdowns and restarts is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason graceful shutdowns and restarts matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands graceful shutdowns and restarts can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through graceful shutdowns and restarts is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where graceful shutdowns and restarts changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of graceful shutdowns and restarts using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with graceful shutdowns and restarts is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+import queue
+
+
+class SmallPool:
+    def __init__(self, path, size=3):
+        self.free = queue.Queue()
+        for _ in range(size):
+            self.free.put(sqlite3.connect(path, check_same_thread=False))
+
+    def borrow(self):
+        return self.free.get()
+
+    def give_back(self, connection):
+        self.free.put(connection)
+
+
+pool = SmallPool(&quot;:memory:&quot;)
+conn = pool.borrow()
+conn.execute(&quot;CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)&quot;)
+pool.give_back(conn)
+print(&quot;pool size stays small and reuse stays simple&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of graceful shutdowns and restarts you could build yourself, and what would you add next?</p>
+<h2>Section 48: Documenting Your Database Decisions</h2>
+<p>This section is about documenting your database decisions. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain documenting your database decisions to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>Think of documenting your database decisions as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply documenting your database decisions, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows documenting your database decisions in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with documenting your database decisions, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and documenting your database decisions will feel far less mysterious. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def back_up(source_path, backup_path):
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    source.backup(target)
+    target.close()
+    source.close()
+    print(&quot;backup written to&quot;, backup_path)
+
+
+source_db = sqlite3.connect(&quot;:memory:&quot;)
+source_db.execute(&quot;CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+source_db.execute(&quot;INSERT INTO items (name) VALUES (?)&quot;, (&quot;first item&quot;,))
+source_db.commit()
+source_db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is documenting your database decisions, and when would you use it?</p>
+<h2>Section 49: A Production Database Checklist</h2>
+<p>In this section you will meet a production database checklist, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does a production database checklist solve, and what would go wrong without it?</p>
+<p>Many beginners skip ideas like a production database checklist because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, a production database checklist usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of a production database checklist using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with a production database checklist is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import time
+
+
+def run_with_retry(statement, tries=3):
+    for attempt in range(1, tries + 1):
+        try:
+            db = sqlite3.connect(&quot;:memory:&quot;)
+            db.execute(&quot;CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY)&quot;)
+            db.execute(statement)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.OperationalError:
+            if attempt == tries:
+                raise
+            time.sleep(0.1 * attempt)
+    return False
+
+
+print(run_with_retry(&quot;INSERT INTO jobs DEFAULT VALUES&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain a production database checklist to a friend who has never built a back end before?</p>
+<h2>Section 50: Review: Running a Database People Depend On</h2>
+<p>Learning review: running a database people depend on is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>The reason review: running a database people depend on matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands review: running a database people depend on can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through review: running a database people depend on is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where review: running a database people depend on changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows review: running a database people depend on in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with review: running a database people depend on is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)&quot;)
+db.execute(&quot;CREATE INDEX idx_orders_customer ON orders (customer)&quot;)
+db.execute(&quot;INSERT INTO orders (customer, total) VALUES (?, ?)&quot;, (&quot;Ada&quot;, 12.50))
+for row in db.execute(&quot;EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer = ?&quot;, (&quot;Ada&quot;,)):
+    print(row)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with review: running a database people depend on, and how would you avoid it?</p>
+<h2>Practical Task</h2>
+<p>Build a small production-shaped database practice project: create a SQLite database with two tables, an index on the column you search by most, and a script that backs the file up and then restores it into a different file and checks the row counts match. Add a tiny monitoring step that prints the row counts and the size of the file, and write a short checklist of what you would check every day if real users depended on this database.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What is the difference between a database on your own computer and one in production, and why does that difference change your decisions?</li>
+<li>Why is a backup you have never restored not yet a backup you can trust?</li>
+<li>How do connection pools help a busy application, and what goes wrong when the pool is too small or too large?</li>
+<li>What would you monitor every day on a database real people depend on, and which alert would you act on first?</li>
+<li>When would you scale a database up, and when would scaling out, such as replicas or sharding, be the better answer?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-35.html">← Chapter 35</a> <a href="index.html">All chapters</a> <a href="chapter-37.html">Chapter 37 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/back-end-developer/chapter-36.html'; this.page.identifier = 'book-back-end-developer-chapter-36'; this.page.title = 'Chapter 36: Databases in Production in Plain Words'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

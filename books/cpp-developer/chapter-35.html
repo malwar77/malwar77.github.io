@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 35 — Databases and Data in C++ — C++ Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 35 of the C++ Developer teaching book: Databases and Data in C++.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:860px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:860px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.25;font-size:2rem}
+h2{color:#22d3ee;margin-top:2.2em;line-height:1.35}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+ul.chapter-list{list-style:none;padding:0}
+ul.chapter-list li{margin:.55em 0}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:700;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← C++ Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 35: Databases and Data in C++</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-35.svg" alt="Design for Chapter 35" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1</h2>
+<p>This section is about what a database really is, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand what a database really is, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about what a database really is is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use what a database really is in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// What a database really is
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is what a database really is, and when would you use it?</p>
+<h2>Section 2</h2>
+<p>This section is about tables, rows and columns, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand tables, rows and columns, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about tables, rows and columns is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use tables, rows and columns in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Tables, rows and columns
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is tables, rows and columns, and when would you use it?</p>
+<h2>Section 3</h2>
+<p>This section is about primary keys, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand primary keys, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about primary keys is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use primary keys in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Primary keys
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is primary keys, and when would you use it?</p>
+<h2>Section 4</h2>
+<p>This section is about data types in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand data types in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about data types in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use data types in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Data types in plain words
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is data types in plain words, and when would you use it?</p>
+<h2>Section 5</h2>
+<p>This section is about select in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand select in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about select in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use select in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// SELECT in concept
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is select in concept, and when would you use it?</p>
+<h2>Section 6</h2>
+<p>This section is about insert, update and delete in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand insert, update and delete in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about insert, update and delete in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use insert, update and delete in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// INSERT, UPDATE and DELETE in concept
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is insert, update and delete in concept, and when would you use it?</p>
+<h2>Section 7</h2>
+<p>This section is about filtering with where in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand filtering with where in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about filtering with where in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use filtering with where in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Filtering with WHERE in concept
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is filtering with where in concept, and when would you use it?</p>
+<h2>Section 8</h2>
+<p>This section is about sorting results with order by in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand sorting results with order by in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about sorting results with order by in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use sorting results with order by in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Sorting results with ORDER BY in concept
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is sorting results with order by in concept, and when would you use it?</p>
+<h2>Section 9</h2>
+<p>This section is about joins in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand joins in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about joins in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use joins in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Joins in concept
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is joins in concept, and when would you use it?</p>
+<h2>Section 10</h2>
+<p>This section is about indexes in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand indexes in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about indexes in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use indexes in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Indexes in concept
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is indexes in concept, and when would you use it?</p>
+<h2>Section 11</h2>
+<p>This section is about transactions in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand transactions in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about transactions in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use transactions in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Transactions in concept
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is transactions in concept, and when would you use it?</p>
+<h2>Section 12</h2>
+<p>This section is about acid properties in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand acid properties in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about acid properties in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use acid properties in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// ACID properties in plain words
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is acid properties in plain words, and when would you use it?</p>
+<h2>Section 13</h2>
+<p>This section is about sqlite in concept without a library, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand sqlite in concept without a library, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about sqlite in concept without a library is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use sqlite in concept without a library in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// SQLite in concept without a library
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is sqlite in concept without a library, and when would you use it?</p>
+<h2>Section 14</h2>
+<p>This section is about file-based storage with plain c++, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand file-based storage with plain c++, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about file-based storage with plain c++ is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use file-based storage with plain c++ in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// File-based storage with plain C++
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is file-based storage with plain c++, and when would you use it?</p>
+<h2>Section 15</h2>
+<p>This section is about records as c++ structs, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand records as c++ structs, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about records as c++ structs is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use records as c++ structs in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Records as C++ structs
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is records as c++ structs, and when would you use it?</p>
+<h2>Section 16</h2>
+<p>This section is about saving records to a text file, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand saving records to a text file, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about saving records to a text file is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use saving records to a text file in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Saving records to a text file
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is saving records to a text file, and when would you use it?</p>
+<h2>Section 17</h2>
+<p>This section is about loading records back from a file, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand loading records back from a file, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about loading records back from a file is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use loading records back from a file in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Loading records back from a file
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is loading records back from a file, and when would you use it?</p>
+<h2>Section 18</h2>
+<p>This section is about searching stored records, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand searching stored records, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about searching stored records is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use searching stored records in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Searching stored records
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is searching stored records, and when would you use it?</p>
+<h2>Section 19</h2>
+<p>This section is about updating a stored record, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand updating a stored record, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about updating a stored record is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use updating a stored record in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Updating a stored record
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is updating a stored record, and when would you use it?</p>
+<h2>Section 20</h2>
+<p>This section is about deleting a record safely, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand deleting a record safely, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about deleting a record safely is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use deleting a record safely in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Deleting a record safely
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is deleting a record safely, and when would you use it?</p>
+<h2>Section 21</h2>
+<p>This section is about validating data before storing it, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand validating data before storing it, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about validating data before storing it is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use validating data before storing it in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Validating data before storing it
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is validating data before storing it, and when would you use it?</p>
+<h2>Section 22</h2>
+<p>This section is about generating unique identifiers, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand generating unique identifiers, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about generating unique identifiers is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use generating unique identifiers in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Generating unique identifiers
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is generating unique identifiers, and when would you use it?</p>
+<h2>Section 23</h2>
+<p>This section is about sorting stored data in code, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand sorting stored data in code, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about sorting stored data in code is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use sorting stored data in code in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Sorting stored data in code
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is sorting stored data in code, and when would you use it?</p>
+<h2>Section 24</h2>
+<p>This section is about filtering records with query functions, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand filtering records with query functions, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about filtering records with query functions is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use filtering records with query functions in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Filtering records with query functions
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is filtering records with query functions, and when would you use it?</p>
+<h2>Section 25</h2>
+<p>This section is about pagination in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand pagination in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about pagination in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use pagination in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Pagination in concept
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is pagination in concept, and when would you use it?</p>
+<h2>Section 26</h2>
+<p>This section is about one-to-many relationships, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand one-to-many relationships, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about one-to-many relationships is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use one-to-many relationships in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// One-to-many relationships
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is one-to-many relationships, and when would you use it?</p>
+<h2>Section 27</h2>
+<p>This section is about foreign keys in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand foreign keys in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about foreign keys in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use foreign keys in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Foreign keys in concept
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is foreign keys in concept, and when would you use it?</p>
+<h2>Section 28</h2>
+<p>This section is about normalisation in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand normalisation in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about normalisation in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use normalisation in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Normalisation in plain words
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is normalisation in plain words, and when would you use it?</p>
+<h2>Section 29</h2>
+<p>This section is about when denormalisation makes sense, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand when denormalisation makes sense, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about when denormalisation makes sense is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use when denormalisation makes sense in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// When denormalisation makes sense
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is when denormalisation makes sense, and when would you use it?</p>
+<h2>Section 30</h2>
+<p>This section is about backing up your data, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand backing up your data, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about backing up your data is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use backing up your data in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Backing up your data
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is backing up your data, and when would you use it?</p>
+<h2>Section 31</h2>
+<p>This section is about concurrency caution with file storage, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand concurrency caution with file storage, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about concurrency caution with file storage is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use concurrency caution with file storage in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Concurrency caution with file storage
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is concurrency caution with file storage, and when would you use it?</p>
+<h2>Section 32</h2>
+<p>This section is about data integrity checks, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand data integrity checks, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about data integrity checks is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use data integrity checks in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Data integrity checks
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is data integrity checks, and when would you use it?</p>
+<h2>Section 33</h2>
+<p>This section is about the csv format in c++, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand the csv format in c++, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about the csv format in c++ is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use the csv format in c++ in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// The CSV format in C++
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is the csv format in c++, and when would you use it?</p>
+<h2>Section 34</h2>
+<p>This section is about parsing csv safely, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand parsing csv safely, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about parsing csv safely is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use parsing csv safely in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Parsing CSV safely
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is parsing csv safely, and when would you use it?</p>
+<h2>Section 35</h2>
+<p>This section is about escaping commas and quotes in csv, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand escaping commas and quotes in csv, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about escaping commas and quotes in csv is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use escaping commas and quotes in csv in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Escaping commas and quotes in CSV
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is escaping commas and quotes in csv, and when would you use it?</p>
+<h2>Section 36</h2>
+<p>This section is about text versus binary storage trade-offs, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand text versus binary storage trade-offs, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about text versus binary storage trade-offs is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use text versus binary storage trade-offs in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Text versus binary storage trade-offs
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is text versus binary storage trade-offs, and when would you use it?</p>
+<h2>Section 37</h2>
+<p>This section is about an in-memory store with vectors, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand an in-memory store with vectors, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about an in-memory store with vectors is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use an in-memory store with vectors in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// An in-memory store with vectors
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is an in-memory store with vectors, and when would you use it?</p>
+<h2>Section 38</h2>
+<p>This section is about a fast lookup index with a map, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand a fast lookup index with a map, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about a fast lookup index with a map is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use a fast lookup index with a map in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// A fast lookup index with a map
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is a fast lookup index with a map, and when would you use it?</p>
+<h2>Section 39</h2>
+<p>This section is about designing query functions, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand designing query functions, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about designing query functions is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use designing query functions in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Designing query functions
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is designing query functions, and when would you use it?</p>
+<h2>Section 40</h2>
+<p>This section is about the repository pattern in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand the repository pattern in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about the repository pattern in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use the repository pattern in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// The repository pattern in plain words
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is the repository pattern in plain words, and when would you use it?</p>
+<h2>Section 41</h2>
+<p>This section is about separating storage from program logic, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand separating storage from program logic, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about separating storage from program logic is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use separating storage from program logic in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Separating storage from program logic
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is separating storage from program logic, and when would you use it?</p>
+<h2>Section 42</h2>
+<p>This section is about migrations: changing a data layout, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand migrations: changing a data layout, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about migrations: changing a data layout is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use migrations: changing a data layout in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Migrations: changing a data layout
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is migrations: changing a data layout, and when would you use it?</p>
+<h2>Section 43</h2>
+<p>This section is about importing and exporting data, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand importing and exporting data, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about importing and exporting data is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use importing and exporting data in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Importing and exporting data
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is importing and exporting data, and when would you use it?</p>
+<h2>Section 44</h2>
+<p>This section is about reports: counts, sums and averages, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand reports: counts, sums and averages, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about reports: counts, sums and averages is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Validation belongs at the boundary, before data is stored, because bad data that gets in is far harder to clean up than bad data that is refused. An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use reports: counts, sums and averages in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Reports: counts, sums and averages
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is reports: counts, sums and averages, and when would you use it?</p>
+<h2>Section 45</h2>
+<p>This section is about case-insensitive text search, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand case-insensitive text search, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about case-insensitive text search is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Think about what happens if the program stops halfway through a save: a half-written file is worse than an old complete one, so plan for that case. Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use case-insensitive text search in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Case-insensitive text search
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is case-insensitive text search, and when would you use it?</p>
+<h2>Section 46</h2>
+<p>This section is about sorting by more than one field, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand sorting by more than one field, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about sorting by more than one field is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Searching and sorting are easier when records are in memory, which is why small programs often load everything, work on it, and save it back. Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use sorting by more than one field in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Sorting by more than one field
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ofstream out(&quot;records.txt&quot;);
+    out &lt;&lt; &quot;1,Ada,90\n&quot;;
+    out &lt;&lt; &quot;2,Ben,75\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is sorting by more than one field, and when would you use it?</p>
+<h2>Section 47</h2>
+<p>This section is about data privacy basics, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand data privacy basics, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about data privacy basics is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>An index is just a shortcut: a map from a key to a position or a record, kept consistent whenever records change. A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use data privacy basics in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Data privacy basics
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+int main() {
+    std::ifstream in(&quot;records.txt&quot;);
+    std::string line;
+    while (std::getline(in, line)) std::cout &lt;&lt; line &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is data privacy basics, and when would you use it?</p>
+<h2>Section 48</h2>
+<p>This section is about testing data-handling code, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand testing data-handling code, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about testing data-handling code is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Real database systems add transactions, indexes, and concurrent access, but the ideas in this chapter are the same ideas those systems automate. File-based storage with plain C++ is an excellent teacher, because every step, saving, loading, searching, and updating, is visible in your own code. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use testing data-handling code in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Testing data-handling code
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;map&gt;
+int main() {
+    std::map&lt;int, std::string&gt; byId;
+    byId[1] = &quot;Ada&quot;;
+    byId[2] = &quot;Ben&quot;;
+    std::cout &lt;&lt; byId[1] &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is testing data-handling code, and when would you use it?</p>
+<h2>Section 49</h2>
+<p>This section is about designing a small database project, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand designing a small database project, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about designing a small database project is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test data code with empty files, missing files, duplicate keys, and malformed lines, because real data is never as tidy as test data. The most common data bug is not a crash but silent corruption: a record written in one format and read back as if it were another. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use designing a small database project in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Designing a small database project
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+struct Record { std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{&quot;Ben&quot;, 75}, {&quot;Ada&quot;, 90}};
+    std::sort(rows.begin(), rows.end(), [](const Record&amp; a, const Record&amp; b) { return a.score &gt; b.score; });
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is designing a small database project, and when would you use it?</p>
+<h2>Section 50</h2>
+<p>This section is about what to learn next after file storage, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand what to learn next after file storage, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about what to learn next after file storage is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A database, however small, is really an agreement about layout: what a record contains, how it is identified, and how it can be found again later. Design your record type first, and let the storage code follow the record, rather than letting file details leak into the rest of the program. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use what to learn next after file storage in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// What to learn next after file storage
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+struct Record { int id; std::string name; int score; };
+int main() {
+    std::vector&lt;Record&gt; rows = {{1, &quot;Ada&quot;, 90}, {2, &quot;Ben&quot;, 75}};
+    for (const auto&amp; r : rows) std::cout &lt;&lt; r.id &lt;&lt; &quot; &quot; &lt;&lt; r.name &lt;&lt; &quot; &quot; &lt;&lt; r.score &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is what to learn next after file storage, and when would you use it?</p>
+<h2>Practical Task</h2>
+<p>Build a file-based record store for ten students (id, name, score) with save, load, search by id, update and delete, and test it with an empty file, a duplicate id and a malformed line.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What makes a primary key different from an ordinary field in a record?</li>
+<li>Why validate data before storing it rather than after?</li>
+<li>What could go wrong if a program stops halfway through rewriting a data file?</li>
+<li>How does a map index make finding a record by id faster than scanning a list?</li>
+<li>When is file-based storage enough, and when would a real database system be better?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-34.html">← Chapter 34</a> <a href="index.html">All chapters</a> <a href="chapter-36.html">Chapter 36 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/cpp-developer/chapter-35.html'; this.page.identifier = 'book-cpp-developer-chapter-35'; this.page.title = 'Chapter 35: Databases and Data in C++'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

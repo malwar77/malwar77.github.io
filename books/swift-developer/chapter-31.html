@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 31 — Actors and Safe Shared State — Swift Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 31 of the Swift Developer teaching book: Actors and Safe Shared State.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Swift Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 31: Actors and Safe Shared State</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-31.svg" alt="Design for Chapter 31" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: Why Shared State Causes Trouble</h2>
+<p>Imagine two people editing the same shopping list at the same time. One person adds milk while the other crosses it off, and neither sees what the other just did. The final list ends up wrong, even though both people acted sensibly on their own. This is exactly what happens inside a program when two tasks share the same piece of data and change it at the same time. Programmers call this shared mutable state, and it is one of the most common sources of strange, hard-to-reproduce bugs. The program might work perfectly a hundred times and then fail once, because the exact timing of the two tasks happened to line up badly on that run. That kind of bug is painful because you cannot reliably make it happen again when you try to investigate it, and adding print statements often changes the timing enough to hide it. The trouble grows as programs do more work at the same time, such as downloading data, updating a screen, and saving a file all at once. Each task believes it owns the data, but in reality they are all stepping on each other&#x27;s toes. The classic symptom is a counter that should reach one hundred but stops at ninety-seven, or a list that loses an item nobody meant to delete. Once you understand that the root cause is unguarded sharing, the solution becomes clear: somebody must be in charge of the shared data, and everybody else must ask that guardian politely instead of grabbing the data directly. That guardian, in Swift, is an actor. An actor owns its data and only lets one task touch it at a time, which turns chaos into an orderly queue. Learning actors therefore starts not with syntax, but with this mental picture of a single careful guardian standing between many eager workers and one precious notebook.</p>
+<pre><code>var counter = 0
+
+func addOne() {
+    counter += 1
+}
+
+addOne()
+addOne()
+print(counter)</code></pre>
+<p>When only one task runs, the code above is harmless, but the moment two tasks call a function like this at the same time, the result can surprise you. One task reads the counter, the other reads it too, both add one, and both write back the same value, so one of the additions is lost. This is called a race, and it happens in the tiny gap between reading and writing. You cannot see that gap by reading the code casually, because the code looks like a single step. In reality the computer performs several small steps, and another task can slip in between them. Actors remove this danger by making sure only one task is inside the actor at any moment. Other tasks wait their turn instead of barging in, so reads and writes never overlap. The waiting is handled by Swift&#x27;s concurrency system, not by you writing locks by hand, which means fewer chances to make a mistake. Think of it as a ticket queue at a small shop: only the person holding the ticket is served, and everyone else waits calmly. By the end of this chapter you will know how to build such guardians, how to talk to them, and when an actor is the right tool rather than a struct or a class.</p>
+<p class="check"><strong>Check:</strong> In your own words, why can two tasks updating the same counter at the same time lose an update?</p>
+<h2>Section 2: What an Actor Is</h2>
+<p>An actor is a special kind of type in Swift that protects the data it holds. It looks a lot like a class when you first meet it: it has properties, it has methods, and you create an instance of it. The big difference is hidden in how Swift treats access to it. With a normal class, any task can reach in and touch its properties whenever it likes, which is exactly how races happen. With an actor, Swift builds a wall around the data. Only one task at a time is allowed inside that wall, and every other task must wait outside until the current visitor finishes. This guarantee is called actor isolation, and it is enforced by the compiler, not just by good intentions. That means many mistakes are caught while you are still writing the code, before the program ever runs. You do not need to remember to lock and unlock anything, because the actor does that job for you automatically. Another important difference is that an actor is a reference type, like a class, so when you pass it around you are sharing the same guardian, not making a copy of it. That is exactly what you want for shared state: there should be one true copy of the counter, the cache, or the download list, and everybody should talk to that one guardian. If each task got its own copy, their changes would never meet, and the program would quietly disagree with itself. Actors also work naturally with Swift&#x27;s async and await, because waiting for your turn is an asynchronous operation. You will see the word await appear whenever you talk to an actor from outside, and that word is a helpful reminder that you might have to wait in line. In short, an actor is a class-like guardian that serialises access to its own data, turning dangerous sharing into safe, orderly sharing.</p>
+<pre><code>actor Counter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}</code></pre>
+<p>The actor above is small, but it already shows the whole pattern. Its property is private, so outsiders cannot grab it directly, and its methods are the only way to change or read the value. Because it is an actor, Swift guarantees that two calls to increment can never run at the same moment inside the same instance. One finishes completely, then the next begins, so no update is ever lost. Notice also that the methods themselves look ordinary. There is no special locking code, no semaphore, and no queue to manage. The safety comes from the actor keyword itself, which tells the compiler to treat this type differently. When you use this actor later, you will write await before calls to it, because calling from outside means joining the queue. That small word is the price of safety, and it is a very good bargain. As you practise, you will start to notice places in your own programs where a class is being shared between tasks, and those places are exactly where an actor belongs.</p>
+<p class="check"><strong>Check:</strong> What is the main difference between an actor and a class when both are shared between tasks?</p>
+<h2>Section 3: Declaring Your First Actor</h2>
+<p>Declaring an actor is pleasantly simple, and the syntax will feel familiar if you have already written structs and classes. You write the word actor, followed by the name you have chosen, followed by a pair of braces containing properties and methods. By convention, actor names use UpperCamelCase, just like classes and structs, so Counter, DownloadManager, and ChatStore are all natural names. Inside the braces you declare stored properties exactly as you would elsewhere, and you write methods with func just as usual. The main habit to build early is to keep the actor&#x27;s properties private whenever possible. Private means that only code inside the actor can touch the property directly, which forces everyone else to go through the actor&#x27;s methods. That is a good thing, because the methods are where the actor&#x27;s protection applies. If a property were left public, outside code could still be forced to use await to reach it, but the design becomes messier and the actor&#x27;s rules harder to reason about. A tidy actor therefore presents a small, clear set of methods, such as add, remove, count, or list, and hides everything else. You should also think about what the actor owns as a single unit. A counter actor owns a number. A shopping basket actor owns a list of items. A download tracker owns a set of active downloads. Each actor should own one coherent job, not become a dumping ground for every shared variable in the program. When you split responsibilities this way, each actor stays easy to understand and easy to test. Finally, remember that you create an actor instance with the usual syntax, Counter(), just like a class. Creating it is cheap and ordinary; the interesting part begins when tasks start talking to it, which is what the next sections explore.</p>
+<pre><code>actor ShoppingBasket {
+    private var items: [String] = []
+
+    func add(_ item: String) {
+        items.append(item)
+    }
+
+    func allItems() -&gt; [String] {
+        return items
+    }
+
+    func count() -&gt; Int {
+        return items.count
+    }
+}</code></pre>
+<p>This basket actor demonstrates the tidy shape you should aim for. The items array is private, so nobody outside can append to it or remove from it behind the actor&#x27;s back. The three methods give outsiders everything they reasonably need: a way to add, a way to see the whole list, and a way to count it. Each method is short and does one thing, which makes the actor easy to trust. If you later decide that adding an item should also check for duplicates or record the time it was added, you only need to change this one place, and every caller benefits automatically. That concentration of responsibility is one of the quiet strengths of actors. You might wonder whether the actor&#x27;s methods need the word async. They do not, unless they themselves do asynchronous work such as waiting for a download. The await you will write at the call site comes from crossing the actor&#x27;s boundary, not from the method being asynchronous in the usual sense. Keep this distinction in mind, because it explains a lot of the syntax you will meet shortly.</p>
+<p class="check"><strong>Check:</strong> Why is it good practice to keep an actor&#x27;s stored properties private?</p>
+<h2>Section 4: Calling Actor Methods with await</h2>
+<p>Talking to an actor from outside feels slightly different from calling a method on a struct, and the difference is one small word: await. Whenever code outside the actor calls one of its methods or reads one of its properties, it must write await first, because the call might have to wait for another task to finish inside the actor. Swift requires this word so that you can see, right in the code, every place where your task might pause. That visibility matters, because a pause is a moment when other work can happen, and a programmer should be aware of those moments. You can only use await inside an asynchronous context, such as a function marked async or inside a Task, which is why actor code so often appears together with Swift&#x27;s concurrency features. When you write await basket.add(&quot;Apples&quot;), your task joins the actor&#x27;s queue. If nobody else is inside, it proceeds immediately. If another task is in the middle of a method, your task suspends politely and resumes when its turn comes. Suspension is cheap: it does not block a thread, it simply parks your task until it is needed again. This is one reason actors scale well. Hundreds of tasks can wait for one actor without tying up hundreds of threads. Inside the actor itself, methods can call each other directly without await, because they are already inside the protected area. That rule keeps the code inside an actor feeling normal while still being safe. The compiler will complain if you forget await outside the actor, and that complaint is a friend, not an annoyance. It is Swift reminding you that you are crossing a boundary where waiting is possible. Over time, reading await becomes second nature, like reading a polite knock before entering a room.</p>
+<pre><code>actor Counter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}
+
+func demo() async {
+    let counter = Counter()
+    await counter.increment()
+    await counter.increment()
+    let total = await counter.currentValue()
+    print(total)
+}</code></pre>
+<p>In the example, demo is marked async, which is what allows it to use await. Each call to the counter is prefixed with await, signalling a possible pause at the actor&#x27;s boundary. The printed total will always be two, no matter how many tasks are using the counter at the same time, because the increments cannot overlap. If you tried to call counter.increment() without await from outside, the compiler would stop you with an error, and that is exactly the kind of error you want: a mistake caught early, in plain sight. Notice that the order of operations in demo is still easy to follow. Await does not make the code jump around unpredictably; it simply marks the spots where waiting may occur. As you write more concurrent code, you will develop an eye for these boundaries, and you will start to see which parts of a program are shared and guarded, and which parts are purely local and free.</p>
+<p class="check"><strong>Check:</strong> Why does Swift require await when calling an actor&#x27;s method from outside the actor?</p>
+<h2>Section 5: Actor Isolation in Plain Words</h2>
+<p>Actor isolation is the formal name for the wall around an actor&#x27;s data, and it is worth understanding in plain words because it explains many compiler errors you will meet. Isolation means that the actor&#x27;s state can only be touched by code that is running inside the actor, and only one task can be inside at a time. Everything else is isolated from that state, in the sense that it cannot reach in directly. When you write a method inside the actor, that method is part of the isolated region, so it can read and write properties freely. When you write code outside the actor, that code is in a different region, so it must go through the boundary, using await, and it must wait its turn. The compiler tracks which region each piece of code belongs to, and it refuses to compile code that tries to cross the wall illegally. This is much stronger than a comment that says please be careful, because comments can be ignored and compiler errors cannot. Isolation also applies to properties. An actor&#x27;s stored properties belong to the isolated region, which is why outside code cannot simply read basket.items without await, and why keeping properties private is the natural complement to isolation. There is one more subtle point: isolation is about the actor instance, not the actor type. Two different counters have two different walls, and tasks using different counters do not wait for each other. Only tasks sharing the same instance queue up together. That is precisely the behaviour you want, because sharing is the source of danger, and separate instances have nothing to fight over. Understanding isolation as one wall per instance, with one visitor at a time, gives you a reliable mental model for everything else in this chapter.</p>
+<pre><code>actor BankAccount {
+    private var balance = 100
+
+    func deposit(_ amount: Int) {
+        balance += amount
+    }
+
+    func withdraw(_ amount: Int) -&gt; Bool {
+        if amount &lt;= balance {
+            balance -= amount
+            return true
+        }
+        return false
+    }
+
+    func currentBalance() -&gt; Int {
+        return balance
+    }
+}</code></pre>
+<p>The bank account actor shows why isolation matters for correctness, not just tidiness. The withdraw method checks the balance and then changes it, and those two steps must happen together without interruption. If two tasks tried to withdraw at once from a plain class, both might see a balance of one hundred, both might approve, and the account could end up overdrawn even though each check looked fine. Inside an actor, that cannot happen, because the whole withdraw method runs without another task slipping in between the check and the change. This property has a name: the method runs atomically with respect to other actor methods, meaning it appears to happen all at once from the outside. Atomicity is a powerful guarantee, and it is the reason actors are so useful for things like balances, counters, and booking systems, where a check followed by a change must be treated as one indivisible action.</p>
+<p class="check"><strong>Check:</strong> Explain actor isolation using the picture of a wall and one visitor at a time.</p>
+<h2>Section 6: One Task at a Time</h2>
+<p>The rule that only one task runs inside an actor at a time is simple to state and surprisingly deep in its consequences. It means that methods on the same actor never truly run in parallel with each other. They may interleave at suspension points, which we will discuss later, but they never execute two lines of code at the exact same instant on the same actor&#x27;s data. For a beginner, the safest way to think about it is sequential: the actor handles one request, finishes it, and then takes the next. This sequential picture explains why actors remove races. A race needs two tasks touching the same data at overlapping times, and the actor&#x27;s rule makes overlap impossible. It also explains why actor code is easier to reason about than code protected by manual locks. With locks, you must remember to acquire and release them correctly on every path, including error paths, and forgetting once creates a bug. With an actor, the rule is built in and cannot be forgotten. There is a trade-off, and honest teaching should name it: if many tasks all need the same actor constantly, they will queue up, and the actor can become a bottleneck. That is usually fine, because the work inside each method is small, but it is worth knowing. The answer is not to abandon actors, but to keep actor methods short and to split unrelated state into separate actors so that unrelated work does not queue behind unrelated work. Think of a shop with one till: if every customer buys one item, the queue moves fast, but if one customer insists on a long negotiation, everyone waits. Keep your actor&#x27;s visits short, and the queue will stay friendly. This one-task-at-a-time rule is the heart of the actor model, and every other detail in this chapter is a refinement of it.</p>
+<pre><code>actor TicketSeller {
+    private var ticketsLeft = 10
+
+    func buyTicket() -&gt; Bool {
+        if ticketsLeft &gt; 0 {
+            ticketsLeft -= 1
+            return true
+        }
+        return false
+    }
+
+    func remaining() -&gt; Int {
+        return ticketsLeft
+    }
+}</code></pre>
+<p>Ticket selling is the classic example where one-at-a-time really matters, because selling the last ticket twice is a visible, embarrassing failure. With a plain shared variable, two buyers could both see one ticket left and both succeed. With the actor above, the check and the decrement happen as one uninterrupted visit, so exactly one buyer gets the last ticket and the other is told there are none left. Notice how little code this takes. There is no lock, no queue, and no special selling ceremony. The actor keyword does the work, and the method reads like ordinary sequential code, which is a great kindness to the reader. When you later write a program that sells, books, counts, or reserves anything, ask yourself whether two users could collide on the last item, and if the answer is yes, reach for an actor.</p>
+<p class="check"><strong>Check:</strong> How does the one-task-at-a-time rule prevent selling the last ticket twice?</p>
+<h2>Section 7: Actors and Many Tasks</h2>
+<p>Actors truly shine when many tasks run at once, so it is worth seeing that pattern explicitly. A common shape in real programs is to launch a group of tasks, each doing some independent work, and then have them all report their results to one shared actor. The independent work happens in parallel, which is fast, while the reporting happens through the actor, which is safe. This combination gives you the best of both worlds: speed where it is safe, and order where it matters. Without an actor, you would have to choose between running everything sequentially, which is slow, or sharing data recklessly, which is buggy. With an actor, the design falls naturally into two parts: the parallel part that does not touch shared state, and the guarded part that does. A useful habit is to do as much work as possible before touching the actor. For example, if each task downloads and processes a file, it should finish all of that work first and only then call the actor to record the result. That way the actor&#x27;s queue stays short, because each visit is just a quick record-keeping step. Another useful habit is to think about how many actors you need. One actor per shared resource is a good starting rule. If your program has a download list and a settings store, those are two resources, and two actors keep their queues independent. If you cram both into one actor, a settings update would wait behind a download update for no good reason. Many tasks plus well-chosen actors is a pattern you will use again and again, and it scales from small command-line tools to large apps.</p>
+<pre><code>actor ResultCollector {
+    private var results: [String] = []
+
+    func add(_ result: String) {
+        results.append(result)
+    }
+
+    func allResults() -&gt; [String] {
+        return results
+    }
+}
+
+func runMany() async {
+    let collector = ResultCollector()
+    await withTaskGroup(of: Void.self) { group in
+        for number in 1...5 {
+            group.addTask {
+                await collector.add(&quot;Done \(number)&quot;)
+            }
+        }
+    }
+    let all = await collector.allResults()
+    print(all.count)
+}</code></pre>
+<p>In this example, five tasks each report to the same collector, and the actor guarantees that all five appends happen without losing any, even though the tasks run concurrently. The task group waits until every task has finished before the program reads the results, so the printed count will always be five. Without the actor, the appends could collide and the count could come out lower, and the bug would appear only occasionally, which is the worst kind of bug to chase. Notice the structure: the group handles the parallelism, and the actor handles the sharing. Each tool does one job well. As your programs grow, you will find this division of labour comforting, because it lets you think about parallelism and sharing separately instead of tangling them together in every function.</p>
+<p>It is also worth noting that the actor does not care which task reports first. The order of results may vary from run to run, because tasks finish in their own time, and that variation is perfectly fine. What matters is that no result is lost and no result is counted twice. If order ever does matter, the actor can record a sequence number or a timestamp with each result, so the final list can be sorted afterwards. Separating the safe collection of results from the ordering of results keeps both jobs simple.</p>
+<p class="check"><strong>Check:</strong> Why is it better for each task to finish its own work before calling the shared actor?</p>
+<h2>Section 8: Nonisolated Methods and Properties</h2>
+<p>Sometimes an actor holds a piece of information that never changes, or a helper method that does not touch any shared state at all, and it feels wasteful to make callers wait in line for something that could never cause a race. Swift provides an escape hatch for exactly this situation: the word nonisolated. Marking a method or a computed property as nonisolated tells the compiler that it does not need the actor&#x27;s protection, because it does not access the actor&#x27;s isolated state. Callers can then use it without await, and without joining the queue, which keeps the code tidy and avoids unnecessary waiting. The classic example is a constant, such as a maximum limit or a name, that is set once and never changes. Since it cannot be changed by any task, reading it concurrently is perfectly safe, and there is no reason to guard it. Another example is a pure helper that only works on its own parameters, such as a function that formats a number or checks whether a string is empty. Because such a helper never touches the actor&#x27;s properties, it does not need isolation. The danger, of course, is misusing the keyword. If you mark something nonisolated and it does touch mutable state, you have removed the very protection the actor exists to provide, and the compiler will usually catch you, because a nonisolated method is not allowed to access isolated properties. That compiler check is reassuring: it means nonisolated is a tool for the safe cases, not a loophole for the dangerous ones. Use it sparingly, for constants and pure helpers, and your actors will stay both safe and convenient.</p>
+<pre><code>actor ScoreBoard {
+    private var score = 0
+    let maximumScore = 100
+
+    nonisolated func describe() -&gt; String {
+        return &quot;A scoreboard that tracks points.&quot;
+    }
+
+    func addPoint() {
+        if score &lt; maximumScore {
+            score += 1
+        }
+    }
+
+    func currentScore() -&gt; Int {
+        return score
+    }
+}</code></pre>
+<p>In this scoreboard, maximumScore is a constant, so reading it never needs protection, and describe is a pure helper that touches no state at all, so it is marked nonisolated and can be called without await. The addPoint and currentScore methods, by contrast, do touch the mutable score, so they remain isolated and still require await from outside. This division is a small design decision that makes the actor nicer to use without weakening its safety. A caller who only wants a description does not have to write async code or wait in a queue, while a caller who wants to change the score still goes through the guarded path. When you design your own actors, look for these safe, unchanging pieces and consider marking them nonisolated. Just remember the rule: if it reads or writes mutable state, it stays isolated, no exceptions.</p>
+<p>A practical tip is to look at your actor&#x27;s methods and ask which of them actually need the guard. If a method only returns a fixed label, a version string, or a value computed purely from its arguments, it is a good candidate for nonisolated. Marking it so makes the actor friendlier to callers who do not need to change anything. If you are ever unsure, leave the method isolated. An unnecessary await is a small inconvenience, while a wrongly removed guard is a real bug.</p>
+<p class="check"><strong>Check:</strong> Give an example of something in an actor that is safe to mark nonisolated, and say why.</p>
+<h2>Section 9: Sendable and Safe Sharing</h2>
+<p>When tasks run concurrently, Swift also worries about the values that travel between them, not just the actors themselves. A value is called Sendable when it is safe to pass from one task to another, because it cannot be mutated in two places at once. Structs made only of simple values, such as integers and strings, are usually Sendable, because each task gets its own copy when the struct is passed around. Classes, on the other hand, are shared by reference, so passing a mutable class between tasks can recreate the very race that actors are meant to prevent, unless the class itself is carefully designed or is an actor. This is why you will see the word Sendable in compiler messages and documentation as you explore concurrency. You do not need to master every detail of it right now, but you should understand its purpose: it is the compiler&#x27;s way of checking that the data crossing task boundaries is safe to share. Actors themselves are always Sendable, which makes sense, because the whole point of an actor is that it is safe to share. When an actor&#x27;s method takes a parameter, that parameter generally needs to be Sendable too, so that handing it across the boundary cannot smuggle in a race. In practice, this means preferring structs, enums, strings, numbers, and arrays of those things when you design the data that flows into and out of actors. If you find yourself wanting to pass a mutable class into an actor, pause and ask whether that class should be a struct instead, or whether the data should be copied into a safe form first. Building with Sendable values from the start keeps the compiler on your side and keeps concurrent bugs rare.</p>
+<pre><code>struct Report: Sendable {
+    let title: String
+    let pages: Int
+}
+
+actor ReportStore {
+    private var reports: [Report] = []
+
+    func store(_ report: Report) {
+        reports.append(report)
+    }
+
+    func count() -&gt; Int {
+        return reports.count
+    }
+}</code></pre>
+<p>The Report struct is a simple bundle of a string and an integer, both of which are safe to copy, so marking it Sendable is natural and honest. The actor can then accept reports from any task without worrying that another task will mutate the report halfway through storing it, because each task&#x27;s copy is its own. This pattern, a Sendable struct plus an actor that stores it, is one of the most common and most reliable shapes in Swift concurrency. It is also a good design habit in general: when data needs to travel, prefer small, immutable bundles of values over shared, mutable objects. Immutable means the value cannot change after it is created, and immutable values are inherently safe to share, because there is nothing to race over. As you grow more confident, you will meet more advanced corners of Sendable, but this core idea will carry you a long way.</p>
+<p>One more habit that helps is to make the values you send to actors immutable wherever you can. Using let instead of var for the properties of a travelling struct means nobody can change the value after it is created, even by accident. Immutable data plus an actor guarding the collection is a combination that is very hard to break. Many experienced Swift developers design their concurrent programs this way by default, and only reach for shared mutable objects when they have a clear reason.</p>
+<p class="check"><strong>Check:</strong> Why is a struct of strings and numbers safer to pass between tasks than a mutable class?</p>
+<h2>Section 10: Actors Versus Classes</h2>
+<p>Choosing between an actor and a class is one of the first design decisions you will make in concurrent programs, and a clear rule of thumb will save you a lot of confusion. Use a class when an object is used by only one task at a time, or when you need features that actors do not provide, such as inheritance. Use an actor when the object will be shared between tasks and its state will be read or changed from more than one of them. That single question, will this be shared concurrently, answers most cases. There are a few more differences worth knowing. Classes support inheritance, meaning one class can build on another, while actors do not support inheritance at all. If your design depends on a class hierarchy, an actor is not a drop-in replacement, and you may need to rethink the design using protocols and composition instead, which later chapters of this book discuss. Actors also cannot be subclassed, and they cannot have convenience initialisers in the same way, but those are minor details for now. Another difference is performance and style: a class method call is direct and immediate, while an actor method call from outside involves await and possibly waiting. That waiting is the cost of safety, and for shared state it is a cost worth paying. For purely local, single-task objects, a struct is usually better than either, because structs are copied rather than shared, which removes the whole problem. So the decision ladder is simple: local data, use a struct; shared data with one task, use a class if you need reference behaviour; shared data with many tasks, use an actor. Keeping this ladder in mind will help you pick the right tool without overthinking every type.</p>
+<pre><code>actor SafeCounter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}
+
+final class LocalCounter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}</code></pre>
+<p>The two counters above look almost identical, and that similarity is instructive. The difference is not in what they do, but in what they promise when shared. The actor promises safe sharing between tasks, while the class promises nothing of the kind, and using the class from many tasks would be a bug waiting to happen. The class is still perfectly fine when only one task uses it, and it is slightly simpler to call because it needs no await. The lesson is that similar-looking code can carry very different safety guarantees, and the type you choose is how you communicate those guarantees to the compiler and to future readers. When in doubt, ask who will use this object. If the answer is many tasks, choose the actor and accept the await. If the answer is one task, the class or struct will serve you well.</p>
+<p>Remember too that you can change your mind later. If a class starts out used by one task and later becomes shared, converting it to an actor is usually a small change, plus adding await at the call sites. The compiler will point you to every place that needs updating, which is another way Swift helps you. Starting simple and upgrading to an actor when sharing appears is a sensible, low-risk path.</p>
+<p class="check"><strong>Check:</strong> A shared counter will be updated by many tasks. Should it be a class or an actor, and why?</p>
+<h2>Section 11: Reentrancy in Plain Words</h2>
+<p>Reentrancy is a slightly fancy word for a simple idea: while an actor&#x27;s method is paused at an await, another task can slip in and run a method on the same actor before the first method resumes. This can surprise beginners, because the one-task-at-a-time rule might sound like it means one method runs fully from start to finish before anything else happens. In reality, the rule is about execution, not about the whole method. When a method awaits something, it is not executing during the wait, so the actor is free to serve another visitor. When the awaited work finishes, the first method resumes and continues where it left off. This behaviour is called reentrancy, and it is not a bug. It keeps actors efficient, because an actor that is waiting for a download should not block every other caller while it waits. However, it does mean you must think carefully about what can change between two awaits inside the same method. If a method reads a value, awaits a slow operation, and then uses the value assuming it is unchanged, it may be surprised, because another task could have changed it during the wait. The safe habit is to re-read any shared state after an await, or to structure the method so that the important check and change happen together without an await in between. Reentrancy is one of those topics that sounds alarming until you see it in action, and then it becomes a useful tool. You simply need to remember that await is a doorway: when you step through it, the world inside the actor may have moved on by the time you return.</p>
+<pre><code>actor Notebook {
+    private var notes: [String] = []
+
+    func addNote(_ note: String) {
+        notes.append(note)
+    }
+
+    func count() -&gt; Int {
+        return notes.count
+    }
+
+    func fetchAndStore() async {
+        let before = notes.count
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let after = notes.count
+        print(&quot;Before: \(before), after wait: \(after)&quot;)
+    }
+}</code></pre>
+<p>The fetchAndStore method shows reentrancy in miniature. It records the count, waits briefly, and then reads the count again. If another task added a note during the wait, the two numbers will differ, and that difference is not an error. It is the actor working as designed, allowing other work to proceed during a pause. The lesson is to treat values read before an await as snapshots of the past, not as promises about the present. If your method needs a fresh value, read it again after the await. If your method needs a check and a change to happen together, keep them on the same side of any await, with no pause between them. Many actor bugs come from forgetting this one idea, so it is worth practising deliberately. Write a small actor with a slow method, call it from two tasks, and watch how the methods interleave. Seeing it happen once teaches more than reading about it ten times.</p>
+<p>A good way to build intuition is to imagine each await as a bookmark. You put the book down, someone else picks it up and writes a page, and when you return, the story has moved on. You are not starting a new book, but you cannot assume the page is where you left it. Bookmark thinking turns reentrancy from an abstract worry into a concrete habit of re-reading after every pause.</p>
+<p class="check"><strong>Check:</strong> What can happen to an actor&#x27;s state while one of its methods is paused at an await?</p>
+<h2>Section 12: Suspension Points Inside an Actor</h2>
+<p>A suspension point is any place in your code where a task can pause and let other work run, and in Swift the most visible suspension points are marked with await. Inside an actor, suspension points matter more than anywhere else, because they are the moments when another task can enter the actor. Between two suspension points, your method runs without interruption from other actor methods, which is a comforting guarantee. Across a suspension point, that guarantee pauses too. This gives you a practical way to reason about actor code: divide a method into segments separated by awaits, and treat each segment as an uninterrupted block. Within a segment, you can rely on the actor&#x27;s state staying as you left it. Across a segment boundary, you must assume the state may have changed. This way of thinking turns a fuzzy worry into a concrete checklist. Look at your method, find the awaits, and ask yourself for each one what could have changed while you were away. If the answer is nothing important, carry on. If the answer is something important, re-read the state after the await before acting on it. You will also meet suspension points in ordinary async code, where they are less dangerous because no shared state is involved, but the habit of noticing them transfers well. Swift helps you here by requiring await to be written out, so suspension points are never hidden. Some languages hide their pauses, which makes this reasoning much harder. In Swift, the pause is right there in the text, marked clearly, inviting you to think about it. Learning to read code this way, segment by segment, is one of the most valuable skills in concurrent programming.</p>
+<pre><code>actor SeatBooker {
+    private var booked: Set&lt;String&gt; = []
+
+    func book(_ seat: String) async -&gt; Bool {
+        if booked.contains(seat) {
+            return false
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        booked.insert(seat)
+        return true
+    }
+}</code></pre>
+<p>The seat booker above contains a deliberate flaw, and spotting it is a good test of your new understanding. The method checks whether a seat is booked, then waits, and only then inserts the seat. During that wait, another task can run the same method for the same seat, pass the same check, and also insert it, so two buyers believe they booked the same seat. The fix is to remove the await between the check and the insert, so the two steps live in the same uninterrupted segment. Once the check and the change are together, the actor&#x27;s guarantee protects them completely. This example is worth remembering, because it shows that actors do not magically make every method correct. They give you a powerful tool, the uninterrupted segment, and you must place your critical steps inside one segment to benefit from it. Whenever you write an actor method, scan it for awaits that sit between a check and a change, and move or remove them where you can.</p>
+<p class="check"><strong>Check:</strong> Why is an await between checking a seat and booking it dangerous?</p>
+<h2>Section 13: Async Methods Inside Actors</h2>
+<p>An actor&#x27;s methods can themselves be async, which means they can wait for slow work such as a network request, a file read, or a timer, while still being protected by the actor. This is a natural combination, because actors are often the guardians of exactly the kind of state that slow work produces, such as downloaded data or cached results. When you mark an actor method as async, callers still use await to call it, just as before, and inside the method you can use await for the slow operations. The important thing to remember from the previous sections still applies: each await inside the method is a suspension point where other tasks can enter the actor, so you should re-read shared state after awaits when it matters. A common and useful pattern is for an async actor method to do its slow work first, then update the actor&#x27;s state in one quick, uninterrupted step at the end. That pattern keeps the actor&#x27;s queue moving, because the slow waiting happens outside the protected segments, and the actual state change is brief. Another useful pattern is caching: an actor method checks whether it already has a result, and if it does, it returns it immediately without repeating the slow work. If it does not, it performs the work, stores the result, and returns it. Later callers then get the cached result instantly. This pattern is safe inside an actor precisely because the check and the store can be arranged carefully, and it is one of the most practical uses of actors in real programs. Async actor methods therefore let you combine slow work with safe state in a single tidy place.</p>
+<pre><code>actor Greeter {
+    private var cachedGreeting: String?
+
+    func greeting(for name: String) async -&gt; String {
+        if let cached = cachedGreeting {
+            return cached
+        }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let greeting = &quot;Hello, \(name)!&quot;
+        cachedGreeting = greeting
+        return greeting
+    }
+}</code></pre>
+<p>The greeter actor demonstrates the caching pattern in its simplest form. The first caller waits briefly while the greeting is prepared, and the result is stored. Later callers find the cached value and return immediately, without waiting again. In a real program the slow work might be fetching a profile from a server or reading a large file, and the cache would save repeated effort. Notice that the method is marked async because it sleeps, and that callers must still use await for the actor boundary as well. The two awaits in a call like await greeter.greeting(for: &quot;Ada&quot;) are really one written word doing two jobs: crossing the boundary and waiting for the slow work. You do not write await twice, which keeps the call site clean. As you design your own async actor methods, keep the slow work and the state update clearly separated in your mind, and your actors will stay both fast and correct.</p>
+<p>It is also helpful to compare this with a non-actor async function, which can wait freely because nobody else shares its local variables. Inside an actor, waiting is shared, because the actor itself is shared. That is the only real difference, and once you grasp it, async actor methods feel like a natural extension of everything you already know about async code rather than a separate topic.</p>
+<p class="check"><strong>Check:</strong> In the caching pattern, why does an actor method check for a stored result before doing slow work?</p>
+<h2>Section 14: One Actor Calling Another Actor</h2>
+<p>Actors can talk to each other, just as people in different departments can talk to each other, and this is often exactly what a larger program needs. For example, a download actor might ask a cache actor whether a file is already stored before starting a download, or a booking actor might ask a payment actor to record a charge. When one actor calls another, the calling method uses await, because it is crossing a boundary, and the call may have to wait if the other actor is busy. This is ordinary and safe. The thing to watch out for is a circular wait, where actor A is waiting for actor B while actor B is waiting for actor A, so neither can ever proceed. Swift&#x27;s actors are reentrant, which prevents some simple versions of this problem when the same actor calls itself, but a genuine circle between two different actors can still stall your program. The practical defence is to keep actor-to-actor calls simple and to avoid designs where two actors constantly need each other at the same moment. Often you can restructure the work so that one actor gathers everything it needs first, and then makes a single call to the other, rather than bouncing back and forth. Another helpful habit is to keep actor methods short, so that any waiting is brief and circles are less likely to matter. In most beginner programs, actor-to-actor calls will be rare and straightforward, such as a manager actor asking a storage actor to save a result. You should not be afraid of them, but you should be aware that each call is a boundary crossing with a possible wait, and that designing the flow of calls thoughtfully is part of designing with actors. Drawing a simple diagram of which actor calls which can reveal a circle before it becomes a bug.</p>
+<pre><code>actor Cache {
+    private var stored: [String: String] = [:]
+
+    func value(for key: String) -&gt; String? {
+        return stored[key]
+    }
+
+    func store(_ value: String, for key: String) {
+        stored[key] = value
+    }
+}
+
+actor Downloader {
+    let cache = Cache()
+
+    func fetch(_ key: String) async -&gt; String {
+        if let cached = await cache.value(for: key) {
+            return cached
+        }
+        let fresh = &quot;Data for \(key)&quot;
+        await cache.store(fresh, for: key)
+        return fresh
+    }
+}</code></pre>
+<p>In this example, the downloader actor owns a cache actor and consults it before doing fresh work. The flow is one-directional: the downloader calls the cache, and the cache never calls back to the downloader, so no circle can form. That one-directional shape is a good pattern to copy. When you need two actors to cooperate, try to arrange them so that calls flow in one direction, like water downhill, rather than in a loop. If you ever find yourself designing a loop, pause and ask whether one of the actors could instead return all the information the other needs in a single answer, removing the need for a return call. Simple call graphs are easier to understand, easier to test, and much less likely to stall.</p>
+<p>Another practical tip is to name the direction of your calls clearly. If a downloader depends on a cache, the dependency is visible in the code, because the downloader holds the cache. When dependencies are visible, circles are visible too. Hidden, indirect calls through several layers are where circles sneak in, so keeping actor relationships simple and explicit is a form of prevention.</p>
+<p class="check"><strong>Check:</strong> Why is a one-directional flow of calls between actors safer than a circular one?</p>
+<h2>Section 15: Actor Initialisers</h2>
+<p>An actor, like a class or struct, is created through an initialiser, and writing one follows familiar rules with one actor-specific twist. Inside an initialiser, the actor&#x27;s isolation is not yet fully in force in the same way, because the instance is still being built and no other task can possibly have a reference to it yet. Swift therefore allows the initialiser to set properties directly, without await, which is convenient and safe. You can also give properties default values, in which case you may not need to write an initialiser at all, just as with other types. Where actor initialisers become interesting is when they need to do work that involves other actors or asynchronous operations. An initialiser cannot be async in the same way a method can, so you cannot await inside it. If your actor needs to load data from a file or a server when it starts, the usual approach is to create the actor with empty state and then call an async setup method on it afterwards, or to load the data before creating the actor and pass it in as a parameter. Passing ready-made data into the initialiser is often the cleanest option, because it keeps creation simple and predictable. Another common pattern is a static factory method that does the async loading and then returns a fully prepared actor. That method can be async, because it is an ordinary function, and it hides the two-step dance from callers. Whichever approach you choose, the guiding principle is the same: creation should be quick and simple, and slow loading should happen explicitly, where the caller can see it and await it.</p>
+<pre><code>actor Playlist {
+    private var songs: [String]
+
+    init(startingSongs: [String] = []) {
+        self.songs = startingSongs
+    }
+
+    func add(_ song: String) {
+        songs.append(song)
+    }
+
+    func allSongs() -&gt; [String] {
+        return songs
+    }
+}
+
+func makePlaylist() async -&gt; Playlist {
+    let playlist = Playlist(startingSongs: [&quot;Morning Light&quot;])
+    await playlist.add(&quot;Evening Rain&quot;)
+    return playlist
+}</code></pre>
+<p>The playlist actor shows both ideas at once. Its initialiser takes an optional starting list and assigns it directly, with no await needed, because the instance is still private to the creating code. The factory-style function makePlaylist then creates the actor and performs an async setup step, adding a second song with await, before handing the ready actor back. Callers of makePlaylist simply await the function and receive a prepared playlist, without worrying about the steps inside. This separation keeps the actor&#x27;s creation story honest: the initialiser builds the object, and the async function prepares it. When you design actors that need starting data, prefer passing that data in or using a small factory function, rather than trying to force slow work into an initialiser where it does not belong.</p>
+<p>If your actor needs configuration that can only be discovered slowly, such as reading a settings file, consider a two-phase start in your design notes: create with defaults, then call an async configure method. Document that configure must be called before other methods, or better, return the configured actor from a factory function so callers cannot forget the second step.</p>
+<p class="check"><strong>Check:</strong> Why can an actor&#x27;s initialiser set properties directly without await?</p>
+<h2>Section 16: Introducing the Main Actor</h2>
+<p>So far we have talked about actors you create yourself, but Swift also provides a very special built-in one called the MainActor. The MainActor is a global actor that represents the main thread, which is the thread where user interface work happens in apps. In many programs, especially apps with a screen, only the main thread is allowed to update what the user sees. If a background task tried to change a label or a button directly, the result could be glitchy or even crash, because the interface system is not designed for simultaneous changes from many threads. The MainActor solves this by giving you a guardian for all main-thread work. When you mark code with @MainActor, you are saying that this code must run on the main thread, and Swift arranges for that to happen, even if the caller is running somewhere else. You can think of the MainActor as a single, program-wide guardian whose protected resource is the user interface itself. Just like your own actors, calling MainActor code from elsewhere requires await, because your task may need to wait until the main thread is free. The MainActor is also useful in command-line programs for a different reason: it gives you a safe place to put code that must not run concurrently, such as printing final results in order. You do not need to use it everywhere, and for the small console programs in this book it is often optional, but understanding it now will make the later chapters on apps much easier, because user interface code in Swift is MainActor code by default in many frameworks.</p>
+<pre><code>@MainActor
+func showMessage(_ message: String) {
+    print(&quot;On the main actor: \(message)&quot;)
+}
+
+func backgroundWork() async {
+    await showMessage(&quot;Hello from background work&quot;)
+}</code></pre>
+<p>In the example, showMessage is marked @MainActor, which means it always runs on the main thread, no matter who calls it. The backgroundWork function calls it with await, and Swift hops to the main thread for the duration of the call before hopping back. The print statement itself is just a stand-in here; in a real app, the MainActor function might update a label, refresh a list, or present a screen. The important point is the guarantee: interface work happens in one place, in order, without races. When you later build apps, you will see @MainActor on view models, view controllers, and other interface-related types, and you will recognise it as the same guardian idea you learned with your own actors, applied at program scale. It is a reassuring consistency: the same concept protects a counter, a cache, and a whole user interface.</p>
+<p>You may wonder whether every function in an app should be marked MainActor. The answer is no. Only the code that touches the interface, or the state the interface observes, needs the main thread. Slow work such as downloading, parsing, and calculating should stay elsewhere, so the interface remains smooth. Marking everything MainActor would push slow work onto the main thread and make the app feel sluggish.</p>
+<p class="check"><strong>Check:</strong> What does marking a function @MainActor guarantee about where it runs?</p>
+<h2>Section 17: The Main Actor and User Interfaces</h2>
+<p>The reason the MainActor matters so much for interfaces deserves a closer look, because it explains a whole class of app bugs that beginners often meet. A user interface is a large piece of shared state: labels, buttons, lists, images, and layout information all live together, and the system that draws them expects to be the only one changing them at any moment. If a background download finished and immediately tried to update a label while the system was in the middle of drawing the screen, the screen could show a half-updated state, or the program could crash. Traditionally, programmers had to remember to hop back to the main thread manually before touching the interface, and forgetting was easy. The MainActor removes that burden by making the hop part of the type system. When a type or function is marked @MainActor, the compiler knows it belongs on the main thread, and any call from elsewhere must use await to hop there. This turns a runtime crash into a compile-time reminder, which is a much friendlier kind of mistake. In practice, you will often see a pattern where a background task does slow work, such as fetching data, and then hands the result to a MainActor function to display it. The slow work stays off the main thread, so the interface remains responsive, and the display work happens on the main thread, so it is safe. That division, slow work in the background and interface work on the MainActor, is one of the most important patterns in app development, and it is worth practising until it feels natural. It is also the reason the MainActor is a global actor rather than an ordinary one: every part of the program shares the same main thread, so they all need the same guardian.</p>
+<pre><code>@MainActor
+class ScreenModel {
+    private var message = &quot;Waiting...&quot;
+
+    func updateMessage(_ newMessage: String) {
+        message = newMessage
+        print(message)
+    }
+}
+
+func loadData(model: ScreenModel) async {
+    try? await Task.sleep(nanoseconds: 200_000_000)
+    await model.updateMessage(&quot;Data loaded&quot;)
+}</code></pre>
+<p>Here the screen model is a MainActor class, so its updateMessage method always runs on the main thread, even though loadData runs in the background. The background function sleeps to simulate slow loading, then calls the model with await, hopping to the main thread just for the update. The interface, represented here by a print, is therefore never touched from the background. In a real app, the model might be observed by the screen, and the screen would refresh itself when the message changes, all safely on the main thread. Notice how the code reads almost like ordinary sequential code, with await marking the hop. That readability is the payoff for learning actors: concurrent programs that look calm and orderly, even though several tasks are involved. When you build your first app, come back to this pattern and use it as your template.</p>
+<p>A useful mental test is to ask whether a function changes anything the user can see. If it updates a label, a list, an image, or a navigation state, it belongs on the MainActor. If it merely computes a value or fetches data, it can run anywhere, and should hand its result to MainActor code for display. This test keeps the boundary between work and display clean.</p>
+<p class="check"><strong>Check:</strong> Why should slow work stay off the main thread while interface updates stay on it?</p>
+<h2>Section 18: Global Actors in Plain Words</h2>
+<p>A global actor is an actor that is shared across a whole program, rather than being an instance you create yourself. The MainActor is the most famous example, but you can also define your own global actors for resources that should have exactly one guardian everywhere. For instance, if your program has a single settings store or a single logging service that every part of the program uses, a global actor gives that resource one consistent guardian without you having to pass an instance around through every function. You declare a global actor with the @globalActor attribute on a type, and then you mark code with that actor&#x27;s name to say it belongs to the guardian. The mechanics are a little advanced for a first encounter, and you do not need to create your own global actors in most beginner programs. What matters is recognising the idea: a global actor is the program-wide version of the actor you already know, protecting a shared resource that belongs to everybody. The MainActor fits this description perfectly, because the user interface belongs to the whole program. Other examples include a single database connection or a single hardware device that must not be used by two tasks at once. The benefit is consistency: no matter where in the program the code lives, it goes through the same guardian, so the protection cannot be accidentally bypassed by creating a second instance. The cost is the same as with any shared guardian: if many parts of the program need it constantly, they will queue. For that reason, global actors are best reserved for genuinely program-wide resources, not for every piece of state. Understanding the concept now means that when you meet @MainActor or a custom global actor in documentation, you will recognise it as a familiar friend rather than a mysterious annotation.</p>
+<pre><code>@globalActor
+actor LoggingActor {
+    static let shared = LoggingActor()
+
+    private var entries: [String] = []
+
+    func log(_ entry: String) {
+        entries.append(entry)
+    }
+
+    func allEntries() -&gt; [String] {
+        return entries
+    }
+}</code></pre>
+<p>This logging actor is declared as a global actor, with a shared instance that the whole program can use. In real code, functions that need to log would be marked with the actor, and their log calls would be guarded automatically. For now, you can treat this example as a preview of a pattern you may use later, not as something you must master today. The key takeaway is simpler: when a resource is truly shared by the entire program, a global actor gives it one guardian, just as an ordinary actor gives one guardian to a resource shared by a few tasks. The scale changes, but the idea stays the same. If you remember that, global actors will never feel mysterious, even when you meet them in larger codebases where they protect databases, hardware, and interfaces.</p>
+<p>Before creating your own global actor, ask whether a plain actor instance passed to the code that needs it would do the job. Passing an instance is more flexible, because different parts of a program or different tests can use different instances. Global actors earn their place only when there is genuinely one resource for the whole program, such as the main thread itself.</p>
+<p class="check"><strong>Check:</strong> What kind of resource is a global actor best suited to protecting?</p>
+<h2>Section 19: Actors and Protocols</h2>
+<p>Actors can conform to protocols, just like structs and classes can, which means an actor can promise to provide a certain set of methods and properties. This is useful when you want to write code that works with any guardian of a certain kind, without caring about the exact actor type. For example, you might define a protocol for a storage service with methods to save and load, and then have different actors conform to it, such as one that stores in memory and one that stores in a file. Code that uses the protocol can then work with either actor. There is one wrinkle to be aware of: because actor methods are isolated, a protocol that an actor conforms to must be compatible with that isolation. In practice, this often means the protocol&#x27;s requirements are treated as asynchronous when used through the actor, so callers use await, which you already expect with actors. Swift handles most of this automatically, and the compiler will guide you if a protocol and an actor do not fit together. The design benefit is worth the small extra care. Protocols let you separate what a guardian does from how it does it, which makes your code more flexible and easier to test. You can write a fake actor for testing that conforms to the same protocol as the real one, and your program will work with either. This is the same protocol thinking you learned in earlier chapters, now applied to concurrent code. Actors and protocols together give you both safety and flexibility, which is a combination that scales well as programs grow from small exercises into real applications with many cooperating parts.</p>
+<pre><code>protocol Storing {
+    func save(_ value: String, for key: String) async
+    func load(for key: String) async -&gt; String?
+}
+
+actor MemoryStore: Storing {
+    private var data: [String: String] = [:]
+
+    func save(_ value: String, for key: String) {
+        data[key] = value
+    }
+
+    func load(for key: String) -&gt; String? {
+        return data[key]
+    }
+}</code></pre>
+<p>The MemoryStore actor promises, through the Storing protocol, that it can save and load values by key. The protocol&#x27;s requirements are marked async, which matches how callers will use them through the actor boundary. Another actor could conform to the same protocol while storing data in a file instead of memory, and code written against Storing would work with both. This is a powerful pattern for real programs, because it lets you swap implementations without rewriting the code that uses them. It also makes testing easier, since a test can substitute a simple in-memory actor for a slow file-based one. When you design your own actors, consider whether a protocol would help you describe their job in general terms. Even a small protocol can clarify your thinking, because writing down what a guardian promises forces you to decide what its job really is.</p>
+<p>When a protocol requirement and an actor method do not line up, read the compiler message slowly. It usually tells you whether the mismatch is about async, about isolation, or about a missing requirement. Fixing one small mismatch at a time is far easier than redesigning the whole actor, and these messages become friendlier with practice.</p>
+<p class="check"><strong>Check:</strong> How does a protocol help you swap one actor implementation for another?</p>
+<h2>Section 20: Actors, Tasks and Cancellation</h2>
+<p>Actors and tasks work together constantly, and cancellation is one place where their interaction deserves attention. A task can be cancelled, for example when a user navigates away from a screen or when a timeout expires, and Swift provides a cooperative cancellation model: a task is asked to stop, and it checks for that request at suitable points and stops gracefully. When a cancelled task is waiting to enter an actor, or is running inside an actor method that awaits something, it can notice the cancellation and abandon its work. The actor itself is not harmed by this. It simply moves on to the next waiting task, and its state remains consistent, because the cancelled method either finished its protected segment or stopped before changing anything important. This is another quiet strength of actors: they do not leave their state half-updated just because a task gave up. There is one habit worth building here. Inside long actor methods, especially those with several awaits, check for cancellation at sensible points if the work is no longer useful when cancelled. Swift provides a function to check this, and throwing a cancellation error lets the caller know the work stopped early. You do not need to check obsessively; a check before starting a new expensive step is usually enough. Also remember that cancellation does not forcibly kill a task in the middle of a segment. A task running an uninterrupted stretch of actor code will finish that stretch before cancellation takes effect, which keeps the actor&#x27;s state consistent. That guarantee is exactly what you want: cancellation is polite, not violent, and the guardian&#x27;s notebook is never left half-written.</p>
+<pre><code>actor WorkTracker {
+    private var completed = 0
+
+    func recordCompletion() {
+        completed += 1
+    }
+
+    func totalCompleted() -&gt; Int {
+        return completed
+    }
+}
+
+func doWork(tracker: WorkTracker) async {
+    for step in 1...5 {
+        if Task.isCancelled {
+            print(&quot;Stopped early at step \(step)&quot;)
+            return
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        await tracker.recordCompletion()
+    }
+}</code></pre>
+<p>In this example, doWork checks Task.isCancelled before each step, and stops early if cancellation has been requested. Each completed step is recorded through the actor, so the tracker always reflects whole steps, never partial ones. If the task is cancelled while waiting, it simply does not record that step, and the actor&#x27;s count stays accurate. This combination of polite cancellation and actor-guarded state is a reliable pattern for real work, such as downloading a series of files or processing a list of items where the user might press stop. The actor keeps the count honest, and the cancellation check keeps the work responsive. Together they show how Swift&#x27;s concurrency features are designed to cooperate, each handling one concern well, rather than one feature trying to do everything.</p>
+<p>Cancellation is also worth testing deliberately. Write a small program that starts a long task, cancels it after a short delay, and prints the actor&#x27;s final count. Watching the count stay consistent after cancellation builds real confidence that the pattern works, and it turns an abstract guarantee into something you have seen with your own eyes.</p>
+<p class="check"><strong>Check:</strong> Why does cancellation not leave an actor&#x27;s state half-updated?</p>
+<h2>Section 21: A Shared Cache Actor</h2>
+<p>A cache is a place where a program keeps results it has already computed or fetched, so that it does not have to repeat expensive work. Caches are among the most natural uses for actors, because many tasks often want to read from the same cache at the same time, and occasionally one of them wants to add a new entry. Without protection, two tasks might both notice a missing entry, both fetch the same data, and both store it, wasting effort and possibly storing inconsistent versions. With an actor, the check for an entry and the storing of a new entry can be coordinated safely, and every task sees a consistent picture. A simple cache actor stores values in a dictionary keyed by a string, with methods to look a value up, store a value, and clear the cache. You can make it more sophisticated later by adding a size limit, so that the cache throws away its oldest entries when it grows too large, or by storing the time each entry was added so that stale entries can be refreshed. Those refinements are worth adding only after the basic version works, because each one is a small change to a well-tested actor. The cache pattern also teaches an important design lesson: an actor should hide its storage details. Callers should not know or care whether the cache uses a dictionary, an array, or a file. They only need to know the methods: look up, store, and clear. Hiding the details means you can change the implementation later without changing any caller, which is a freedom you will appreciate as programs grow. A cache actor is therefore both a practical tool and a good example of clean actor design.</p>
+<pre><code>actor CacheStore {
+    private var values: [String: String] = [:]
+
+    func value(for key: String) -&gt; String? {
+        return values[key]
+    }
+
+    func store(_ value: String, for key: String) {
+        values[key] = value
+    }
+
+    func remove(for key: String) {
+        values.removeValue(forKey: key)
+    }
+
+    func clear() {
+        values.removeAll()
+    }
+}</code></pre>
+<p>The cache store above is deliberately small, with four clear methods covering the whole job. A task can ask for a value, store a new one, remove one, or empty the cache, and the actor guarantees that these operations never overlap in a harmful way. In a real program, the values might be downloaded images, parsed documents, or computed results, but the actor&#x27;s shape would stay the same. That stability is a sign of a good abstraction: the details change, the interface does not. When you build your own cache, start with exactly this shape and test it with several tasks reading and writing at once. Once you trust it, you can add refinements one at a time, such as a maximum size or an expiry time, testing after each addition. Building in small, verified steps is how reliable concurrent programs are made, and a cache actor is an excellent place to practise that discipline.</p>
+<p>When you add a size limit later, keep the rule simple: when the cache is full, remove the oldest entry before adding the new one. The actor makes that rule safe, because the check for fullness and the removal happen in the same visit, so two tasks cannot both believe there is room for one last entry.</p>
+<p class="check"><strong>Check:</strong> Why is a cache a natural job for an actor rather than a plain shared dictionary?</p>
+<h2>Section 22: A Download Manager Actor</h2>
+<p>A download manager is a more ambitious actor, because it tracks several downloads that are in progress at the same time, and each download can be in a different state. Some are waiting, some are running, some have finished, and some have failed. Keeping that picture consistent while tasks start, finish, and cancel downloads is exactly the kind of job where an actor earns its keep. Without one, a list of downloads could lose an entry, count a finished download twice, or report a download as running long after it failed. With an actor, every change to the download list goes through one guardian, so the list always tells the truth. A simple design uses a dictionary that maps a download name to a state, represented by an enum with cases such as waiting, running, finished, and failed. Methods let callers start a download, mark it finished, mark it failed, and ask for the current state of any download or a list of all downloads. The actor does not perform the downloads itself; it merely tracks them, while separate tasks do the actual fetching and report back. That separation is important, because it keeps the actor&#x27;s methods short and its queue fast, while the slow network work happens elsewhere. As your programs grow, you can extend the manager with progress percentages, retry counts, or priorities, but the core idea remains the same: one guardian, one true list, updated only through its methods. A download manager is a satisfying project because it feels like a real piece of software, and it shows actors solving a problem you can picture clearly.</p>
+<pre><code>enum DownloadState {
+    case waiting
+    case running
+    case finished
+    case failed
+}
+
+actor DownloadManager {
+    private var downloads: [String: DownloadState] = [:]
+
+    func start(_ name: String) {
+        downloads[name] = .running
+    }
+
+    func finish(_ name: String) {
+        downloads[name] = .finished
+    }
+
+    func fail(_ name: String) {
+        downloads[name] = .failed
+    }
+
+    func state(of name: String) -&gt; DownloadState? {
+        return downloads[name]
+    }
+
+    func allDownloads() -&gt; [String: DownloadState] {
+        return downloads
+    }
+}</code></pre>
+<p>The manager above tracks each download by name and state, with one method for each change of state. A caller starts a download, and later reports success or failure, and any part of the program can ask for the current state without worrying about races. Because the state changes are simple dictionary updates with no awaits between a check and a change, they are safe and quick. In a fuller program, a task performing a download would call start, do its network work outside the actor, and then call finish or fail to report the outcome. That structure keeps slow work out of the actor and state changes inside it, which is the pattern recommended throughout this chapter. If you build this manager as an exercise and drive it from several tasks, you will see the actor keeping a consistent list even when downloads finish in an unpredictable order, which is exactly the behaviour a real download manager needs.</p>
+<p>A further refinement is to record the time each download started, so the manager can report how long downloads have been running. That information is useful for a progress display, and it costs almost nothing, because the actor already owns the download list and can store one more small value per entry.</p>
+<p class="check"><strong>Check:</strong> Why should the download manager track downloads but not perform the network work itself?</p>
+<h2>Section 23: A Chat and Message Store Actor</h2>
+<p>A message store is another everyday example where actors shine, because messages arrive from many sources and must be kept in order without losing any. Imagine a small chat program where several tasks receive messages from different users at the same time. Each message must be appended to a shared list exactly once, and anyone reading the list must see a consistent snapshot, not a list that is half-updated. A plain array shared between tasks cannot promise that, but an actor can, with very little code. The actor holds an array of messages, each represented by a simple struct containing the sender and the text, and it offers methods to append a message, to fetch all messages, and to fetch the most recent few. You might also add a method to count messages or to search for messages from a particular sender. The important design point is the same as before: the array is private, and all access goes through methods. A refinement worth considering is that the method returning all messages returns a copy of the array, because arrays in Swift are value types. That means the caller gets its own snapshot, which it can read safely without holding up the actor, while new messages continue to arrive. This copy-on-return behaviour is a happy accident of Swift&#x27;s value types, and it makes actor design much easier. You do not need to worry that a caller will mutate the actor&#x27;s internal list through the returned value, because the caller holds a separate copy. Message stores, comment lists, notification feeds, and activity logs all share this shape, so learning it once gives you a template for many programs.</p>
+<pre><code>struct ChatMessage: Sendable {
+    let sender: String
+    let text: String
+}
+
+actor MessageStore {
+    private var messages: [ChatMessage] = []
+
+    func add(_ message: ChatMessage) {
+        messages.append(message)
+    }
+
+    func allMessages() -&gt; [ChatMessage] {
+        return messages
+    }
+
+    func recent(_ count: Int) -&gt; [ChatMessage] {
+        return Array(messages.suffix(count))
+    }
+
+    func totalCount() -&gt; Int {
+        return messages.count
+    }
+}</code></pre>
+<p>The message store demonstrates the snapshot idea clearly. When a caller asks for all messages, it receives a copy of the array at that moment, and later arrivals do not change the copy it already holds. That is usually what you want: a reader sees a consistent moment in time, rather than a list that shifts under its feet. The recent method shows how an actor can offer convenient views of its data, such as the last few messages, without exposing the internal array. If you extend this actor as an exercise, you might add a method that returns messages from one sender, or one that clears messages older than a certain point. Each addition follows the same pattern: a short method, private state, and a copy returned to the caller. Practising with a message store is enjoyable because the behaviour is easy to test: send messages from many tasks, then check that the final count matches the number sent, with none lost and none duplicated.</p>
+<p>If you want messages grouped by day or by sender, resist the urge to store them in a complicated structure at first. A single list, plus small methods that filter it, is easier to test and easier to trust. You can always add an index later, once the simple version has proven itself under concurrent use.</p>
+<p class="check"><strong>Check:</strong> Why is returning a copy of the message array safer than returning the actor&#x27;s own array?</p>
+<h2>Section 24: A Rate Limiter Actor</h2>
+<p>A rate limiter is an actor that controls how often something is allowed to happen, which is a common need in real programs. For example, a program might be allowed to call a service only ten times per minute, or a user might be allowed to try a login only a few times before waiting. Without a guardian, several tasks could each check the count, each decide there is room, and together exceed the limit, which defeats the whole purpose. An actor prevents that by making the check and the recording of a use happen together, in one uninterrupted visit. A simple rate limiter stores the number of uses and the time when the current window started. When a caller asks whether it may proceed, the actor checks whether the window has expired, and if so, it resets the count and starts a new window. If the count is below the limit, it increases the count and grants permission. If the count has reached the limit, it refuses. That logic is short, but it must run atomically, because a gap between checking and counting would let extra callers slip through. The actor gives you that atomicity for free. Rate limiters appear in many places: network clients, login systems, message senders, and tools that respect a service&#x27;s rules. Learning to build one with an actor teaches you both a useful component and a deeper lesson about why check-and-change pairs need protection. It also shows that actors are not only for counters and lists; they are for any rule that must be enforced consistently when many tasks compete.</p>
+<pre><code>import Foundation
+
+actor RateLimiter {
+    private var uses = 0
+    private var windowStart = Date()
+    let limit = 5
+    let windowSeconds: TimeInterval = 60
+
+    func allow() -&gt; Bool {
+        let now = Date()
+        if now.timeIntervalSince(windowStart) &gt;= windowSeconds {
+            uses = 0
+            windowStart = now
+        }
+        if uses &lt; limit {
+            uses += 1
+            return true
+        }
+        return false
+    }
+}</code></pre>
+<p>The rate limiter above allows five uses per sixty-second window, resetting automatically when a new window begins. Every call to allow performs the expiry check, the limit check, and the count increase as one visit, so no two callers can both slip through the last available slot. This is a small piece of code with a strong guarantee, and it is the kind of component you can reuse in many programs once you trust it. As an exercise, you could test it by calling allow many times in a loop and confirming that exactly five calls succeed before the sixth is refused. Then test it from several concurrent tasks and confirm that the total number of successes is still five, not more. That second test is the one that would fail with a plain class, and passing it with an actor is a satisfying demonstration of why actors matter. Rate limiters also remind you that safety and fairness are related: a correct limiter treats every caller by the same rule, with no caller able to jump the queue by timing luck.</p>
+<p>Another place rate limiters appear is in programs that send messages or emails, where sending too quickly can annoy recipients or break a service&#x27;s rules. The actor pattern is identical: check, count, and refuse or allow in one visit, so the rule holds no matter how many tasks are sending.</p>
+<p class="check"><strong>Check:</strong> Why must checking the limit and counting a use happen in the same actor visit?</p>
+<h2>Section 25: A Settings Store Actor</h2>
+<p>A settings store holds a program&#x27;s preferences, such as a username, a theme choice, or a notification setting, and it is another place where an actor can help. Settings are read often and changed occasionally, and they may be accessed from many parts of a program at once. If one part of the program reads a setting while another part is halfway through changing several related settings, the reader could see a mixture of old and new values, which might be inconsistent. An actor solves this by ensuring that each read and each change happens as a complete visit. A simple settings actor stores values in a dictionary, with methods to set a value for a key, to read a value for a key, and to remove a value. You can build a more typed version later, with a dedicated property for each setting, but the dictionary version is a good starting point because it is flexible and easy to understand. One design question is whether settings changes should be saved to a file immediately. If they should, the actor can include an async method that writes the current settings to disk, while keeping the in-memory dictionary as the source of truth. That method would read the dictionary, which is safe inside the actor, and then perform the file write, which is slow, so you should think about suspension points and re-reading state if the write takes a long time. For a beginner&#x27;s settings store, keeping the values in memory is enough, and persistence can be added as a later refinement. The lesson of this section is that even quiet, unglamorous state like settings benefits from a guardian, because inconsistency in settings can cause confusing behaviour far from the place where the change was made.</p>
+<pre><code>actor SettingsStore {
+    private var settings: [String: String] = [:]
+
+    func set(_ value: String, for key: String) {
+        settings[key] = value
+    }
+
+    func value(for key: String) -&gt; String? {
+        return settings[key]
+    }
+
+    func remove(for key: String) {
+        settings.removeValue(forKey: key)
+    }
+
+    func allSettings() -&gt; [String: String] {
+        return settings
+    }
+}</code></pre>
+<p>The settings store is intentionally plain, because its value lies in its safety rather than its cleverness. Any part of the program can read or change a setting through the actor, and no reader will ever see a half-written dictionary. Returning a copy of the whole dictionary, as allSettings does, gives callers a consistent snapshot they can inspect freely. As an exercise, you could build a typed wrapper around this store, with methods such as setTheme and currentTheme, that translate between friendly method names and dictionary keys. That wrapper would make the store nicer to use while keeping the actor&#x27;s protection underneath. Wrappers like that are a common pattern: a simple, safe core, plus a friendly face for callers. When you design your own programs, look for quiet shared state like settings, and consider giving it an actor early, before an inconsistency bug teaches you the lesson the hard way.</p>
+<p>If two settings must always change together, such as a theme and its matching accent colour, give the actor a single method that changes both at once. Callers then cannot accidentally change one without the other, and readers will never see a theme paired with the wrong accent.</p>
+<p class="check"><strong>Check:</strong> How could a reader see inconsistent settings if they were stored in a plain shared dictionary?</p>
+<h2>Section 26: Common Mistake: Forgetting await</h2>
+<p>The most common beginner mistake with actors is also the friendliest, because the compiler catches it immediately. When you call an actor&#x27;s method from outside and forget to write await, Swift refuses to compile the code and tells you that the call is asynchronous in the actor&#x27;s context. Beginners sometimes find this annoying, but it is actually Swift doing you a favour. The compiler is pointing at the exact place where a boundary is being crossed and a wait may occur, and it is insisting that you acknowledge that wait in writing. The fix is simple: add await before the call, and make sure the surrounding function is marked async or the call sits inside a Task. The deeper lesson is to read compiler errors as guidance rather than as scolding. A message about missing await is not telling you that your idea is wrong; it is telling you that your code needs one small word to express the idea correctly. Another version of this mistake is trying to access an actor&#x27;s property directly from outside without await, which produces a similar error. The remedy is the same: use await, or better, add a method to the actor that returns the value you need, keeping the property private. Over time, you will start writing await automatically whenever you touch an actor from outside, just as you automatically write a question mark when unwrapping an optional. That automatic habit is a sign that the actor model has become part of your thinking. Until then, treat each missing-await error as a helpful tap on the shoulder, reminding you that you are talking to a guardian who may ask you to wait.</p>
+<pre><code>actor Counter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}
+
+func correctUse() async {
+    let counter = Counter()
+    await counter.increment()
+    let total = await counter.currentValue()
+    print(total)
+}</code></pre>
+<p>The correctUse function shows the fixed version of the common mistake. Every call to the actor from outside carries await, and the function itself is marked async, which is what permits await inside it. If you removed either await, the compiler would stop you, and that stop is the safety net working as intended. A useful debugging habit when you meet this error is to check two things: first, is the call really to an actor, and second, is the surrounding function async? If both answers are yes, adding await is the fix. If the surrounding function cannot be async, you may need to wrap the call in a Task, which is a topic covered in the concurrency chapter. The key point is not to fight the error or to look for a way around it, but to accept it as part of the actor&#x27;s design. Await is not bureaucracy; it is the visible sign of safe sharing.</p>
+<p>It also helps to remember that await is required even when you are fairly sure the actor is idle. Swift does not make exceptions for probably-idle actors, because probably is not a guarantee. The rule is uniform, which keeps the code honest and the reasoning simple.</p>
+<p class="check"><strong>Check:</strong> What two things must be true for an await call to an actor to compile?</p>
+<h2>Section 27: Common Mistake: Long Methods Blocking the Queue</h2>
+<p>A subtler mistake than forgetting await is writing actor methods that do too much slow work, which makes every other caller wait behind them. Remember that only one task runs inside an actor at a time, and while a method is executing without suspension, no other method on that actor can run. If a method spends a long time calculating, sorting a huge list, or waiting in a way that does not suspend, the actor&#x27;s queue backs up, and the program feels sluggish even though no individual piece of code is wrong. The remedy is to keep actor methods short and to move slow work outside the actor wherever possible. A good rule is that an actor method should either read state, change state, or do a tiny bit of both, and nothing else. If a method needs to perform a long calculation, it should do that calculation before calling the actor, or in a separate task, and then call the actor only to record the result. Similarly, if a method needs to fetch data from a network, the fetching should happen outside the actor or in an async method where the waiting suspends and frees the actor for others. Note the distinction: an await that suspends does free the actor, so async waiting is not the same problem as long uninterrupted computation. The problem is long stretches of code with no suspension points, because during those stretches the actor cannot serve anyone else. When you notice an actor becoming a bottleneck, look at its methods and ask which ones are longest. Splitting a long method into a slow part outside and a quick update inside usually fixes the problem without changing the program&#x27;s behaviour. This habit of keeping guardians quick is one of the marks of an experienced concurrent programmer.</p>
+<pre><code>actor ScoreKeeper {
+    private var total = 0
+
+    func add(_ points: Int) {
+        total += points
+    }
+
+    func currentTotal() -&gt; Int {
+        return total
+    }
+}
+
+func heavyCalculation() -&gt; Int {
+    var sum = 0
+    for number in 1...1000 {
+        sum += number
+    }
+    return sum
+}
+
+func recordScore(keeper: ScoreKeeper) async {
+    let result = heavyCalculation()
+    await keeper.add(result)
+}</code></pre>
+<p>In this example, the heavy calculation happens outside the actor, in an ordinary function, and only the quick add call touches the actor. That means the actor is occupied for a tiny moment, not for the whole calculation, and other callers are barely delayed. If the calculation had been placed inside the actor&#x27;s method, every other caller would have waited for all thousand additions to finish, which would be wasteful and unnecessary. The recordScore function shows the preferred shape: compute first, then record. When you review your own actor code, look for this shape and rearrange methods that do not follow it. The rearrangement is usually simple, and the improvement in responsiveness can be dramatic, especially when many tasks share the same actor. Keeping guardians quick is a small discipline with a large payoff.</p>
+<p>A practical way to spot this mistake is to time your actor&#x27;s methods during testing. If one method takes noticeably longer than the others, ask whether its slow work belongs inside the actor at all. Often the answer is no, and moving the work out is a quick, safe refactor.</p>
+<p class="check"><strong>Check:</strong> Why does a long calculation inside an actor method delay other callers?</p>
+<h2>Section 28: Common Mistake: Passing a Mutable Class into an Actor</h2>
+<p>Another mistake that can quietly undo an actor&#x27;s protection is passing a mutable class instance into the actor and then continuing to mutate it from outside. The actor guards its own properties, but if one of those properties is a reference to a class, then outside code holding the same reference can change the class&#x27;s contents directly, bypassing the actor entirely. The actor&#x27;s wall has a back door, and the race returns through it. This is why the Sendable discussion matters: values that travel into an actor should be safe to share, which usually means structs, enums, and other value types, or immutable objects. If you must work with a class, consider whether it can be replaced by a struct, or whether the actor should copy the relevant data into its own private storage instead of holding the reference. Copying is often the simplest fix: the actor takes the values it needs from the class at the moment of the call and stores those values, so later outside changes cannot affect it. This mistake is sneaky because the code compiles and often appears to work, since races only show up under particular timing. The defence is a design habit: whenever you pass something into an actor, ask yourself whether anyone else still holds a way to change it. If the answer is yes, and that something is a mutable class, redesign the handover. Prefer value types for actor boundaries, and your actors will keep their promises. This habit also improves your code in general, because value types make data flow easier to follow and easier to reason about, even in programs without concurrency.</p>
+<pre><code>final class MutableBox {
+    var content = &quot;&quot;
+}
+
+struct Snapshot: Sendable {
+    let content: String
+}
+
+actor BoxStore {
+    private var stored = &quot;&quot;
+
+    func store(_ snapshot: Snapshot) {
+        stored = snapshot.content
+    }
+
+    func current() -&gt; String {
+        return stored
+    }
+}</code></pre>
+<p>The safe version above passes a Snapshot struct, which is a value type, into the actor, instead of passing the mutable class itself. Once the snapshot is created, nobody can change it, so the actor&#x27;s stored value cannot be altered behind its back. If the original code had passed the MutableBox directly and stored the reference, then any outside code holding that box could change its content at any time, and the actor&#x27;s stored value would change without the actor ever being involved. That is exactly the race the actor was meant to prevent, reintroduced through a shared reference. The fix is small, a struct instead of a class, but the safety difference is large. When you audit your own actor code, check the types crossing the boundary first, because that is where protection is most easily lost. A guardian is only as strong as the doors into its room.</p>
+<p>The same caution applies to arrays and dictionaries that contain class instances. Even if the collection itself is a value type, the objects inside it are still shared by reference. Copy the values you need, or convert them to structs, before handing them to the actor.</p>
+<p class="check"><strong>Check:</strong> How can passing a mutable class into an actor bypass the actor&#x27;s protection?</p>
+<h2>Section 29: Common Mistake: One Giant Actor</h2>
+<p>A tempting mistake, especially when actors are new and exciting, is to put all of a program&#x27;s shared state into a single giant actor. It feels safe, because everything is guarded, but it creates two problems. First, unrelated work starts queuing behind unrelated work, so a task waiting to read a setting must wait for a task updating a download list, even though the two have nothing to do with each other. The program becomes slower than it needs to be, and the slowness is hard to diagnose because each individual method looks fine. Second, a giant actor becomes hard to understand and hard to change, because it mixes many responsibilities into one type, and every change risks affecting something unrelated. The remedy is the same principle that guides good design everywhere: split responsibilities. Give each coherent piece of shared state its own actor, so that each actor guards one job and its queue only holds work related to that job. A settings actor, a download actor, and a message actor can coexist happily, each with a short queue, and tasks that need only one of them never wait for the others. This splitting also makes testing easier, because each actor can be tested on its own with a clear purpose. If you find yourself writing an actor with dozens of properties covering unrelated topics, that is a signal to split it. Ask yourself what the actor&#x27;s one job is, and if you cannot answer in a single sentence, it probably has more than one job. Small, focused actors are easier to name, easier to explain, and easier to trust, and a program built from them is usually both faster and clearer than one built around a single giant guardian.</p>
+<pre><code>actor SettingsStore {
+    private var theme = &quot;Light&quot;
+
+    func setTheme(_ theme: String) {
+        self.theme = theme
+    }
+
+    func currentTheme() -&gt; String {
+        return theme
+    }
+}
+
+actor DownloadStore {
+    private var active: [String] = []
+
+    func addDownload(_ name: String) {
+        active.append(name)
+    }
+
+    func allDownloads() -&gt; [String] {
+        return active
+    }
+}</code></pre>
+<p>The two small actors above illustrate the split clearly. Settings and downloads are unrelated, so they have separate guardians, and a task updating a theme never waits for a task recording a download. Each actor has a single sentence job: one guards the theme, the other guards the download list. If either job grows more complex later, it can grow inside its own actor without disturbing the other. Contrast this with a single actor holding both a theme and a download list, where every method would share one queue and one type would carry two responsibilities. The split version is barely longer in code, but it is much better in design. As a rule of thumb, when you add a new piece of shared state to a program, ask whether it belongs to an existing actor&#x27;s job or deserves its own. If it deserves its own, create a new actor without hesitation. Actors are cheap to create, and clarity is worth more than saving a few lines.</p>
+<p class="check"><strong>Check:</strong> What two problems does putting all shared state into one giant actor create?</p>
+<h2>Section 30: Queue Stalls Are Not Deadlocks</h2>
+<p>Beginners sometimes worry that actors will deadlock, meaning two tasks wait forever for each other, and it is worth clarifying what can and cannot happen. A classic deadlock needs a circle of waiting: task A holds a resource and waits for a resource held by task B, while task B waits for the resource held by A, so neither can proceed. With actors, a simple version of this cannot happen for a single actor, because actors are reentrant: if a method on an actor awaits and then the same actor is needed again, the reentrant behaviour allows progress rather than a permanent block. However, a stall can still occur between two different actors if they wait on each other in a circle, as discussed earlier, or if a task waits for an actor that is busy with a very long method. Those stalls are usually temporary or design problems, not the permanent, mysterious deadlocks of manual locking. The practical response is the same set of habits you have already learned: keep actor methods short, keep call flows one-directional where possible, and avoid long uninterrupted work inside an actor. If your program ever seems stuck, check whether a task is waiting on an actor whose current method is doing something slow, and check whether two actors are waiting on each other. Those two checks resolve most stalls quickly. It is also reassuring to know that Swift&#x27;s actor system is designed to avoid the worst locking pitfalls, such as forgetting to release a lock, because there is no lock for you to forget. The actor manages access itself, so the class of bugs that comes from manual lock management largely disappears. What remains is design: choosing the right actors, keeping them focused, and keeping their methods brief. Good design plus the actor&#x27;s built-in guarantees gives you concurrent programs that are both safe and responsive.</p>
+<pre><code>actor QuickStore {
+    private var items: [String] = []
+
+    func add(_ item: String) {
+        items.append(item)
+    }
+
+    func count() -&gt; Int {
+        return items.count
+    }
+}
+
+func useStore(store: QuickStore) async {
+    await store.add(&quot;First&quot;)
+    let total = await store.count()
+    print(total)
+}</code></pre>
+<p>The quick store is a reminder of what healthy actor use looks like: short methods, quick visits, and no long waits inside. A program built from actors like this rarely stalls, because no visit holds the guardian for long. If you ever face a program that seems frozen, resist the urge to blame actors in general, and instead look for the specific long method or circular call that is causing the wait. That focused investigation will usually find the culprit quickly, and the fix will usually be a small rearrangement rather than a redesign. Actors are not magic, but they do remove a large family of bugs, and the remaining problems are the kind that clear design habits prevent. Keeping methods short and call flows simple is the whole secret, and it is a secret you already know.</p>
+<p class="check"><strong>Check:</strong> What two things should you check first if a program using actors seems stuck?</p>
+<h2>Section 31: Protecting File Writes with an Actor</h2>
+<p>Files are a classic source of shared-state trouble, because several tasks may want to write to the same file, or one task may read a file while another is halfway through writing it. The result can be a file containing a mixture of two writes, or a reader seeing a half-finished document. An actor solves this by becoming the single guardian of the file: every read and every write goes through the actor, and the actor performs them one at a time. A simple file-writer actor holds the file path and offers a method to append a line of text and a method to read the whole file. Because file operations can be slow, the methods are usually async, and the actor&#x27;s suspension behaviour matters: while one write is waiting for the disk, another task&#x27;s write can be queued, but it cannot overlap the first write in a harmful way. You should still keep the actor&#x27;s methods focused, performing one file operation per method, so that the queue stays orderly. A useful refinement is to have the actor keep an in-memory copy of recent lines, so that reads can be served quickly without touching the disk every time, while writes update both the memory and the file. That refinement is optional, but it shows how an actor can combine fast memory access with durable file storage in one safe place. File-writing actors are used for logs, saved notes, exported data, and any situation where a program&#x27;s lasting record must not be corrupted by concurrent writes. They are a practical, satisfying use of everything you have learned so far.</p>
+<pre><code>import Foundation
+
+actor FileWriter {
+    let path: String
+
+    init(path: String) {
+        self.path = path
+    }
+
+    func append(_ line: String) {
+        let text = line + &quot;\n&quot;
+        if let data = text.data(using: .utf8) {
+            if let handle = FileHandle(forWritingAtPath: path) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            } else {
+                try? data.write(to: URL(fileURLWithPath: path))
+            }
+        }
+    }
+
+    func readAll() -&gt; String {
+        return (try? String(contentsOfFile: path)) ?? &quot;&quot;
+    }
+}</code></pre>
+<p>The file writer actor shows the guardian pattern applied to a real resource outside memory. Every append goes through the actor, so two appends cannot interleave their bytes, and every read sees a file that is between writes rather than in the middle of one. The code handles the case where the file does not exist yet by creating it, which is a small detail that makes the actor friendlier to use. In a fuller program, you might add error handling that reports failures instead of silently ignoring them, which is a topic covered in the error-handling chapters. For now, the important point is the structure: one actor, one file, and all access through its methods. If you practise with this actor by appending lines from many tasks and then reading the file, you will find every line present and intact, with none truncated or mixed together. That reliability is exactly what a lasting record requires, and it is the reason file access is so often guarded by an actor.</p>
+<p>As a further safeguard, a file-writing actor can also offer a method that writes a whole batch of lines at once. Batching reduces the number of visits to the actor and guarantees that the lines of one batch stay together in the file, which is useful for records that belong together, such as one log entry made of several lines.</p>
+<p class="check"><strong>Check:</strong> How does an actor prevent two tasks from mixing their writes into the same file?</p>
+<h2>Section 32: Protecting Network State with an Actor</h2>
+<p>Network programs also have shared state that needs guarding, even though the network itself feels remote and abstract. A program that talks to a server often keeps track of things like whether it is currently connected, how many requests are in flight, what the last error was, or which authentication token it is using. If several tasks read and change those values without coordination, the program can end up believing it is connected when it is not, sending two requests with an expired token, or counting the same request twice. An actor that owns the network state removes that confusion. It can store the connection status, the active request count, and the current token, with methods to update each one and to read a consistent snapshot. The actual network requests still happen outside the actor, in async functions, and they report back through the actor&#x27;s methods, just as downloads report back to a download manager. That separation keeps the actor quick and keeps the slow network work where it belongs. One particularly useful pattern is token refresh: when a request fails because a token has expired, only one task should refresh the token, while other tasks wait for the fresh one, rather than every task refreshing it separately. An actor can coordinate that elegantly, by recording that a refresh is in progress and letting other callers wait for its result. Even without that refinement, a simple network-state actor makes a program&#x27;s behaviour much easier to understand, because there is one place where the truth about the connection lives, and every part of the program consults that one place.</p>
+<pre><code>actor NetworkState {
+    private var isConnected = false
+    private var activeRequests = 0
+    private var lastError: String?
+
+    func setConnected(_ connected: Bool) {
+        isConnected = connected
+    }
+
+    func connectionStatus() -&gt; Bool {
+        return isConnected
+    }
+
+    func requestStarted() {
+        activeRequests += 1
+    }
+
+    func requestFinished() {
+        if activeRequests &gt; 0 {
+            activeRequests -= 1
+        }
+    }
+
+    func activeCount() -&gt; Int {
+        return activeRequests
+    }
+
+    func recordError(_ message: String) {
+        lastError = message
+    }
+
+    func latestError() -&gt; String? {
+        return lastError
+    }
+}</code></pre>
+<p>The network state actor gathers several related facts into one guardian, with a small method for each change and each reading. A task that starts a request calls requestStarted, and when it finishes, it calls requestFinished, so the active count always reflects reality. If the count ever looks wrong, there is only one place to investigate, which is a great comfort when debugging. The guard on requestFinished, preventing the count from dropping below zero, is a small defensive touch that shows how an actor can enforce its own rules. You could extend this actor with a token field and a method that returns the current token, or with a method that returns a snapshot struct containing all the state at once. Snapshot methods are especially useful for debugging, because they let you print the whole state in one consistent picture. Building a network-state actor is good practice for real programs, where the state of a connection is exactly the kind of shared truth that deserves a guardian.</p>
+<p>A snapshot method is especially valuable here. A single method that returns the connection status, the active count, and the latest error together gives a debugger one consistent picture, instead of three separate readings that might come from three different moments. Consistent snapshots make network problems much easier to diagnose.</p>
+<p class="check"><strong>Check:</strong> Why is it better for connection status and request counts to live in one actor?</p>
+<h2>Section 33: Actors Compared with Locks and Queues</h2>
+<p>Before actors existed in Swift, programmers protected shared state with locks and serial queues, and it is useful to understand how actors compare, because you will still meet those older tools in existing code. A lock is a low-level mechanism: a task acquires the lock before touching shared data and releases it afterwards, and any other task that wants the lock must wait. Locks work, but they are easy to misuse. Forgetting to release a lock, releasing it twice, or holding it while waiting for something else can cause crashes or deadlocks, and the compiler does not help you remember. A serial queue is a higher-level tool: tasks are submitted to a queue that runs them one at a time, which is closer to the actor idea, but the queue does not protect the data itself. Nothing stops a careless piece of code from touching the shared data directly instead of going through the queue, so safety depends on discipline. An actor combines the strengths of both older tools while removing their weaknesses. Like a serial queue, it runs access one at a time, but unlike a queue, the compiler enforces the boundary, so direct access from outside is simply not allowed without await. Like a lock, it protects the data, but unlike a lock, there is nothing to acquire or release by hand, so the classic lock mistakes disappear. Actors also integrate with async and await, so waiting for an actor suspends rather than blocking a thread, which is more efficient than many lock-based designs. The honest trade-off is that actors are a Swift-specific, higher-level tool, and they do not fit every situation, such as code that must interoperate with low-level systems. For ordinary Swift programs, however, they are the recommended first choice for shared state, and understanding the older tools helps you appreciate why.</p>
+<pre><code>actor SafeList {
+    private var items: [String] = []
+
+    func add(_ item: String) {
+        items.append(item)
+    }
+
+    func allItems() -&gt; [String] {
+        return items
+    }
+}</code></pre>
+<p>The safe list actor achieves with a few lines what used to require careful lock or queue management, and the compiler checks the boundary for you. There is no lock to forget, no queue to remember to use, and no direct access path that bypasses the protection. That combination of brevity and compiler enforcement is why actors are now the standard recommendation in Swift. When you read older code that uses locks or queues, you can now translate it mentally: the lock or queue was playing the role that an actor would play today. That translation skill is useful, because you will maintain and learn from older code for years, even as new code uses actors. It also helps you judge when an older tool is still appropriate, such as when working with a system that does not understand actors. In general, though, reach for an actor first, and reach for a lock only when you have a specific reason that an actor cannot serve.</p>
+<p class="check"><strong>Check:</strong> In what two ways is an actor safer to use than a manual lock?</p>
+<h2>Section 34: Actors in Command-Line Tools</h2>
+<p>Actors are often introduced with app examples, but they are just as useful in command-line tools, which is good news because many programs in this book are command-line tools. A command-line tool that downloads several files, processes a list of items, or collects results from parallel work faces exactly the same shared-state problems as an app, and an actor solves them in exactly the same way. The structure is familiar: a main function creates an actor, launches tasks to do independent work, and the tasks report their results through the actor. At the end, the main function reads the actor&#x27;s final state and prints a summary. Because command-line tools have no user interface thread to worry about, you do not need the MainActor for most of their work, which keeps the design simple. One practical detail is that the top-level code of a command-line tool must be asynchronous to use await, which Swift supports in modern command-line programs through an async main entry point. If you are writing a small script-style program, you can also wrap the concurrent work in a Task and wait for it to finish. Either way, the actor code itself does not change; only the surrounding scaffolding differs slightly from an app. Command-line tools are an excellent place to practise actors, because the feedback is immediate: you can print the actor&#x27;s final state, run the tool many times, and confirm that the result is always the same. That repeatability is the hallmark of a correct concurrent program, and it is satisfying to see it in a tool you built yourself.</p>
+<pre><code>actor WordCounter {
+    private var total = 0
+
+    func add(_ count: Int) {
+        total += count
+    }
+
+    func totalWords() -&gt; Int {
+        return total
+    }
+}
+
+func countWords(in text: String) -&gt; Int {
+    return text.split(separator: &quot; &quot;).count
+}
+
+func runTool() async {
+    let counter = WordCounter()
+    let texts = [&quot;Hello world&quot;, &quot;Swift actors are safe&quot;, &quot;One guardian at a time&quot;]
+    await withTaskGroup(of: Void.self) { group in
+        for text in texts {
+            group.addTask {
+                let count = countWords(in: text)
+                await counter.add(count)
+            }
+        }
+    }
+    let total = await counter.totalWords()
+    print(&quot;Total words: \(total)&quot;)
+}</code></pre>
+<p>The word counter tool shows the full pattern in miniature. Each text is counted independently, in parallel, and the results are combined through the actor, which guarantees the total is correct. The total will always be the same, no matter how the tasks are scheduled, because the actor serialises the additions. You can extend this tool as an exercise by reading texts from files instead of a fixed list, or by counting characters as well as words. Each extension follows the same shape: independent work outside the actor, shared results inside it. That shape is the backbone of many real command-line tools, from build systems to data processors, and learning it now gives you a template you will reuse often. Actors are not an app-only feature; they are a general Swift tool for any program where tasks share state.</p>
+<p>If you are working through an older tutorial that uses a serial queue, try rewriting its example with an actor as an exercise. The rewrite is usually shorter, and comparing the two versions side by side shows clearly what the actor is doing for you. That comparison is a good way to deepen your understanding of both tools.</p>
+<p class="check"><strong>Check:</strong> Why is a command-line tool that processes items in parallel a good place to use an actor?</p>
+<h2>Section 35: Actors and Value Types Working Together</h2>
+<p>Swift&#x27;s value types, such as structs and enums, are natural partners for actors, and understanding their partnership will improve your concurrent designs. A struct is copied when it is passed around, so each task that receives a struct gets its own independent copy. That means tasks can work on their own copies freely, without any risk of racing each other, and only when they need to share a result do they need an actor. This division is elegant: value types handle the independent work, and actors handle the shared work. A common pattern is for a task to build or modify a struct locally, and then hand the finished struct to an actor for storage. Because the struct is a value, the actor receives its own copy, and later changes by the original task cannot affect the stored copy. That safety comes for free from the type system, with no extra code. Enums work the same way, which is why state enums like the download states in an earlier section pair so well with actors. The actor stores the enum, tasks read and write it through the actor, and the enum&#x27;s value semantics keep copies independent. When you design a concurrent program, a useful question is which parts of the data are local and which are shared. Local data should be structs, because copying is safe and simple. Shared data should live in an actor, because the actor serialises access. Programs designed this way tend to be both safe and easy to understand, because the boundary between local and shared is visible in the types themselves. That visibility is one of Swift&#x27;s great strengths, and actors plus value types are its clearest expression.</p>
+<pre><code>struct TaskItem: Sendable {
+    let title: String
+    var isDone = false
+}
+
+actor TaskList {
+    private var tasks: [TaskItem] = []
+
+    func add(_ task: TaskItem) {
+        tasks.append(task)
+    }
+
+    func markDone(at index: Int) {
+        if tasks.indices.contains(index) {
+            tasks[index].isDone = true
+        }
+    }
+
+    func allTasks() -&gt; [TaskItem] {
+        return tasks
+    }
+}</code></pre>
+<p>The task list actor stores TaskItem structs, and the interplay between value and reference semantics is worth noticing. Inside the actor, marking a task done modifies the actor&#x27;s own array, which is safe because only one task is inside at a time. Outside the actor, a caller that receives the list gets a copy, so it can read or even modify its own copy without affecting the actor&#x27;s list. That independence is exactly what you want from a snapshot. If TaskItem had been a class, the caller would have received references to the actor&#x27;s own objects, and changes through those references would bypass the actor, reintroducing the shared-reference problem. The lesson is to prefer structs for the data that actors store and return, and to reserve classes for cases where shared identity is genuinely needed. This preference will serve you well beyond actors, because value types make reasoning about any program easier, concurrent or not.</p>
+<p>A helpful exercise is to take a program that currently uses a class for its shared data and convert the stored data to structs held by an actor. Notice how many places become simpler, because copying replaces careful sharing, and the actor replaces manual coordination. Simplicity gained this way tends to stay gained.</p>
+<p class="check"><strong>Check:</strong> Why does storing structs in an actor give callers safe snapshots?</p>
+<h2>Section 36: Actors Storing Dictionaries</h2>
+<p>Dictionaries are a frequent choice for actor storage, because so much shared state is naturally keyed: users by name, downloads by file, settings by key, or results by job. An actor wrapping a dictionary gives you safe, keyed access with very little code, and the pattern is worth learning thoroughly because you will use it constantly. The actor holds a private dictionary and offers methods to set a value for a key, read a value for a key, remove a key, and list all keys or all values. Each method is short, and each runs as one visit, so a read never sees a half-updated dictionary. One detail to notice is that dictionary access in Swift returns an optional when a key is missing, so the actor&#x27;s read method naturally returns an optional too. Callers handle that optional with if let or a default value, just as they would with an ordinary dictionary, which keeps the actor&#x27;s interface familiar. Another detail is that returning the whole dictionary gives the caller a copy, because dictionaries are value types, so the caller can inspect it freely without holding up the actor. That copy behaviour is convenient, but it also means that if the dictionary is very large, returning the whole thing can be expensive. In that case, prefer methods that answer specific questions, such as whether a key exists or what the count is, rather than returning everything. Designing dictionary actors with focused questions, rather than one giant dump method, keeps them efficient and keeps their interfaces clear. A dictionary actor is a small, reliable building block, and you will find yourself reaching for it in almost every concurrent program.</p>
+<pre><code>actor UserScores {
+    private var scores: [String: Int] = [:]
+
+    func setScore(_ score: Int, for user: String) {
+        scores[user] = score
+    }
+
+    func score(for user: String) -&gt; Int? {
+        return scores[user]
+    }
+
+    func removeUser(_ user: String) {
+        scores.removeValue(forKey: user)
+    }
+
+    func allUsers() -&gt; [String] {
+        return Array(scores.keys)
+    }
+
+    func count() -&gt; Int {
+        return scores.count
+    }
+}</code></pre>
+<p>The user scores actor shows the dictionary pattern with a concrete example. Each user has a score, and tasks can update scores concurrently without losing updates or corrupting the dictionary. The allUsers method returns just the keys, which is often all a caller needs, and the count method answers a simple question without copying the whole dictionary. If you extend this actor, you might add a method that returns the highest score, or one that increases a user&#x27;s score by a given amount. The increase method is a good exercise, because it combines a read and a write in one visit, which is exactly the atomic operation that an actor makes safe. Without the actor, two tasks increasing the same user&#x27;s score could lose one of the increases. With the actor, both increases are preserved. That small example captures the whole value of dictionary actors: familiar dictionary operations, made safe for concurrent use by a guardian that serialises them.</p>
+<p>You can also add a method that updates a value only if the key already exists, or one that returns the previous value when setting a new one. Small, focused methods like these keep callers from needing to perform a read and a write as two separate visits, which is exactly the two-step pattern that actors are meant to replace.</p>
+<p class="check"><strong>Check:</strong> Why is a method that increases a score in one visit safer than reading and writing separately?</p>
+<h2>Section 37: Actors Storing Sets</h2>
+<p>Sets are another collection that actors guard well, because set operations such as inserting, removing, and checking membership are exactly the kind of short operations that must happen atomically. A set stores unique values with no duplicates and no particular order, which makes it ideal for tracking things like active users, downloaded file names, visited pages, or tags. An actor wrapping a set offers methods to insert a value, remove a value, check whether a value is present, and count the values. The membership check is a particularly good example of why the actor matters: a task might check whether a value is present and then act on the answer, and if another task changes the set between the check and the action, the first task acts on stale information. When the check and the action are combined inside one actor method, that staleness disappears. Sets also have a useful property for actors: inserting a value that is already present simply does nothing, so duplicate inserts are harmless. That makes set actors forgiving to use, because a task that reports the same item twice does not corrupt the state. As with dictionaries, returning a copy of the set gives callers a safe snapshot, and focused query methods keep large sets efficient. If you are tracking uniqueness in a concurrent program, such as ensuring each job is processed once, a set actor is often the simplest correct tool. It is small, it is easy to test, and its behaviour under concurrency is easy to verify by checking that the final count matches the number of unique items.</p>
+<pre><code>actor VisitedPages {
+    private var pages: Set&lt;String&gt; = []
+
+    func visit(_ page: String) {
+        pages.insert(page)
+    }
+
+    func hasVisited(_ page: String) -&gt; Bool {
+        return pages.contains(page)
+    }
+
+    func remove(_ page: String) {
+        pages.remove(page)
+    }
+
+    func totalVisited() -&gt; Int {
+        return pages.count
+    }
+
+    func allPages() -&gt; Set&lt;String&gt; {
+        return pages
+    }
+}</code></pre>
+<p>The visited pages actor tracks which pages have been seen, with one method per operation. A task can record a visit, ask whether a page has been visited, or count the total, all safely. Because a set ignores duplicate inserts, a page visited twice is still counted once, which is the correct behaviour for a visited tracker. You could use this actor in a small web crawler that visits pages in parallel, where each task checks the actor before visiting a page and records the visit through it. That design prevents the same page from being visited many times by different tasks, saving effort and avoiding duplicate work. As an exercise, you could add a method that inserts a page and returns whether it was newly added, which combines the check and the insert into one atomic step. That method is the set version of the atomic check-and-change pattern, and it is a pattern you will use in many forms throughout concurrent programming.</p>
+<p>Another useful set operation is the union of two sets, which an actor can perform safely in one visit. If two tasks each hold a set of visited pages, an actor method can merge them into the stored set without losing any page, even if both tasks report the same page at the same time.</p>
+<p class="check"><strong>Check:</strong> Why is a set actor a good tool for making sure each job is processed only once?</p>
+<h2>Section 38: Actors and Optional State</h2>
+<p>Optional state inside an actor is common, because many pieces of shared state start out empty and gain a value later. A current user might be nil until someone logs in, a cached result might be nil until it is first computed, or a selected item might be nil until the user picks one. An actor handles optionals just like any other state, with the added safety that the check for nil and the use of the value can happen in the same visit. That matters, because with a plain shared optional, one task might check that a value exists and then try to use it, only to find that another task set it to nil in between, causing a crash or a wrong result. Inside an actor, the check and the use can be combined into a single method that returns a sensible result, such as a default value or an optional that the caller handles. The actor&#x27;s methods for optional state usually include setting the value, clearing it back to nil, and reading it. You might also add a method that sets the value only if it is currently nil, which is useful for one-time initialisation, or a method that returns the value or computes it if missing, which is the caching pattern in another form. Optionals and actors pair naturally, because both are about handling absence safely. The optional says the value might not be there, and the actor says the answer to whether it is there will not change halfway through your question. Together they let you write code that deals gracefully with empty states, which is a large part of real programming, where data often arrives later than the code that wants it.</p>
+<pre><code>actor CurrentUser {
+    private var username: String?
+
+    func login(as name: String) {
+        username = name
+    }
+
+    func logout() {
+        username = nil
+    }
+
+    func currentUsername() -&gt; String? {
+        return username
+    }
+
+    func greeting() -&gt; String {
+        if let name = username {
+            return &quot;Welcome back, \(name)!&quot;
+        }
+        return &quot;Welcome, guest!&quot;
+    }
+}</code></pre>
+<p>The current user actor shows optional state handled cleanly. The greeting method checks the username and builds a message in the same visit, so it can never crash on a username that vanished halfway through, and it can never greet a user who has just logged out with the wrong name. The login and logout methods are simple state changes, each safe on its own. If you extend this actor, you might add a method that logs in only if nobody is currently logged in, returning whether the login succeeded. That method combines a check and a change atomically, which is the recurring pattern of this chapter. Optional state is easy to get wrong in concurrent code, because absence is a state that can change, but an actor makes it manageable by ensuring that every question about the state is answered in one consistent visit. When you see an optional shared between tasks, consider an actor.</p>
+<p>It is also worth noting that an actor&#x27;s optional can hold a struct, not just a string. A current-user actor might store an optional user profile struct, with a name, an email address, and a join date, and the same safety rules apply. The whole profile changes in one visit, so readers never see a name from one profile paired with an email from another.</p>
+<p class="check"><strong>Check:</strong> Why can checking a shared optional and then using it be unsafe without an actor?</p>
+<h2>Section 39: Actors Returning Copies</h2>
+<p>A recurring theme in this chapter is that actors return copies of their value-type data, and it is worth pausing to understand why that behaviour is so helpful. When an actor method returns an array, a dictionary, a set, or a struct, Swift copies that value, because those types have value semantics. The caller receives an independent copy, which it can read, filter, sort, or even modify without affecting the actor&#x27;s internal state and without needing the actor&#x27;s permission. That independence has two benefits. First, the caller does not hold up the actor while it works with the copy, so the actor remains free to serve other callers. Second, the caller cannot accidentally corrupt the actor&#x27;s state by mutating the returned value, because the mutation affects only the copy. This is a strong safety property that comes for free, and it is one of the reasons Swift&#x27;s combination of value types and actors is so pleasant. The contrast with classes is instructive: if an actor returned a class instance, the caller would receive a reference to the actor&#x27;s own object, and mutations through that reference would bypass the actor entirely. That is why the earlier advice to prefer structs matters so much. Returning copies is not just a detail; it is part of how actors keep their promises. When you design actor methods, think about what the caller really needs. Often a filtered copy, a count, or a single value is more useful than the whole collection, and returning a smaller, focused result is both more efficient and clearer. But when the whole collection is needed, returning a copy is safe, and you can rely on that safety without extra code.</p>
+<pre><code>actor Library {
+    private var books: [String] = []
+
+    func addBook(_ title: String) {
+        books.append(title)
+    }
+
+    func allBooks() -&gt; [String] {
+        return books
+    }
+
+    func bookCount() -&gt; Int {
+        return books.count
+    }
+}
+
+func libraryDemo() async {
+    let library = Library()
+    await library.addBook(&quot;Swift Basics&quot;)
+    var myCopy = await library.allBooks()
+    myCopy.append(&quot;Not in the library&quot;)
+    let realCount = await library.bookCount()
+    print(realCount)
+}</code></pre>
+<p>In the demonstration, the caller appends a title to its own copy, but the library&#x27;s real count stays at one, because the copy and the original are independent. That independence is easy to verify and reassuring to rely on. It means you can hand out snapshots freely, without worrying that a careless caller will damage the shared state. It also means that a caller holding an old snapshot will not see later additions, which is usually correct behaviour: a snapshot is a picture of a moment, not a live view. If a caller needs fresh data, it simply asks the actor again. This snapshot model simplifies reasoning enormously, because each interaction with the actor is a clean, self-contained exchange. Keep it in mind whenever you design an actor&#x27;s interface, and prefer returning copies of value types over handing out shared references.</p>
+<p>The snapshot idea also helps with testing. A test can ask an actor for its current list, check that the list matches expectations, and then continue driving the actor, without worrying that the test&#x27;s own copy will interfere with later steps. Clean snapshots make concurrent tests far easier to write and to trust.</p>
+<p class="check"><strong>Check:</strong> How does returning a copy protect an actor&#x27;s internal list from a careless caller?</p>
+<h2>Section 40: Actors and Error Handling</h2>
+<p>Actors can throw errors just like other types, which means an actor method can report failure instead of silently ignoring it or returning a placeholder value. This is important, because many guarded operations can fail: a file write can run out of disk space, a network state update can involve an invalid token, or a booking can fail because the item is already taken. When an actor method is marked throws, callers use try together with await, writing try await in that order, to call it. The combination looks slightly unusual at first, but it reads naturally once you practise it: try because the call can fail, and await because it crosses the actor boundary. Inside the actor, throwing works as usual: the method can throw an error, and the actor&#x27;s state remains consistent, because the method either completes its protected segment or throws before changing anything important. A good habit is to validate before changing state, so that a throwing method leaves the actor unchanged when it fails. For example, a booking method should check availability first and throw if the item is taken, rather than changing state and then throwing. That way, a failed call has no side effects, and the caller can safely retry or report the error. Error handling in actors follows the same principles as error handling elsewhere in Swift, with the actor boundary adding only the await. That consistency is comforting: you do not need to learn a separate error system for actors, just the combination of two familiar words.</p>
+<pre><code>enum BookingError: Error {
+    case alreadyBooked
+    case invalidSeat
+}
+
+actor SeatManager {
+    private var booked: Set&lt;String&gt; = []
+
+    func book(_ seat: String) throws {
+        if seat.isEmpty {
+            throw BookingError.invalidSeat
+        }
+        if booked.contains(seat) {
+            throw BookingError.alreadyBooked
+        }
+        booked.insert(seat)
+    }
+
+    func bookedCount() -&gt; Int {
+        return booked.count
+    }
+}
+
+func tryBooking(manager: SeatManager) async {
+    do {
+        try await manager.book(&quot;A1&quot;)
+        print(&quot;Booked A1&quot;)
+    } catch {
+        print(&quot;Booking failed: \(error)&quot;)
+    }
+}</code></pre>
+<p>The seat manager validates before it changes anything, so a failed booking leaves the set untouched. A caller that tries to book an already-booked seat receives a clear error, and the actor&#x27;s state remains correct. The call site shows the try await combination, which you should practise until it feels ordinary. Error handling like this makes actors suitable for real operations where failure is possible, not just for counters and lists where nothing can go wrong. When you design an actor method that can fail, define a small error enum for its failures, validate early, and keep successful changes atomic. Those three habits will make your actors robust and their errors informative, which is exactly what callers need when something goes wrong.</p>
+<p>One more habit is to document, in a comment above each throwing actor method, which errors it can throw and what each one means. Callers who know the possible failures can handle them sensibly, instead of treating every failure as a mystery. Clear error documentation is a kindness to future readers, including your future self, and it costs only a sentence or two per method. When a method&#x27;s failures are well described, the code that calls it becomes easier to write correctly, because the caller can plan for each case rather than guessing.</p>
+<p class="check"><strong>Check:</strong> Why should an actor method validate before changing its state when it can throw?</p>
+<h2>Section 41: Actors and Task Groups</h2>
+<p>Task groups and actors are a natural pairing, because task groups create many parallel tasks and actors safely collect their results. A task group lets you launch a variable number of tasks, wait for all of them to finish, and gather their outcomes, while an actor gives those tasks a safe place to report. The pattern has three parts: create the actor, launch the group, and after the group finishes, read the actor&#x27;s final state. The reading happens after the group completes, which guarantees that every task has reported before you look at the result. This ordering is important, because reading too early would give a partial result, and the actor alone cannot tell you whether more tasks are still coming. The group provides the completion signal, and the actor provides the safe collection. Together they cover both concerns. A variation is to have each task return a value to the group instead of reporting to an actor, and then combine the returned values after the group finishes. That variation works well when the combination step is simple, such as adding numbers or joining strings, and it avoids an actor entirely. The actor version is better when tasks need to share intermediate state while they run, such as a cache that later tasks can reuse, or when the number of results is large and combining them afterwards would be awkward. Knowing both patterns lets you choose the simpler one for each job. In general, if tasks only need to combine results at the end, use a group&#x27;s return values. If tasks need to share state during the work, use an actor. Many real programs use both, with an actor for shared state and a group for coordination.</p>
+<pre><code>actor ScoreCollector {
+    private var scores: [Int] = []
+
+    func add(_ score: Int) {
+        scores.append(score)
+    }
+
+    func total() -&gt; Int {
+        return scores.reduce(0, +)
+    }
+}
+
+func collectScores() async {
+    let collector = ScoreCollector()
+    await withTaskGroup(of: Void.self) { group in
+        for score in [10, 20, 30] {
+            group.addTask {
+                await collector.add(score)
+            }
+        }
+    }
+    let total = await collector.total()
+    print(&quot;Total: \(total)&quot;)
+}</code></pre>
+<p>The score collector example shows the pairing in its simplest form. Three tasks each add a score through the actor, the group waits for all of them, and only then is the total read. The printed total will always be sixty, regardless of the order in which the tasks ran, because addition does not depend on order. If the task group were missing, and the total were read immediately after launching the tasks, it might be read before some tasks had reported, giving a smaller, wrong total. That timing bug is easy to introduce and hard to spot, because it appears only when tasks are slow. The group prevents it by providing a clear completion point. When you write concurrent programs, look for this shape: a group for waiting, an actor for sharing, and a final read after both have done their jobs. It is a reliable template that scales from three tasks to three thousand.</p>
+<p>A useful debugging tip is to print the actor&#x27;s state at three moments: before the group starts, after the group finishes, and after any later processing. If the middle reading is wrong, the problem is in the tasks or the actor. If only the final reading is wrong, the problem is in the later processing. Separating the stages makes the fault easier to locate.</p>
+<p class="check"><strong>Check:</strong> Why must the actor&#x27;s total be read only after the task group has finished?</p>
+<h2>Section 42: Actors and Async Sequences</h2>
+<p>An async sequence is a sequence of values that arrive over time, such as lines from a file, messages from a network connection, or numbers produced by a slow calculation. Actors can work with async sequences in two useful ways. First, an actor can be the consumer that receives values from a sequence and stores or processes them safely, one at a time. Second, an actor can protect the state that a sequence&#x27;s producer uses, so that multiple consumers do not interfere with each other. For a beginner, the first pattern is the more useful one: a for await loop reads values as they arrive and hands each one to an actor, which records it. Because the loop runs in one task, and the actor serialises access from any other tasks that might also be reporting, the collected results stay consistent. A concrete example is reading lines from a large input, where each line is processed independently and the results are stored in an actor. The loop handles the arrival of data, the actor handles the sharing, and neither needs to know the details of the other. Async sequences are an advanced topic in full, and you do not need to master them now, but recognising how they fit with actors will help you later. The key idea is that time-varying data and shared state are separate concerns, and Swift gives you a tool for each: sequences for data over time, and actors for data shared between tasks. When a program needs both, combining them is natural and safe, provided you keep the roles clear.</p>
+<pre><code>actor LineStore {
+    private var lines: [String] = []
+
+    func add(_ line: String) {
+        lines.append(line)
+    }
+
+    func count() -&gt; Int {
+        return lines.count
+    }
+}
+
+func storeLines(store: LineStore) async {
+    let incoming = [&quot;First&quot;, &quot;Second&quot;, &quot;Third&quot;]
+    for line in incoming {
+        await store.add(line)
+    }
+    let total = await store.count()
+    print(total)
+}</code></pre>
+<p>The example uses a simple array in place of a real async sequence, to keep the shape visible without introducing new syntax. The loop hands each line to the actor, one at a time, and the actor stores them safely. A real async sequence would replace the array with a for await loop, but the actor code would not change at all, which shows how well the two ideas separate. The store does not care where its lines come from, and the loop does not care how the store protects them. That separation is a sign of good design, and it is worth aiming for in your own programs. When you later meet real async sequences, come back to this pattern and replace the array with a sequence, keeping the actor exactly as it is. The program will still work, and the actor will still keep the results safe, no matter how slowly or unpredictably the values arrive.</p>
+<p>Another benefit of this separation is that the actor can be reused with a different source of values. The same line store could collect lines from a file, from a network stream, or from user input, without any change to its code. Reusable guardians are a sign that the boundary between collecting and storing has been drawn in the right place.</p>
+<p class="check"><strong>Check:</strong> In the loop-and-actor pattern, what job does the loop do and what job does the actor do?</p>
+<h2>Section 43: Testing an Actor&#x27;s Behaviour</h2>
+<p>Testing an actor is mostly like testing any other type, with the added step that calls from the test need await, because the test is outside the actor. A test creates an actor, calls its methods with await, and checks that the results match expectations. For a simple actor like a counter, the test increments a known number of times and checks the final value. For a concurrent actor, the test launches several tasks that use the actor at once, waits for them all to finish, and then checks that the final state is correct. That second kind of test is the valuable one, because it checks the very property the actor exists to provide: safety under concurrency. A good concurrent test runs the same scenario many times, because a race that appears once in a hundred runs will not be caught by a single run. Running a test in a loop, or with many tasks, increases the chance of catching a rare timing problem. It is also useful to test the actor&#x27;s edge cases, such as booking the last ticket twice, exceeding a rate limit, or reading an empty store, because edge cases are where bugs hide. Testing actors does not require special tools beyond Swift&#x27;s testing support, which is covered in the next chapter, but the mindset is worth establishing now: an actor&#x27;s test should prove both that its ordinary behaviour is correct and that its concurrent behaviour is safe. An actor that passes only single-task tests has not really been tested at all, because single-task use cannot reveal a race.</p>
+<pre><code>actor Counter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}
+
+func testCounter() async {
+    let counter = Counter()
+    await withTaskGroup(of: Void.self) { group in
+        for _ in 1...100 {
+            group.addTask {
+                await counter.increment()
+            }
+        }
+    }
+    let total = await counter.currentValue()
+    print(total)
+}</code></pre>
+<p>The test function launches one hundred tasks, each incrementing the counter once, and then checks the total. With an actor, the total will always be one hundred. With a plain shared variable, it would often be less, because some increments would be lost to races. Running this test repeatedly and seeing one hundred every time is a convincing demonstration that the actor works. You can adapt this test shape to any actor: launch many tasks, have them perform the actor&#x27;s operations, wait for completion, and check the final state against a known correct value. That shape is simple, but it catches a remarkable number of bugs, because it exercises the actor under the very conditions that cause races. Make a habit of writing such a test for every actor you build, even a small one, and you will catch mistakes early, when they are cheap to fix.</p>
+<p>It is also worth testing what happens when the actor is used with no tasks at all, and when it is used with exactly one task. Those edge cases catch mistakes in initialisation and in the basic methods, before concurrent tests add their own complexity. Simple tests first, concurrent tests second, is a reliable order.</p>
+<p class="check"><strong>Check:</strong> Why should an actor test launch many tasks instead of testing with a single task?</p>
+<h2>Section 44: When an Actor Is Not the Answer</h2>
+<p>Actors are powerful, but they are not the answer to every concurrency problem, and knowing their limits will make you a better designer. If your data is only used by one task, an actor adds unnecessary await and queueing, and a struct or class is simpler. If your data never changes after it is created, it is already safe to share, because immutable data cannot race, and no guardian is needed. If your tasks only need to combine results at the end, a task group&#x27;s return values may be simpler than an actor. If your program needs extremely high performance with very frequent access to shared state, an actor&#x27;s queueing might become a bottleneck, and a more specialised design, such as splitting the state into independent pieces, might be better. Actors also do not solve every kind of concurrency bug. They prevent races on their own state, but they do not prevent logical errors, such as two tasks booking different seats when they should have booked the same one, or a task reading stale data because it asked too early. Those are design errors, not race conditions, and they require careful thinking about what the program should do, not just about how it shares data. Recognising when not to use an actor is a sign of maturity, not of doubt about actors. The best programmers choose the simplest tool that safely does the job, and they reach for actors when sharing is real and mutation is involved. For everything else, simpler tools will serve you better and keep your code easier to read.</p>
+<pre><code>struct Point {
+    let x: Int
+    let y: Int
+}
+
+func distance(from first: Point, to second: Point) -&gt; Int {
+    let dx = second.x - first.x
+    let dy = second.y - first.y
+    return dx * dx + dy * dy
+}</code></pre>
+<p>The point example shows data that needs no actor at all. A point is immutable, because its properties are constants, and it is a struct, so each task gets its own copy. Two tasks can use the same point, or copies of it, without any risk, because nobody can change it. The distance function works purely on its parameters and has no shared state, so it is safe to call from any task at any time. No guardian is needed, because there is nothing to guard. This is an important counterpoint to the rest of the chapter: much of your program&#x27;s data will look like this, local and immutable, and that data is already safe. Actors are for the smaller, special portion of state that is both shared and mutable. Keeping that portion small, by preferring immutable structs elsewhere, is one of the best ways to keep a concurrent program manageable. When in doubt, ask whether the data changes and whether it is shared. Only when both answers are yes does an actor earn its place.</p>
+<p>Actors also do not help when the real problem is that tasks disagree about the meaning of the data, rather than about its value. If one task counts items starting from zero and another starting from one, an actor will faithfully preserve both counts, and the program will still be wrong. Shared meaning, agreed in advance, matters as much as shared safety.</p>
+<p class="check"><strong>Check:</strong> Give two situations where an actor is unnecessary, and say why in each case.</p>
+<h2>Section 45: Designing with Several Actors</h2>
+<p>Real programs usually need several actors working together, and designing that cooperation well is a skill worth practising. Start by listing the pieces of shared state in your program and grouping them by job, as you did when avoiding the giant actor. Each group becomes one actor, with a clear name and a small set of methods. Then draw, even roughly, how the actors relate: which actor calls which, and in which direction. Aim for a simple, mostly one-directional flow, where higher-level actors call lower-level ones, and lower-level ones do not call back. That shape avoids circular waits and makes the program easier to understand. Next, decide what data travels between actors. Prefer small, immutable structs for that data, so that the handover is safe and the actors remain independent. Finally, think about the queues: if one actor is used by many others constantly, consider whether its work can be split or its methods shortened, so that it does not become a bottleneck. A program designed this way has a pleasing structure: each actor is a small guardian with one job, the actors cooperate through clear interfaces, and no single actor knows too much about the others. That structure is easier to test, because each actor can be tested alone, and easier to change, because a change to one actor rarely affects the others. Designing with several actors is not harder than designing with one giant actor; it is actually easier, because each piece is smaller and its job is clearer. The effort goes into the boundaries between actors, and clear boundaries are the foundation of good software design in general.</p>
+<pre><code>actor Inventory {
+    private var stock: [String: Int] = [:]
+
+    func setStock(_ count: Int, for item: String) {
+        stock[item] = count
+    }
+
+    func stockCount(for item: String) -&gt; Int {
+        return stock[item] ?? 0
+    }
+}
+
+actor OrderLog {
+    private var orders: [String] = []
+
+    func record(_ order: String) {
+        orders.append(order)
+    }
+
+    func allOrders() -&gt; [String] {
+        return orders
+    }
+}
+
+actor Shop {
+    let inventory = Inventory()
+    let log = OrderLog()
+
+    func placeOrder(for item: String) async -&gt; Bool {
+        let available = await inventory.stockCount(for: item)
+        if available &gt; 0 {
+            await inventory.setStock(available - 1, for: item)
+            await log.record(&quot;Ordered \(item)&quot;)
+            return true
+        }
+        return false
+    }
+}</code></pre>
+<p>The shop example shows three actors cooperating: an inventory, an order log, and a shop that coordinates them. The shop calls the inventory to check and update stock, and calls the log to record the order, with calls flowing in one direction from the shop to its helpers. Each actor has one job, and the shop&#x27;s job is coordination rather than storage. This layered shape is easy to extend: a payment actor could be added later, called by the shop in the same one-directional way, without changing the inventory or the log. It is also easy to test, because the inventory and the log can be tested alone, and the shop can be tested with its helpers. When you design your own multi-actor programs, start with a sketch like this, naming each actor and its job in one sentence, before writing any code. That sketch will guide your implementation and prevent the design from drifting into a tangle.</p>
+<p>When you sketch a multi-actor design, also note which actor owns each piece of data, so that no piece has two owners. Double ownership is a common source of inconsistency, because two guardians can disagree. One owner per piece of state is a rule that prevents a whole class of design arguments before they start.</p>
+<p class="check"><strong>Check:</strong> Why is a one-directional flow of calls between actors easier to understand and test?</p>
+<h2>Section 46: Actors and the SwiftDay Project</h2>
+<p>The capstone project of this book, SwiftDay, is a command-line task-and-notes manager, and it is worth thinking about where actors might fit into it, even though its early versions are single-task programs. In a simple version of SwiftDay, one task reads commands, updates tasks and notes, and saves them to a file, and no actor is needed, because nothing is shared concurrently. That simplicity is correct, and adding an actor to a single-task program would be unnecessary complexity. However, imagine a later version of SwiftDay that watches a file for changes while also accepting commands, or that syncs tasks with a server in the background while the user continues working. In that version, the task list becomes shared state: the command handler and the background sync both read and change it, and an actor becomes the natural guardian. The actor would own the list of tasks and notes, with methods to add, complete, search, and list them, and both the command handler and the sync task would talk to it through await. The file-saving logic could also live behind the actor, so that saves never overlap with edits. This thought experiment shows how to judge actor use in a real project: start simple, and add an actor when a second task appears that shares the state. It also shows that learning actors now prepares you for the later chapters, where SwiftDay grows more ambitious. You do not need to retrofit an actor into SwiftDay today, but you should be able to picture where it would go, and why, when the program&#x27;s needs change. That ability to picture the future shape of a program is a valuable design skill.</p>
+<pre><code>struct DayTask: Sendable {
+    let title: String
+    var isDone = false
+}
+
+actor DayTaskList {
+    private var tasks: [DayTask] = []
+
+    func add(_ task: DayTask) {
+        tasks.append(task)
+    }
+
+    func markDone(at index: Int) {
+        if tasks.indices.contains(index) {
+            tasks[index].isDone = true
+        }
+    }
+
+    func allTasks() -&gt; [DayTask] {
+        return tasks
+    }
+
+    func search(_ text: String) -&gt; [DayTask] {
+        return tasks.filter { $0.title.contains(text) }
+    }
+}</code></pre>
+<p>The day task list actor is a sketch of how SwiftDay&#x27;s core could be guarded in a concurrent version. It stores DayTask structs, offers methods to add, complete, list, and search, and returns copies so callers get safe snapshots. The search method is a nice example of an actor method that answers a question without changing anything, which is a common and useful kind of method. In the single-task version of SwiftDay, this actor would be overkill, but in a version with background sync, it would be essential. The code is deliberately similar to the task list actor from an earlier section, because the pattern transfers directly: the same guardian shape serves a toy example and a real project. When you reach the SwiftDay chapters, remember this sketch, and consider whether the version you are building has one task or several. Let the answer guide whether the actor appears now or waits for a later version.</p>
+<p>A second SwiftDay idea is a background auto-save actor that saves the task list every minute. The auto-save task and the command handler would both use the same task-list actor, so a save could never catch the list halfway through an edit. That is a concrete, motivating example of an actor earning its place in a real tool.</p>
+<p class="check"><strong>Check:</strong> In SwiftDay, what change would make an actor for the task list necessary?</p>
+<h2>Section 47: Performance Notes for Actors</h2>
+<p>Actors are efficient for most programs, but a few performance notes will help you use them wisely. First, calling an actor involves a small amount of overhead, because the call must cross the actor boundary and possibly wait in a queue. For most programs, that overhead is negligible compared with the work being done, but if a method is called millions of times in a tight loop, the overhead can add up. In that case, consider whether the loop can be restructured to call the actor once with a batch of work, rather than once per item. Batching is a general performance technique, and it pairs well with actors, because one visit that processes many items is much cheaper than many visits that process one item each. Second, an actor&#x27;s queue means that a very busy actor can become a bottleneck, as discussed earlier. The remedy is to split the state, shorten the methods, or batch the calls, in that order. Third, returning large copies from an actor can be expensive, because copying a huge array or dictionary takes time and memory. Prefer focused query methods that return small answers, and reserve whole-collection returns for moments when the caller genuinely needs everything. These notes are not warnings to avoid actors; they are refinements for programs where performance has been measured and found wanting. For the vast majority of programs, including everything in this book, actor performance is more than adequate, and clarity and safety matter far more than squeezing out the last drop of speed. Optimise only when you have evidence of a problem, and when you do, batching and splitting are your first tools.</p>
+<pre><code>actor BatchCollector {
+    private var items: [String] = []
+
+    func addOne(_ item: String) {
+        items.append(item)
+    }
+
+    func addMany(_ newItems: [String]) {
+        items.append(contentsOf: newItems)
+    }
+
+    func count() -&gt; Int {
+        return items.count
+    }
+}</code></pre>
+<p>The batch collector offers both a single-item method and a batch method, and the batch method is the performance-friendly option when a caller has many items ready at once. Instead of crossing the actor boundary a hundred times, the caller crosses it once with a hundred items, and the actor appends them all in one visit. That single visit is faster and also simpler to reason about, because the batch is added atomically. When you design actor interfaces, consider offering a batch version of any method that callers are likely to use in a loop. It costs little extra code, and it gives callers an efficient option when they need it. Performance work in concurrent programs is often about reducing boundary crossings, and batching is the simplest way to do that. Keep it in your toolkit, alongside splitting actors and shortening methods, and you will be able to handle performance concerns without sacrificing safety.</p>
+<p>A final performance habit is to measure before optimising. Add a simple timing print around a busy section, run the program, and only then decide whether batching or splitting is needed. Guessing at performance problems often leads to complicated code that solves a problem the program never had.</p>
+<p class="check"><strong>Check:</strong> Why is adding a hundred items in one actor call faster than adding them in a hundred calls?</p>
+<h2>Section 48: Refactoring a Class into an Actor</h2>
+<p>Refactoring, meaning restructuring existing code without changing what it does, is a common task, and converting a shared class into an actor is a refactoring you will perform more than once. The steps are straightforward. First, find the class that is shared between tasks and confirm that it is the source of races or the reason you want stronger safety. Second, change the word class to actor, and make the class final or remove any inheritance, because actors do not support inheritance. If the class relied on inheritance, you will need to restructure that part, perhaps by using a protocol or by moving shared behaviour into a helper. Third, make the stored properties private if they are not already, so that all access goes through methods. Fourth, update every call site outside the actor to use await, and make sure the calling functions are async or the calls sit inside tasks. The compiler will guide you through this step by reporting every missing await, which turns a potentially error-prone search into a systematic checklist. Fifth, run your tests, especially concurrent tests, and confirm that the behaviour is unchanged for single-task use and correct for multi-task use. The result of this refactoring is code that looks very similar to the original but carries a much stronger safety guarantee. That similarity is reassuring: refactoring to an actor is not a rewrite, it is a change of type plus a scattering of await keywords. Keeping a checklist like this one will make the process smooth, and it will help you explain the change to teammates who may be unfamiliar with actors.</p>
+<pre><code>final class OldCounter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}
+
+actor NewCounter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}</code></pre>
+<p>The old and new counters look almost identical, and that is the point. The refactoring changes the type keyword and nothing else in the type itself, while the call sites gain await. That small change buys a large safety improvement, which is a very good return on a small investment. When you perform this refactoring on a larger class, take it step by step, compiling after each step, so that errors appear in small, manageable batches rather than all at once. Start with the type change, then fix the call sites the compiler reports, then run the tests. If the class is large, consider splitting it into smaller actors during the refactoring, rather than converting it wholesale into one large actor. A refactoring is a good moment to improve design, not just to change a keyword, and the discipline of small, verified steps will serve you in every refactoring you do, not just this one.</p>
+<p>After the refactoring, review the actor&#x27;s methods once more and ask whether any of them are now doing work that belongs elsewhere. A refactoring is a good moment to move a long calculation out of the actor, or to split a large method into a slow part and a quick update, while the change is already fresh in your mind.</p>
+<p class="check"><strong>Check:</strong> List the steps for converting a shared class into an actor, in order.</p>
+<h2>Section 49: A Complete Actor Example</h2>
+<p>It is time to put the pieces together in a complete, slightly larger example that feels like a real component. Imagine a small download-and-cache service for a command-line tool. The service has a cache actor that stores downloaded content, and a service actor that checks the cache before downloading, downloads when needed, and stores the result. Tasks can ask the service for content by name, and the service guarantees that each piece of content is downloaded at most once in the simple version, or at least that concurrent requests do not corrupt the cache. The service&#x27;s download work is simulated with a short wait, standing in for a real network call, and the cache stores strings by name. This example combines several ideas from the chapter: an actor storing a dictionary, an actor calling another actor, an async method with a suspension point, and a caching pattern that avoids repeated slow work. It is still small enough to read in one sitting, which is important, because a complete example should be understandable, not impressive. As you read it, trace the flow of a request: the caller awaits the service, the service awaits the cache, the cache answers, and if the answer is missing, the service waits for the simulated download and then stores the result. Each await marks a boundary or a pause, and the whole flow is safe because the cache is guarded. Building examples like this, and then extending them with features such as error handling or a download count, is the best way to consolidate your understanding of actors.</p>
+<pre><code>actor ContentCache {
+    private var stored: [String: String] = [:]
+
+    func value(for name: String) -&gt; String? {
+        return stored[name]
+    }
+
+    func store(_ value: String, for name: String) {
+        stored[name] = value
+    }
+}
+
+actor ContentService {
+    let cache = ContentCache()
+
+    func content(for name: String) async -&gt; String {
+        if let cached = await cache.value(for: name) {
+            return cached
+        }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let fresh = &quot;Content of \(name)&quot;
+        await cache.store(fresh, for: name)
+        return fresh
+    }
+}</code></pre>
+<p>The content service shows the complete pattern in compact form. The cache actor is a simple dictionary guardian, and the service actor coordinates it with simulated slow work. A first request for a name waits briefly and stores the result, while a later request for the same name returns the cached value immediately. Concurrent requests for the same name might both miss the cache and both download, which is a refinement you could address later, but neither request corrupts the cache, and both receive a correct answer. That distinction matters: the example is safe even if it is not perfectly efficient, and efficiency refinements can be added once safety is established. As an exercise, try extending this service with a method that counts downloads, or one that clears the cache, and test it with several concurrent tasks. Each extension will reinforce the patterns of this chapter and give you a component you could genuinely reuse in a small tool.</p>
+<p>As a final exercise with this service, try adding a download counter to the cache actor and printing it after several concurrent requests. The counter will tell you how many fresh downloads actually happened, which is useful evidence when you later refine the service to avoid duplicate downloads.</p>
+<p class="check"><strong>Check:</strong> Trace the flow of a first request and a second request for the same content through the service.</p>
+<h2>Section 50: Choosing Your Guardians</h2>
+<p>You now have the tools to decide where actors belong in a program, and this final section gathers that decision-making into a simple checklist you can reuse. First, list the state in your program and ask, for each piece, whether it is shared between tasks and whether it changes. If both answers are yes, it needs a guardian, and an actor is the natural choice. Second, group related state into coherent actors, one job per actor, and give each actor a clear name that states its job. Third, design each actor&#x27;s methods as a small, complete interface: ways to change the state, ways to read it, and ways to answer focused questions about it, with properties kept private. Fourth, keep methods short, move slow work outside, and batch calls where a caller has many items. Fifth, use value types for the data that crosses actor boundaries, so that snapshots are safe and references cannot bypass the guard. Sixth, think about suspension points: keep checks and their changes on the same side of any await, and re-read state after awaits when it matters. Seventh, test each actor concurrently, with many tasks and repeated runs, not just with a single task. If you follow this checklist, your concurrent programs will be safe, understandable, and easy to change, which is the real goal. Actors are not a complicated topic once the guardian picture is clear; they are a simple idea, applied consistently, that removes an entire family of bugs. Carry that picture with you into every concurrent program you write, and let it guide your design from the first sketch to the final test.</p>
+<pre><code>actor ChecklistExample {
+    private var done = 0
+
+    func recordDone() {
+        done += 1
+    }
+
+    func totalDone() -&gt; Int {
+        return done
+    }
+}</code></pre>
+<p>The checklist example is deliberately tiny, because the checklist itself is the point, not the code. A small actor, a private counter, and two methods are enough to illustrate the whole approach: shared mutable state, guarded by one actor, with a minimal interface and safe access. When you start a new concurrent program, return to this checklist and work through it before writing code. A few minutes of design at the start will save hours of debugging later, because concurrent bugs are hardest to find after the program is built. Actors reward that upfront thinking more than most features, because their safety depends on choosing the right guardians, not just on writing correct methods. You have learned the syntax, the guarantees, and the pitfalls. Now practise by building small actors, testing them concurrently, and applying the checklist until it becomes second nature. That practice is what turns knowledge into skill.</p>
+<p>One more useful habit is to revisit the checklist after the program is working, not just before you start. Programs change, new tasks appear, and a piece of state that was once local can become shared. A quick second pass through the checklist catches guardians that are now needed, or actors that are no longer earning their place.</p>
+<p class="check"><strong>Check:</strong> What are the first two questions to ask when deciding whether a piece of state needs an actor?</p>
+<h2>Practical Task</h2>
+<p>Build a small command-line program that uses an actor to guard a shared counter and a shared list of completed jobs. Launch at least twenty tasks that each add a job name to the list and increment the counter, wait for all tasks to finish using a task group, then print the counter and the number of jobs. Run the program several times and confirm that the counter and the job count always match the number of tasks. Then extend the actor with a method that records a job and increments the counter in a single visit, and explain in a short comment why the single method is safer than two separate calls.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What is actor isolation, and how does it prevent two tasks from changing the same data at the same time?</li>
+<li>Why must code outside an actor use await to call its methods, and what does that await signify?</li>
+<li>Explain reentrancy: what can change inside an actor while one of its methods is paused at an await, and how should you write code to cope with it?</li>
+<li>When should you choose an actor, a class, and a struct for a piece of data? Give an example of each.</li>
+<li>Describe a real program feature, such as a download manager or a ticket seller, and explain how an actor keeps it correct when many tasks use it at once.</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-30.html">← Chapter 30</a> <a href="index.html">All chapters</a> <a href="chapter-32.html">Chapter 32 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/swift-developer/chapter-31.html'; this.page.identifier = 'book-swift-developer-chapter-31'; this.page.title = 'Chapter 31: Actors and Safe Shared State'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

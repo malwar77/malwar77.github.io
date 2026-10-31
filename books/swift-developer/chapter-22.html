@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 22 — Error Handling: do, try and catch — Swift Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 22 of the Swift Developer teaching book: Error Handling: do, try and catch.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Swift Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 22: Error Handling: do, try and catch</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-22.svg" alt="Design for Chapter 22" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What an Error Is</h2>
+<p>An error is a problem your program can recognise and respond to, rather than a crash that ends everything without explanation. A missing file, a broken network connection, or an invalid password are all errors: they are expected possibilities, not impossible surprises. Swift&#x27;s error handling gives you a structured way to say that a function might fail, to describe how it failed, and to let the caller decide what to do. That structure is what separates a robust program from one that only works on a perfect day.</p>
+<p>Think of what an error is as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses what an error is, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound
+}
+func readFile() throws -&gt; String {
+    throw FileError.notFound
+}
+print(&quot;Ready to handle errors&quot;)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of what an error is differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with what an error is is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make what an error is stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What makes a problem an error rather than a crash?</p>
+<h2>Section 2: Errors as Enum Cases</h2>
+<p>In Swift, errors are usually described by an enum that conforms to the Error protocol, with one case for each kind of failure. This design reuses everything you learned about enums: each failure has a name, and cases that need detail can carry associated values, such as the name of a missing file. Conforming to Error is a marker that tells Swift this enum is meant to be thrown and caught. A well-designed error enum reads like a list of honest possibilities, not a vague message.</p>
+<p>Think of errors as enum cases as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors as enum cases, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum LoginError: Error {
+    case wrongPassword
+    case accountLocked
+}
+print(LoginError.wrongPassword)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors as enum cases differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors as enum cases is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors as enum cases stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why are errors usually modelled as enums in Swift?</p>
+<h2>Section 3: The throws Keyword</h2>
+<p>A function that might fail is marked with the throws keyword, placed after its parameter list and before its return type. That single word is a promise and a warning: the function may return a value, or it may throw an error instead. Callers must acknowledge that possibility, which means errors cannot be silently ignored by accident. Marking a function as throws is therefore a design decision, not just syntax, because it tells every future reader that failure is part of this function&#x27;s job.</p>
+<p>Think of the throws keyword as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses the throws keyword, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    if b == 0 { throw MathError.divideByZero }
+    return a / b
+}
+enum MathError: Error {
+    case divideByZero
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of the throws keyword differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with the throws keyword is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make the throws keyword stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Where does throws go in a function declaration, and what does it promise?</p>
+<h2>Section 4: Throwing an Error</h2>
+<p>To throw an error, you write throw followed by an error value, usually an enum case. Throwing immediately stops the current function and hands control to the nearest code that is prepared to catch the error, skipping the rest of the function. That is why code after a throw only runs when no error occurred: the throw is an exit, not a return value. You should throw as soon as you know something has gone wrong, with the most specific case you have, so the caller gets useful information.</p>
+<p>Think of throwing an error as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses throwing an error, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of throwing an error differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with throwing an error is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make throwing an error stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What happens to a function the moment it throws?</p>
+<h2>Section 5: Calling a Throwing Function with try</h2>
+<p>A call to a throwing function must be marked with try, which is Swift&#x27;s way of making the risk visible at the call site. Writing try does not handle the error by itself; it simply acknowledges that this call might throw and that the surrounding code takes responsibility for that possibility. That visibility matters, because a reader scanning the code can spot every risky call without reading the function definition. Try is therefore a signpost, not a solution, and it always appears together with do-catch, try?, or try!.</p>
+<p>Think of calling a throwing function with try as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses calling a throwing function with try, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+do {
+    let result = try divide(10, by: 2)
+    print(result)
+} catch {
+    print(&quot;Something went wrong&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of calling a throwing function with try differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with calling a throwing function with try is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make calling a throwing function with try stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What does try actually do, and what does it not do?</p>
+<h2>Section 6: do and catch in Plain Words</h2>
+<p>A do block groups code that might throw, and the catch blocks that follow it say what to do when an error escapes. Think of do as saying try this plan, and catch as saying if it fails in this way, do this instead. The code inside do runs normally until a throw happens, at which point Swift jumps to the first matching catch. If no error occurs, the catch blocks are skipped entirely, so the happy path stays clean and the failure handling stays separate and visible.</p>
+<p>Think of do and catch in plain words as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses do and catch in plain words, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+do {
+    print(try divide(10, by: 0))
+} catch {
+    print(&quot;Could not divide&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of do and catch in plain words differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with do and catch in plain words is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make do and catch in plain words stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How do do and catch divide a program into a plan and its backup plans?</p>
+<h2>Section 7: Your First Complete do-catch</h2>
+<p>A complete do-catch example has three parts: a throwing function, a do block that calls it with try, and at least one catch that responds to failure. Start by writing the happy path inside do, then decide what the catch should do, such as printing a friendly message, using a fallback value, or asking the user to try again. Resist the temptation to leave catch empty: an empty catch hides failures and makes debugging painful. Even a simple printed message is better than silence, because it proves the failure path was considered.</p>
+<p>Think of your first complete do-catch as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses your first complete do-catch, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound
+}
+func load() throws -&gt; String {
+    throw FileError.notFound
+}
+do {
+    let text = try load()
+    print(text)
+} catch {
+    print(&quot;File could not be loaded&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of your first complete do-catch differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with your first complete do-catch is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make your first complete do-catch stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What three parts does a complete do-catch example need?</p>
+<h2>Section 8: Catching a Specific Error</h2>
+<p>A bare catch handles every error the same way, which is fine for a first example but too blunt for real programs. To respond differently to different failures, you write catch with a pattern, such as catch FileError.notFound, and Swift runs that block only when the thrown error matches. More specific catches come first, and a general catch can sit last as a safety net. This ordering mirrors how you would help a person: first try the specific remedy, and only then fall back to a general one.</p>
+<p>Think of catching a specific error as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses catching a specific error, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound
+    case noPermission
+}
+func load() throws -&gt; String {
+    throw FileError.notFound
+}
+do {
+    print(try load())
+} catch FileError.notFound {
+    print(&quot;That file does not exist&quot;)
+} catch {
+    print(&quot;Another file problem&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of catching a specific error differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with catching a specific error is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make catching a specific error stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why should specific catch blocks come before a general catch?</p>
+<h2>Section 9: Catching with Associated Values</h2>
+<p>When an error case carries an associated value, a catch pattern can bind that value and use it in the response, for example by printing the name of the missing file. You write catch FileError.notFound(let name) and then use name inside the block, which gives the user a precise message instead of a generic one. This is the same pattern matching you learned for enums, applied to errors, and it is one of the strongest reasons to give error cases associated values. A precise message helps the user fix the problem, while a vague message only tells them that something failed.</p>
+<p>Think of catching with associated values as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses catching with associated values, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound(String)
+}
+func load() throws -&gt; String {
+    throw FileError.notFound(&quot;notes.txt&quot;)
+}
+do {
+    print(try load())
+} catch FileError.notFound(let name) {
+    print(&quot;Missing file: \(name)&quot;)
+} catch {
+    print(&quot;Another problem&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of catching with associated values differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with catching with associated values is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make catching with associated values stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How does a catch block use an error&#x27;s associated value?</p>
+<h2>Section 10: The Catch-All Error Variable</h2>
+<p>In a catch block without a pattern, Swift provides a variable called error that holds whatever was thrown. You can print it, inspect its type, or pass it to a logging function, which is useful while you are learning or debugging. The default message for a simple enum error is its case name, which is readable but not user-friendly, so for real messages you will usually switch over the error or catch specific cases. Still, knowing about error gives you a quick way to see what went wrong during development.</p>
+<p>Think of the catch-all error variable as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses the catch-all error variable, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound
+}
+func load() throws -&gt; String {
+    throw FileError.notFound
+}
+do {
+    print(try load())
+} catch {
+    print(&quot;Failed with error: \(error)&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of the catch-all error variable differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with the catch-all error variable is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make the catch-all error variable stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What is the error variable available in a catch block?</p>
+<h2>Section 11: Multiple Catch Blocks</h2>
+<p>Multiple catch blocks let you write a different response for each kind of failure, in order from most specific to most general. Swift tries them in the order you write them and runs the first one that matches, so a general catch placed first would swallow every error and make the later blocks unreachable. Think of the list as a series of questions: is it this failure, is it that failure, or is it something else entirely? Keeping the order honest is essential, and the compiler will warn you about unreachable catches.</p>
+<p>Think of multiple catch blocks as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses multiple catch blocks, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum LoadError: Error {
+    case notFound
+    case empty
+}
+func load() throws -&gt; String {
+    throw LoadError.empty
+}
+do {
+    print(try load())
+} catch LoadError.notFound {
+    print(&quot;File missing&quot;)
+} catch LoadError.empty {
+    print(&quot;File is empty&quot;)
+} catch {
+    print(&quot;Unknown load problem&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of multiple catch blocks differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with multiple catch blocks is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make multiple catch blocks stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> In what order should multiple catch blocks be written, and why?</p>
+<h2>Section 12: Errors and Optional Results</h2>
+<p>Sometimes a function that might fail is better expressed as returning an optional, especially when failure is routine and carries no useful detail, such as looking up a word that may not exist. Errors are better when the caller needs to know why something failed, or when there are several distinct failures to distinguish. Choosing between throws and an optional is therefore a design question: ask whether the reason for failure matters to the caller. If it does, throw a descriptive error; if it does not, an optional keeps the code simpler.</p>
+<p>Think of errors and optional results as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors and optional results, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>func find(_ word: String, in list: [String]) -&gt; String? {
+    return list.first { $0 == word }
+}
+print(find(&quot;swift&quot;, in: [&quot;swift&quot;, &quot;kotlin&quot;]) ?? &quot;Not found&quot;)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors and optional results differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors and optional results is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors and optional results stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> When is an optional a better choice than a thrown error?</p>
+<h2>Section 13: try? Turning Errors into Optionals</h2>
+<p>The try? keyword calls a throwing function and turns its result into an optional: success becomes a wrapped value, and any error becomes nil. This is convenient when you only care whether something worked, not why it failed, such as trying to read an optional configuration file. The trade-off is that the reason is discarded, so try? is a poor choice when the user needs a helpful message or when different failures need different responses. Use it deliberately, and prefer do-catch when the reason matters.</p>
+<p>Think of try? turning errors into optionals as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses try? turning errors into optionals, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+let result = try? divide(10, by: 0)
+print(result ?? &quot;No result&quot;)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of try? turning errors into optionals differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with try? turning errors into optionals is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make try? turning errors into optionals stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What does try? do to an error, and what information is lost?</p>
+<h2>Section 14: try! and When Never to Use It</h2>
+<p>The try! keyword tells Swift that you are certain a call cannot fail, and it crashes the program if you are wrong. There are rare legitimate uses, such as loading a file that is bundled with your app and must exist, but in most code try! is a danger sign. Beginners should treat it as a last resort and ask whether a do-catch or try? would be safer. A crash is the worst user experience for a predictable failure, and try! turns a handleable error into exactly that. If you use it, leave a comment explaining why failure is impossible.</p>
+<p>Think of try! and when never to use it as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses try! and when never to use it, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+let result = try! divide(10, by: 2)
+print(result)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of try! and when never to use it differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with try! and when never to use it is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make try! and when never to use it stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why is try! dangerous, and when might it be acceptable?</p>
+<h2>Section 15: Propagating Errors Upwards</h2>
+<p>A function does not have to catch every error itself; it can be marked throws and let the error travel upwards to its caller. This is called propagation, and it is how errors reach the part of the program that actually knows what to do about them. A low-level file reader, for example, should not decide how to show an error to a user, so it throws and lets a higher layer catch. Propagation keeps each layer focused: lower layers detect problems, higher layers decide responses.</p>
+<p>Think of propagating errors upwards as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses propagating errors upwards, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound
+}
+func read() throws -&gt; String {
+    throw FileError.notFound
+}
+func loadDocument() throws -&gt; String {
+    return try read()
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of propagating errors upwards differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with propagating errors upwards is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make propagating errors upwards stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What does it mean for a function to propagate an error?</p>
+<h2>Section 16: Rethrows and Higher-Order Functions</h2>
+<p>A function that takes a throwing closure as a parameter is often marked rethrows, which means it only throws if the closure it was given throws. This lets higher-order functions such as map-like helpers work with both throwing and non-throwing closures, without forcing every caller to handle errors. You will meet rethrows again with collections, where a transforming function should only fail when the transformation itself fails. For now, remember the idea: rethrows passes the throwing behaviour through, rather than inventing new errors of its own.</p>
+<p>Think of rethrows and higher-order functions as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses rethrows and higher-order functions, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>func apply(_ work: () throws -&gt; String) rethrows -&gt; String {
+    return try work()
+}
+let text = try apply { &quot;Done&quot; }
+print(text)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of rethrows and higher-order functions differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with rethrows and higher-order functions is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make rethrows and higher-order functions stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What does rethrows mean for a function that takes a closure?</p>
+<h2>Section 17: Throwing Initialisers</h2>
+<p>Initialisers can also throw, which is useful when an object should never exist in an invalid state. A username type, for example, might throw if the name is empty, so the only way to obtain one is with a valid name. You write init with throws, call it with try, and handle failure at the creation site. This pattern pushes validation to the boundary where the object is born, instead of checking the same condition in every method that uses it. It is a small design choice with a large effect on reliability.</p>
+<p>Think of throwing initialisers as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses throwing initialisers, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum NameError: Error {
+    case empty
+}
+struct Username {
+    var value: String
+    init(_ value: String) throws {
+        guard !value.isEmpty else { throw NameError.empty }
+        self.value = value
+    }
+}
+let name = try Username(&quot;kel&quot;)
+print(name.value)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of throwing initialisers differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with throwing initialisers is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make throwing initialisers stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why would an initialiser throw instead of accepting any value?</p>
+<h2>Section 18: Errors in Switch Statements</h2>
+<p>A switch over an error value works like a switch over any enum, letting you describe a response for each failure case in one place. This is often cleaner than a long chain of catch blocks when the error has already been caught and stored, or when you are formatting it for display. You can bind associated values, use where clauses for extra conditions, and rely on exhaustiveness to remind you when a new error case is added. Choosing between catch patterns and a switch is a matter of readability: use whichever makes the responses easier to follow.</p>
+<p>Think of errors in switch statements as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors in switch statements, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound(String)
+    case noPermission
+}
+func describe(_ error: FileError) -&gt; String {
+    switch error {
+    case .notFound(let name): return &quot;Missing: \(name)&quot;
+    case .noPermission: return &quot;No permission&quot;
+    }
+}
+print(describe(.noPermission))</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors in switch statements differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors in switch statements is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors in switch statements stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> When is switching over an error clearer than several catch blocks?</p>
+<h2>Section 19: Throwing Functions and Return Values</h2>
+<p>A throwing function returns either its declared value or an error, never both, and never neither in the sense of a silent gap: the caller either receives the value or enters a catch block. This either-or contract is what makes throws reliable, because there is no in-between state where the caller holds a half-finished result. When you design a throwing function, think carefully about its return type on success and its error type on failure, since together they form the complete contract. A function that returns a value and also sets an error flag is doing the same job badly.</p>
+<p>Think of throwing functions and return values as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses throwing functions and return values, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum ReadError: Error {
+    case empty
+}
+func firstLine(of text: String) throws -&gt; String {
+    guard let line = text.split(separator: &quot;\n&quot;).first else { throw ReadError.empty }
+    return String(line)
+}
+print(try firstLine(of: &quot;Hello\nWorld&quot;))</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of throwing functions and return values differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with throwing functions and return values is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make throwing functions and return values stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What are the only two outcomes of calling a throwing function?</p>
+<h2>Section 20: Guard and Throw Together</h2>
+<p>Guard and throw are a natural pair: guard checks a condition that must hold, and throw describes what went wrong when it does not. Writing guard b != 0 else { throw MathError.divideByZero } reads almost like a sentence, and it keeps the happy path unindented below the guard. This pattern appears constantly in validation code, where each guard handles one requirement and the main logic only runs when all requirements pass. Using guard for validation and throw for failure keeps both the check and the explanation in one visible place.</p>
+<p>Think of guard and throw together as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses guard and throw together, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum AgeError: Error {
+    case tooYoung
+}
+func checkAge(_ age: Int) throws {
+    guard age &gt;= 13 else { throw AgeError.tooYoung }
+    print(&quot;Age OK&quot;)
+}
+try checkAge(20)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of guard and throw together differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with guard and throw together is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make guard and throw together stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why do guard and throw work well together for validation?</p>
+<h2>Section 21: Error Handling in Loops</h2>
+<p>When a throwing call sits inside a loop, a single throw will exit the whole loop unless you catch inside it. If you want the loop to continue with the next item after a failure, put the do-catch inside the loop body, so each iteration has its own error handling. If instead one failure should stop the entire job, keep the do-catch outside the loop. The placement of do-catch therefore expresses your intention: inside means keep going, outside means stop at the first problem. Choosing deliberately avoids both silent skips and unwanted stops.</p>
+<p>Think of error handling in loops as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses error handling in loops, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum ItemError: Error {
+    case badItem(String)
+}
+func process(_ item: String) throws {
+    if item == &quot;bad&quot; { throw ItemError.badItem(item) }
+    print(&quot;Processed \(item)&quot;)
+}
+for item in [&quot;a&quot;, &quot;bad&quot;, &quot;c&quot;] {
+    do {
+        try process(item)
+    } catch {
+        print(&quot;Skipped a bad item&quot;)
+    }
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of error handling in loops differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with error handling in loops is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make error handling in loops stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How does the placement of do-catch change a loop&#x27;s behaviour on failure?</p>
+<h2>Section 22: Errors from User Input</h2>
+<p>User input is one of the most common sources of errors, because users type unexpected values, leave fields empty, or choose files that do not exist. Throwing functions are ideal for validation: a parser throws a specific error for each kind of bad input, and the caller turns that error into a friendly message. Never show a raw error case name to a user; translate it into plain language that says what went wrong and what to do next. Good input handling treats the user as a collaborator who made a mistake, not as an adversary to be scolded.</p>
+<p>Think of errors from user input as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors from user input, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum InputError: Error {
+    case empty
+    case notANumber
+}
+func parseAge(_ text: String) throws -&gt; Int {
+    guard !text.isEmpty else { throw InputError.empty }
+    guard let age = Int(text) else { throw InputError.notANumber }
+    return age
+}
+do {
+    print(try parseAge(&quot;25&quot;))
+} catch {
+    print(&quot;Please enter a whole number&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors from user input differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors from user input is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors from user input stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why should input errors be translated before they reach the user?</p>
+<h2>Section 23: Errors from Files</h2>
+<p>File operations fail for many reasons: the file may not exist, the app may lack permission, the disk may be full, or the contents may be damaged. Swift&#x27;s file APIs therefore throw, and your code should catch the specific failures it can handle, such as offering to create a missing file, while reporting the rest honestly. Always think about what state the program is in after a file error: is a half-written file left behind, and should it be cleaned up? Handling the error is only half the job; leaving the system tidy is the other half.</p>
+<p>Think of errors from files as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors from files, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound(String)
+}
+func loadFile(named name: String) throws -&gt; String {
+    throw FileError.notFound(name)
+}
+do {
+    print(try loadFile(named: &quot;notes.txt&quot;))
+} catch FileError.notFound(let name) {
+    print(&quot;Could not find \(name)&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors from files differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors from files is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors from files stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What file failures should a program expect, and why?</p>
+<h2>Section 24: Errors from the Network</h2>
+<p>Network calls fail in ways that are outside your program&#x27;s control: the device may be offline, the server may be busy, or the response may be malformed. These failures are usually temporary, which is why network code often retries, waits, and then reports failure gracefully instead of crashing. When you write network-style code in exercises, model the failures explicitly with error cases for offline, timeout, and bad data, and decide for each whether retrying makes sense. A program that says the network is unavailable and offers to retry respects the user far more than one that simply stops.</p>
+<p>Think of errors from the network as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors from the network, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum NetworkError: Error {
+    case offline
+    case timeout
+}
+func fetch() throws -&gt; String {
+    throw NetworkError.offline
+}
+do {
+    print(try fetch())
+} catch NetworkError.offline {
+    print(&quot;You appear to be offline&quot;)
+} catch {
+    print(&quot;Network problem&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors from the network differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors from the network is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors from the network stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why are network errors often temporary, and how should code respond?</p>
+<h2>Section 25: Testing Throwing Functions</h2>
+<p>Testing a throwing function means testing both paths: the success path, where it returns the expected value, and each failure path, where it throws the expected error. In a test you can use a do-catch and record whether the right error was thrown, or use the testing framework&#x27;s throwing assertions when they are available. Writing the failure tests first often clarifies the error design, because it forces you to name every failure before you write the implementation. A function whose failures are untested is a function whose failures are unknown.</p>
+<p>Think of testing throwing functions as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses testing throwing functions, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+do {
+    _ = try divide(10, by: 0)
+    print(&quot;Unexpected success&quot;)
+} catch MathError.divideByZero {
+    print(&quot;Correctly threw divideByZero&quot;)
+} catch {
+    print(&quot;Wrong error&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of testing throwing functions differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with testing throwing functions is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make testing throwing functions stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What two paths must a test cover for a throwing function?</p>
+<h2>Section 26: Common do-catch Mistakes</h2>
+<p>The most common do-catch mistakes are easy to spot once you know them: forgetting try, which the compiler catches; writing catch without handling the error, which hides failures; catching too broadly, which treats different problems identically; and using try! to silence the compiler, which turns handleable failures into crashes. Another mistake is throwing a vague error, such as a single generic case, when a specific case would have told the caller what to do. Reviewing your catches with these mistakes in mind is a quick way to improve any program.</p>
+<p>Think of common do-catch mistakes as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses common do-catch mistakes, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+do {
+    print(try divide(10, by: 2))
+} catch {
+    print(&quot;Division failed&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of common do-catch mistakes differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with common do-catch mistakes is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make common do-catch mistakes stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Which do-catch mistakes hide failures instead of handling them?</p>
+<h2>Section 27: Designing a Good Error Enum</h2>
+<p>A good error enum has cases that are specific enough to act on, but not so numerous that callers cannot keep track of them. Each case should name the problem, not the solution, and cases that need detail should carry it as an associated value. Group related failures under one enum per area, such as one enum for file errors and another for login errors, rather than one giant enum for the whole program. Finally, keep case names in plain language, because error enums are read by people debugging at midnight as well as by the compiler.</p>
+<p>Think of designing a good error enum as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses designing a good error enum, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum PaymentError: Error {
+    case insufficientFunds
+    case cardExpired
+    case networkUnavailable
+}
+print(PaymentError.cardExpired)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of designing a good error enum differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with designing a good error enum is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make designing a good error enum stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What makes an error enum specific enough to act on, but not overwhelming?</p>
+<h2>Section 28: Error Descriptions for Humans</h2>
+<p>An error value on its own is not a user message. To produce a friendly message, you can switch over the error and return a sentence for each case, or conform to a description protocol in later work. The message should say what happened, in plain words, and what the user can do next, such as checking a file name or trying again. Avoid technical jargon, blame, and raw case names, and never include sensitive details such as passwords. Writing the message is part of handling the error, not an optional extra.</p>
+<p>Think of error descriptions for humans as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses error descriptions for humans, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum LoginError: Error {
+    case wrongPassword
+}
+func message(for error: LoginError) -&gt; String {
+    switch error {
+    case .wrongPassword: return &quot;That password does not match. Please try again.&quot;
+    }
+}
+print(message(for: .wrongPassword))</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of error descriptions for humans differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with error descriptions for humans is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make error descriptions for humans stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What should a human-friendly error message contain?</p>
+<h2>Section 29: Recovering from an Error</h2>
+<p>Recovery means continuing usefully after a failure, rather than simply reporting it and stopping. A program might use a default value, load a cached copy, ask the user for a different file, or retry the operation once. Not every error is recoverable: a missing password cannot be invented, but a missing configuration file can be replaced with defaults. Deciding which errors are recoverable is a design decision that belongs in the catch block, where you know both what failed and what the user was trying to achieve.</p>
+<p>Think of recovering from an error as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses recovering from an error, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum ConfigError: Error {
+    case missing
+}
+func loadConfig() throws -&gt; String {
+    throw ConfigError.missing
+}
+let config: String
+do {
+    config = try loadConfig()
+} catch {
+    config = &quot;default settings&quot;
+}
+print(config)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of recovering from an error differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with recovering from an error is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make recovering from an error stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> When is recovery possible, and when is reporting the failure the right choice?</p>
+<h2>Section 30: Retrying After Failure</h2>
+<p>Retrying is a specific kind of recovery that makes sense for temporary failures, such as a busy server or a brief loss of connection, but not for permanent ones, such as a wrong password. A simple retry loop tries the operation a limited number of times, perhaps with a short pause between attempts, and then gives up with a clear message. Unlimited retries are dangerous, because they can hang a program or overload a server. Always set a limit, and always tell the user what is happening, so a retry does not look like a frozen program.</p>
+<p>Think of retrying after failure as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses retrying after failure, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum NetworkError: Error {
+    case busy
+}
+func fetch() throws -&gt; String {
+    throw NetworkError.busy
+}
+var attempts = 0
+while attempts &lt; 3 {
+    do {
+        print(try fetch())
+        break
+    } catch {
+        attempts += 1
+        print(&quot;Attempt \(attempts) failed, retrying&quot;)
+    }
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of retrying after failure differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with retrying after failure is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make retrying after failure stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Which failures are worth retrying, and what limit should a retry loop have?</p>
+<h2>Section 31: Logging Errors for Debugging</h2>
+<p>Logging an error means recording what failed, when, and with what detail, so that a developer can diagnose a problem that a user cannot describe precisely. A good log entry includes the error case, any associated values, and the context, such as which file or operation was involved, but it must never include passwords or personal data. Logging does not replace handling the error for the user: the user still needs a friendly message, while the log serves the developer. Keep logs concise, because a flood of entries hides the important ones.</p>
+<p>Think of logging errors for debugging as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses logging errors for debugging, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound(String)
+}
+func load() throws -&gt; String {
+    throw FileError.notFound(&quot;notes.txt&quot;)
+}
+do {
+    print(try load())
+} catch {
+    print(&quot;LOG: load failed with \(error)&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of logging errors for debugging differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with logging errors for debugging is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make logging errors for debugging stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What should an error log contain, and what must it never contain?</p>
+<h2>Section 32: Errors and Early Returns</h2>
+<p>Error handling and early returns share a goal: keep the main path clear by dealing with problems at the top. A guard that throws, or a do-catch that returns from a function, both prevent the rest of the function from running on bad data. The difference is that a throw also carries information to the caller, while a simple return does not. Choose throw when the caller needs to know why the function stopped, and choose a plain early return when the reason is internal and the caller only needs to know that nothing more happened.</p>
+<p>Think of errors and early returns as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors and early returns, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum DataError: Error {
+    case empty
+}
+func process(_ items: [String]) throws {
+    guard !items.isEmpty else { throw DataError.empty }
+    print(&quot;Processing \(items.count) items&quot;)
+}
+try process([&quot;a&quot;, &quot;b&quot;])</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors and early returns differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors and early returns is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors and early returns stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How do throwing guards and early returns differ in what they tell the caller?</p>
+<h2>Section 33: Throwing Closures</h2>
+<p>A closure can also be marked throws, which means calling it requires try and may produce an error. This is useful for callbacks that validate, transform, or load data, where failure is a real possibility. When you pass a throwing closure to a function, that function usually propagates or rethrows the error, as you saw earlier. The syntax places throws after the closure&#x27;s parameter list, mirroring functions, and the same do-catch tools handle the result. Thinking of closures as small functions makes their error behaviour feel familiar rather than new.</p>
+<p>Think of throwing closures as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses throwing closures, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>let work: () throws -&gt; String = {
+    return &quot;Finished&quot;
+}
+do {
+    print(try work())
+} catch {
+    print(&quot;Closure failed&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of throwing closures differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with throwing closures is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make throwing closures stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How is a throwing closure declared and called?</p>
+<h2>Section 34: Errors in Async Code Preview</h2>
+<p>Later chapters introduce async and await, where functions can pause while waiting for a network response or a file. Throwing works the same way there, with try await marking a call that might both pause and fail. The combination is powerful, because a single do-catch can handle failures from several awaited steps in order. You do not need async to understand errors, but knowing that the same tools extend to asynchronous code shows why learning do-catch well now will pay off again. The pattern stays the same; only the waiting is new.</p>
+<p>Think of errors in async code preview as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors in async code preview, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FetchError: Error {
+    case offline
+}
+func fetch() throws -&gt; String {
+    throw FetchError.offline
+}
+do {
+    print(try fetch())
+} catch {
+    print(&quot;Fetch failed&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors in async code preview differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors in async code preview is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors in async code preview stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How will do-catch extend when you meet async code later?</p>
+<h2>Section 35: When Not to Throw</h2>
+<p>Not every problem should be an error. A function that searches a list and finds nothing has not failed; it has answered a question with no match, and an optional is the honest result. Throwing for routine outcomes forces callers into do-catch blocks for ordinary control flow, which makes code noisy and hides genuine failures. Reserve throws for situations where the caller cannot proceed normally and needs to know why. If you find yourself throwing for a common, expected result, reconsider whether an optional or a result enum describes the situation better.</p>
+<p>Think of when not to throw as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses when not to throw, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>func firstEven(in numbers: [Int]) -&gt; Int? {
+    return numbers.first { $0 % 2 == 0 }
+}
+print(firstEven(in: [1, 3, 5]) ?? -1)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of when not to throw differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with when not to throw is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make when not to throw stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> When is throwing the wrong tool for a routine outcome?</p>
+<h2>Section 36: Refactoring to Throwing Functions</h2>
+<p>Refactoring a function to throw usually starts by replacing a vague failure signal, such as returning nil or a magic number, with a specific error enum. You add throws to the signature, replace the failure returns with throw statements, and update call sites to use try inside do-catch blocks. The compiler helps at every step, pointing to each call site that needs updating, which makes the refactor safe. The result is code where failures are visible, specific, and handled deliberately, instead of being encoded in values that callers might forget to check.</p>
+<p>Think of refactoring to throwing functions as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses refactoring to throwing functions, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum ParseError: Error {
+    case invalidNumber(String)
+}
+func parse(_ text: String) throws -&gt; Int {
+    guard let value = Int(text) else { throw ParseError.invalidNumber(text) }
+    return value
+}
+print(try parse(&quot;42&quot;))</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of refactoring to throwing functions differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with refactoring to throwing functions is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make refactoring to throwing functions stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What steps turn a function that returns a magic value into a throwing function?</p>
+<h2>Section 37: Errors Across Module Boundaries</h2>
+<p>When code is shared between parts of a program or between projects, its error enum becomes part of its public contract. Changing a case name, removing a case, or adding a required associated value can break callers, so public error enums should be designed with care and changed thoughtfully. Document each case in plain language, explaining when it is thrown and what the caller should do. A stable, documented error type is a sign of a mature library, because it respects the time of everyone who builds on it.</p>
+<p>Think of errors across module boundaries as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors across module boundaries, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum LibraryError: Error {
+    case unavailable
+}
+func useLibrary() throws {
+    throw LibraryError.unavailable
+}
+do {
+    try useLibrary()
+} catch {
+    print(&quot;Library unavailable&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors across module boundaries differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors across module boundaries is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors across module boundaries stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why does a public error enum need extra care when it changes?</p>
+<h2>Section 38: Error Handling and Testing Together</h2>
+<p>A thorough test suite for error handling checks that each error case is thrown by the right input and caught or reported correctly by the caller. One useful technique is to write a test for each case of your error enum, using inputs that trigger exactly that failure and no other. Another is to test recovery: after a failure and a fallback, does the program continue in a valid state? Tests like these turn error handling from a hope into evidence, and they catch regressions when the code changes later.</p>
+<p>Think of error handling and testing together as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses error handling and testing together, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+func testDivideByZero() {
+    do {
+        _ = try divide(10, by: 0)
+        print(&quot;Test failed: no error&quot;)
+    } catch MathError.divideByZero {
+        print(&quot;Test passed&quot;)
+    } catch {
+        print(&quot;Test failed: wrong error&quot;)
+    }
+}
+testDivideByZero()</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of error handling and testing together differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with error handling and testing together is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make error handling and testing together stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How do you test that the right error is thrown for the right input?</p>
+<h2>Section 39: Reading Error Handling in Real Code</h2>
+<p>When you read real Swift code, look for throws in function signatures first, because they mark the risky operations. Then follow the try calls to see where errors are caught, propagated, or converted to optionals, and notice which layer makes each decision. You will often find that low-level code throws, middle layers propagate, and the top layer catches and shows a message. That shape is not an accident: it is the design pattern this chapter teaches, applied at the scale of a whole program. Recognising it will help you read large codebases with confidence.</p>
+<p>Think of reading error handling in real code as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses reading error handling in real code, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound
+}
+func load() throws -&gt; String {
+    throw FileError.notFound
+}
+func show() {
+    do {
+        print(try load())
+    } catch {
+        print(&quot;Could not show the file&quot;)
+    }
+}
+show()</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of reading error handling in real code differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with reading error handling in real code is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make reading error handling in real code stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Where should you look first when reading error handling in real code?</p>
+<h2>Section 40: Errors and User Experience</h2>
+<p>Error handling is ultimately a user-experience topic, because every unhandled error is a moment where a person is confused, blocked, or loses work. Good handling preserves what the user has done, explains the problem in their language, and offers a next step, whether that is retrying, choosing another file, or saving elsewhere. Poor handling, by contrast, crashes, shows jargon, or silently discards work. When you design error handling, imagine yourself as the user at the moment of failure, and ask what you would most want the program to do.</p>
+<p>Think of errors and user experience as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors and user experience, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum SaveError: Error {
+    case diskFull
+}
+func save() throws {
+    throw SaveError.diskFull
+}
+do {
+    try save()
+    print(&quot;Saved&quot;)
+} catch {
+    print(&quot;Could not save: the disk is full. Free some space and try again.&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors and user experience differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors and user experience is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors and user experience stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How does good error handling protect the user&#x27;s work and time?</p>
+<h2>Section 41: Defer and Cleanup on Error</h2>
+<p>When a function opens a file, starts a task, or reserves a resource, that resource must be released even if an error occurs partway through. Swift&#x27;s defer statement, which you will study in full later, runs cleanup code when the current scope exits, whether by return, by throw, or by reaching the end. Placing cleanup in a defer block right after acquiring the resource guarantees it cannot be forgotten on one error path. Thinking about cleanup at the moment you acquire a resource is a habit that prevents leaks and half-finished states.</p>
+<p>Think of defer and cleanup on error as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses defer and cleanup on error, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>func useResource() {
+    print(&quot;Resource opened&quot;)
+    defer { print(&quot;Resource closed&quot;) }
+    print(&quot;Resource in use&quot;)
+}
+useResource()</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of defer and cleanup on error differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with defer and cleanup on error is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make defer and cleanup on error stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why should cleanup be tied to acquiring a resource, not left to the end?</p>
+<h2>Section 42: Error Handling in Struct Methods</h2>
+<p>Methods on structs and classes can throw just like free functions, and the same rules apply: mark the method throws, throw specific errors, and let callers handle them with try. A bank account method, for example, might throw when a withdrawal exceeds the balance, which is far clearer than silently allowing a negative balance or returning a magic number. Keeping validation inside the method means every caller gets the same protection, and the type itself guarantees that its values stay valid. This is encapsulation and error handling working together.</p>
+<p>Think of error handling in struct methods as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses error handling in struct methods, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum AccountError: Error {
+    case insufficientFunds
+}
+struct Account {
+    var balance: Int
+    mutating func withdraw(_ amount: Int) throws {
+        guard amount &lt;= balance else { throw AccountError.insufficientFunds }
+        balance -= amount
+    }
+}
+var account = Account(balance: 100)
+try account.withdraw(30)
+print(account.balance)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of error handling in struct methods differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with error handling in struct methods is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make error handling in struct methods stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How does a throwing method protect a struct&#x27;s values?</p>
+<h2>Section 43: Converting Errors Between Types</h2>
+<p>Sometimes a low-level error needs to be translated into a higher-level error that makes sense to the caller, such as turning a file error into a document error. Conversion happens in a catch block: catch the low-level error, and throw a new, more meaningful one, optionally carrying the original detail. This keeps layers honest, because each layer speaks in its own terms, while still preserving the information needed for debugging. Without conversion, high-level code would have to understand every low-level failure, which couples the layers together too tightly.</p>
+<p>Think of converting errors between types as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses converting errors between types, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum FileError: Error {
+    case notFound
+}
+enum DocumentError: Error {
+    case couldNotOpen
+}
+func openDocument() throws {
+    do {
+        throw FileError.notFound
+    } catch {
+        throw DocumentError.couldNotOpen
+    }
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of converting errors between types differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with converting errors between types is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make converting errors between types stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> Why would you convert a low-level error into a higher-level one?</p>
+<h2>Section 44: Errors Versus Assertions</h2>
+<p>An assertion is a check that a condition you believe impossible to violate holds true, and it crashes in debug builds if it does not, while an error is a recognised possibility that the program handles. Use errors for problems that can happen in the real world, such as missing files and bad input, and use assertions for programmer mistakes that should never reach a user, such as an internal invariant being broken. Confusing the two is costly: asserting on user input crashes on bad data, while throwing for an internal bug hides a defect that should be fixed. Ask who can cause the problem, a user or a programmer, to choose correctly.</p>
+<p>Think of errors versus assertions as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses errors versus assertions, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>func setAge(_ age: Int) {
+    assert(age &gt;= 0, &quot;Age cannot be negative&quot;)
+    print(&quot;Age set to \(age)&quot;)
+}
+setAge(20)</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of errors versus assertions differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with errors versus assertions is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make errors versus assertions stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How do you choose between an error and an assertion?</p>
+<h2>Section 45: Nested do-catch Blocks</h2>
+<p>A do-catch block can sit inside another do-catch block, or inside a catch block, when an inner operation needs its own handling before the outer handling runs. For example, a catch block that tries to save a backup might itself fail, and that inner failure needs its own response. Nesting is powerful, but deep nesting quickly becomes hard to read, so use it only when the inner failure genuinely needs different handling. Often, extracting the inner work into its own throwing function, with its own do-catch at the call site, keeps the structure flatter and clearer.</p>
+<p>Think of nested do-catch blocks as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses nested do-catch blocks, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum InnerError: Error {
+    case failed
+}
+func inner() throws {
+    throw InnerError.failed
+}
+do {
+    do {
+        try inner()
+    } catch {
+        print(&quot;Inner problem handled&quot;)
+    }
+    print(&quot;Outer work continues&quot;)
+} catch {
+    print(&quot;Outer problem&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of nested do-catch blocks differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with nested do-catch blocks is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make nested do-catch blocks stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> When is a nested do-catch justified, and when is extraction better?</p>
+<h2>Section 46: Handling Errors at the Top Level</h2>
+<p>At the top level of a program, such as in main code, there is no higher caller to propagate to, so errors must finally be caught and reported. A top-level do-catch often prints a friendly message, saves any recoverable work, and exits with a clear status, rather than crashing with a stack trace. This final catch is the user&#x27;s last safety net, and it should never be empty. Even in a small command-line program, a thoughtful top-level catch turns a confusing failure into a message the user can act on or report.</p>
+<p>Think of handling errors at the top level as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses handling errors at the top level, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum AppError: Error {
+    case startupFailed
+}
+func run() throws {
+    throw AppError.startupFailed
+}
+do {
+    try run()
+} catch {
+    print(&quot;The program could not start. Please try again.&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of handling errors at the top level differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with handling errors at the top level is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make handling errors at the top level stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What must a top-level catch do, since no caller remains?</p>
+<h2>Section 47: An Error Handling Checklist</h2>
+<p>Before you consider error handling finished, run through a short checklist: is every throwing call marked with try, does every error case have a response, are specific catches before general ones, are user messages friendly and actionable, and is any cleanup guaranteed even on failure? Also check that no try! hides a predictable failure, and that tests cover at least one success and one failure for each throwing function. A checklist turns good intentions into consistent practice, and it is quick to apply once it becomes a habit. Keep it beside you while you review your own code.</p>
+<p>Think of an error handling checklist as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses an error handling checklist, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum CheckError: Error {
+    case failed
+}
+func check() throws {
+    throw CheckError.failed
+}
+do {
+    try check()
+} catch {
+    print(&quot;Checklist: failure handled&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of an error handling checklist differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with an error handling checklist is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make an error handling checklist stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What five questions belong on an error-handling checklist?</p>
+<h2>Section 48: From do-catch to Result Preview</h2>
+<p>Swift also provides a Result type that wraps either a success value or a failure error in a single value, without throwing. You can convert a throwing call into a Result, pass it around, and handle it later with a switch, which is useful when an error must travel through code that cannot throw. Result and do-catch describe the same idea in different forms: one is a value you inspect, the other is control flow you catch. The next chapter explores handling errors well, including when a Result is the clearer choice, so treat this as a preview, not a second system to master yet.</p>
+<p>Think of from do-catch to result preview as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses from do-catch to result preview, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum SimpleError: Error {
+    case failed
+}
+let result: Result&lt;String, SimpleError&gt; = .success(&quot;Done&quot;)
+switch result {
+case .success(let value): print(value)
+case .failure(let error): print(error)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of from do-catch to result preview differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with from do-catch to result preview is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make from do-catch to result preview stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> How does Result differ from do-catch in form, even though the idea is similar?</p>
+<h2>Section 49: Building a Small Error Project</h2>
+<p>A good small project for this chapter is a number parser or a tiny file reader with at least three error cases, a throwing function, and a do-catch that gives a different friendly message for each case. Add one recoverable error, such as a missing optional file that falls back to defaults, and one unrecoverable error that is reported honestly. Test each case by hand, and then add a fourth error case to see how the compiler guides your catch blocks. That exercise covers the whole chapter in a program you can actually run and explain.</p>
+<p>Think of building a small error project as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses building a small error project, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum ParseError: Error {
+    case empty
+    case notANumber
+    case tooLarge
+}
+func parse(_ text: String) throws -&gt; Int {
+    guard !text.isEmpty else { throw ParseError.empty }
+    guard let value = Int(text) else { throw ParseError.notANumber }
+    guard value &lt; 1000 else { throw ParseError.tooLarge }
+    return value
+}
+do {
+    print(try parse(&quot;42&quot;))
+} catch {
+    print(&quot;Parse failed&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of building a small error project differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with building a small error project is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make building a small error project stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What small project would practise every do-catch idea in this chapter?</p>
+<h2>Section 50: Chapter Review: do, try and catch</h2>
+<p>You now know the core of Swift error handling: describe failures with an error enum, mark risky functions with throws, throw specific errors when problems occur, and handle them with do-catch, try?, or propagation. The central habit is to treat failure as a designed outcome, not an afterthought, and to give each failure a name, a reason, and a response. The next chapter goes further, asking not just how to catch an error, but how to handle it well, with recovery, retries, and messages that genuinely help.</p>
+<p>Think of chapter review: do, try and catch as a way of giving a name to an idea that your program already uses, so the idea is easy to recognise when you meet it again later. When you read code that uses chapter review: do, try and catch, slow down and ask what choice is being made, what information travels with that choice, and what should happen for each possible outcome. That habit turns a short example into a mental model you can reuse. You do not need to remember every detail at once. Start with the simplest case, run it, and then add one small variation. Each variation teaches you something the definition alone cannot, because you see the result change in front of you.</p>
+<pre><code>enum MathError: Error {
+    case divideByZero
+}
+func divide(_ a: Int, by b: Int) throws -&gt; Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+do {
+    print(try divide(10, by: 2))
+} catch {
+    print(&quot;Division failed&quot;)
+}</code></pre>
+<p>Before you look at the code, say in plain words what you expect it to do. Then read it line by line and match each line to that expectation. If a line surprises you, that surprise is useful: it shows exactly where your picture of chapter review: do, try and catch differs from how Swift actually works. Change one value, run the example again in your head or in a playground, and notice what stays the same and what changes. This small experiment habit is how beginners become confident programmers, because confidence comes from tested understanding rather than from memorising rules.</p>
+<p>A common mistake with chapter review: do, try and catch is to rush past the simple case and try to combine several new ideas at once. When the result is wrong, it is then hard to tell which idea caused the problem. Keep your first attempt small and clear, even if it looks too easy. Give your values honest names, keep each step on its own line where that helps, and check the result before you add the next feature. If you get stuck, explain the code out loud as if you were teaching a friend. The sentence where you hesitate usually points to the part you need to practise again.</p>
+<p>To make chapter review: do, try and catch stick, try a tiny task of your own after this section. Invent a small example from everyday life, write the code for it, and predict the output before you run it. Then compare your prediction with the real result and write down, in one sentence, what you learned from any difference. Over time, those small sentences build a personal guide that is far more useful than notes copied from someone else. Good Swift code is not clever code. It is code that a future reader, including your future self, can follow without guessing.</p>
+<p class="check"><strong>Check:</strong> What is the single most important habit to carry forward from do-catch?</p>
+<h2>Practical Task</h2>
+<p>Build a small Swift program called Safe Reader. Define an error enum with at least four cases for reading and parsing text, including one case with an associated value for a bad line or file name. Write a throwing function that validates and parses a short piece of input, a do-catch block that gives a different friendly message for each error case, one use of try? for an optional step, and a recovery path for one recoverable error using a default value. Test every error case by hand with different inputs, and write down which errors you chose to recover from and which you chose to report.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Explain the roles of do, try, and catch in a single example, in your own words.</li>
+<li>When should you use try?, and when would try? hide information you actually need?</li>
+<li>Design an error enum for saving a note. What cases would it need, and which would carry associated values?</li>
+<li>Why should specific catch blocks come before a general catch, and what happens if they do not?</li>
+<li>Describe a situation where propagating an error is better than catching it immediately.</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-21.html">← Chapter 21</a> <a href="index.html">All chapters</a> <a href="chapter-23.html">Chapter 23 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/swift-developer/chapter-22.html'; this.page.identifier = 'book-swift-developer-chapter-22'; this.page.title = 'Chapter 22: Error Handling: do, try and catch'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 32 — Threads: Running Code at the Same Time — C++ Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 32 of the C++ Developer teaching book: Threads: Running Code at the Same Time.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:860px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:860px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.25;font-size:2rem}
+h2{color:#22d3ee;margin-top:2.2em;line-height:1.35}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+ul.chapter-list{list-style:none;padding:0}
+ul.chapter-list li{margin:.55em 0}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:700;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← C++ Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 32: Threads: Running Code at the Same Time</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-32.svg" alt="Design for Chapter 32" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1</h2>
+<p>This section is about what a thread really is, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand what a thread really is, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about what a thread really is is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use what a thread really is in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// What a thread really is
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is what a thread really is, and when would you use it?</p>
+<h2>Section 2</h2>
+<p>This section is about creating a thread with std::thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand creating a thread with std::thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about creating a thread with std::thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use creating a thread with std::thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Creating a thread with std::thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is creating a thread with std::thread, and when would you use it?</p>
+<h2>Section 3</h2>
+<p>This section is about joining a thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand joining a thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about joining a thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use joining a thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Joining a thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is joining a thread, and when would you use it?</p>
+<h2>Section 4</h2>
+<p>This section is about why detaching is usually risky, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand why detaching is usually risky, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about why detaching is usually risky is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use why detaching is usually risky in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Why detaching is usually risky
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is why detaching is usually risky, and when would you use it?</p>
+<h2>Section 5</h2>
+<p>This section is about passing arguments to a thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand passing arguments to a thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about passing arguments to a thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use passing arguments to a thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Passing arguments to a thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is passing arguments to a thread, and when would you use it?</p>
+<h2>Section 6</h2>
+<p>This section is about passing references with std::ref, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand passing references with std::ref, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about passing references with std::ref is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use passing references with std::ref in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Passing references with std::ref
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is passing references with std::ref, and when would you use it?</p>
+<h2>Section 7</h2>
+<p>This section is about running a member function in a thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand running a member function in a thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about running a member function in a thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use running a member function in a thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Running a member function in a thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is running a member function in a thread, and when would you use it?</p>
+<h2>Section 8</h2>
+<p>This section is about running a lambda in a thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand running a lambda in a thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about running a lambda in a thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use running a lambda in a thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Running a lambda in a thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is running a lambda in a thread, and when would you use it?</p>
+<h2>Section 9</h2>
+<p>This section is about how many threads your hardware supports, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand how many threads your hardware supports, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about how many threads your hardware supports is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use how many threads your hardware supports in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// How many threads your hardware supports
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is how many threads your hardware supports, and when would you use it?</p>
+<h2>Section 10</h2>
+<p>This section is about getting and printing a thread id, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand getting and printing a thread id, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about getting and printing a thread id is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use getting and printing a thread id in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Getting and printing a thread id
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is getting and printing a thread id, and when would you use it?</p>
+<h2>Section 11</h2>
+<p>This section is about sleeping and yielding a thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand sleeping and yielding a thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about sleeping and yielding a thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use sleeping and yielding a thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Sleeping and yielding a thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is sleeping and yielding a thread, and when would you use it?</p>
+<h2>Section 12</h2>
+<p>This section is about race conditions in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand race conditions in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about race conditions in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use race conditions in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Race conditions in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is race conditions in plain words, and when would you use it?</p>
+<h2>Section 13</h2>
+<p>This section is about data races versus logic races, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand data races versus logic races, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about data races versus logic races is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use data races versus logic races in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Data races versus logic races
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is data races versus logic races, and when would you use it?</p>
+<h2>Section 14</h2>
+<p>This section is about thread lifetimes and ownership, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand thread lifetimes and ownership, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about thread lifetimes and ownership is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use thread lifetimes and ownership in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Thread lifetimes and ownership
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is thread lifetimes and ownership, and when would you use it?</p>
+<h2>Section 15</h2>
+<p>This section is about checking whether a thread is joinable, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand checking whether a thread is joinable, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about checking whether a thread is joinable is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use checking whether a thread is joinable in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Checking whether a thread is joinable
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is checking whether a thread is joinable, and when would you use it?</p>
+<h2>Section 16</h2>
+<p>This section is about exceptions inside a thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand exceptions inside a thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about exceptions inside a thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use exceptions inside a thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Exceptions inside a thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is exceptions inside a thread, and when would you use it?</p>
+<h2>Section 17</h2>
+<p>This section is about the idea of a thread pool, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand the idea of a thread pool, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about the idea of a thread pool is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use the idea of a thread pool in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// The idea of a thread pool
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is the idea of a thread pool, and when would you use it?</p>
+<h2>Section 18</h2>
+<p>This section is about a work queue in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand a work queue in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about a work queue in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use a work queue in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// A work queue in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is a work queue in plain words, and when would you use it?</p>
+<h2>Section 19</h2>
+<p>This section is about dividing work between threads, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand dividing work between threads, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about dividing work between threads is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use dividing work between threads in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Dividing work between threads
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is dividing work between threads, and when would you use it?</p>
+<h2>Section 20</h2>
+<p>This section is about parallel loops in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand parallel loops in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about parallel loops in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use parallel loops in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Parallel loops in concept
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is parallel loops in concept, and when would you use it?</p>
+<h2>Section 21</h2>
+<p>This section is about false sharing in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand false sharing in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about false sharing in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use false sharing in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// False sharing in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is false sharing in plain words, and when would you use it?</p>
+<h2>Section 22</h2>
+<p>This section is about thread-local storage, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand thread-local storage, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about thread-local storage is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use thread-local storage in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong. If the behaviour surprises you, simplify the program until the surprise disappears, and that smaller program will usually show you exactly which assumption was wrong.</p>
+<pre><code>// Thread-local storage
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is thread-local storage, and when would you use it?</p>
+<h2>Section 23</h2>
+<p>This section is about std::async in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand std::async in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about std::async in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use std::async in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// std::async in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is std::async in plain words, and when would you use it?</p>
+<h2>Section 24</h2>
+<p>This section is about futures and waiting for a result, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand futures and waiting for a result, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about futures and waiting for a result is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use futures and waiting for a result in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Futures and waiting for a result
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is futures and waiting for a result, and when would you use it?</p>
+<h2>Section 25</h2>
+<p>This section is about std::packaged_task in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand std::packaged_task in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about std::packaged_task in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use std::packaged_task in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// std::packaged_task in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is std::packaged_task in plain words, and when would you use it?</p>
+<h2>Section 26</h2>
+<p>This section is about std::promise in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand std::promise in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about std::promise in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use std::promise in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// std::promise in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is std::promise in plain words, and when would you use it?</p>
+<h2>Section 27</h2>
+<p>This section is about waiting for several results, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand waiting for several results, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about waiting for several results is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use waiting for several results in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Waiting for several results
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is waiting for several results, and when would you use it?</p>
+<h2>Section 28</h2>
+<p>This section is about designing code to be thread-safe, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand designing code to be thread-safe, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about designing code to be thread-safe is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use designing code to be thread-safe in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Designing code to be thread-safe
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is designing code to be thread-safe, and when would you use it?</p>
+<h2>Section 29</h2>
+<p>This section is about sharing immutable data safely, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand sharing immutable data safely, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about sharing immutable data safely is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use sharing immutable data safely in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Sharing immutable data safely
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is sharing immutable data safely, and when would you use it?</p>
+<h2>Section 30</h2>
+<p>This section is about why read-only sharing is safe, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand why read-only sharing is safe, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about why read-only sharing is safe is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use why read-only sharing is safe in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Why read-only sharing is safe
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is why read-only sharing is safe, and when would you use it?</p>
+<h2>Section 31</h2>
+<p>This section is about debugging threaded programs, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand debugging threaded programs, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about debugging threaded programs is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use debugging threaded programs in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Debugging threaded programs
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is debugging threaded programs, and when would you use it?</p>
+<h2>Section 32</h2>
+<p>This section is about deadlock preview before the next chapter, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand deadlock preview before the next chapter, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about deadlock preview before the next chapter is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use deadlock preview before the next chapter in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Deadlock preview before the next chapter
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is deadlock preview before the next chapter, and when would you use it?</p>
+<h2>Section 33</h2>
+<p>This section is about oversubscription and too many threads, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand oversubscription and too many threads, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about oversubscription and too many threads is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use oversubscription and too many threads in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Oversubscription and too many threads
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is oversubscription and too many threads, and when would you use it?</p>
+<h2>Section 34</h2>
+<p>This section is about the cost of creating a thread, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand the cost of creating a thread, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about the cost of creating a thread is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use the cost of creating a thread in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// The cost of creating a thread
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is the cost of creating a thread, and when would you use it?</p>
+<h2>Section 35</h2>
+<p>This section is about choosing how many threads to use, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand choosing how many threads to use, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about choosing how many threads to use is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use choosing how many threads to use in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Choosing how many threads to use
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is choosing how many threads to use, and when would you use it?</p>
+<h2>Section 36</h2>
+<p>This section is about using timers with threads, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand using timers with threads, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about using timers with threads is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use using timers with threads in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Using timers with threads
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is using timers with threads, and when would you use it?</p>
+<h2>Section 37</h2>
+<p>This section is about stopping a thread cooperatively, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand stopping a thread cooperatively, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about stopping a thread cooperatively is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use stopping a thread cooperatively in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Stopping a thread cooperatively
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is stopping a thread cooperatively, and when would you use it?</p>
+<h2>Section 38</h2>
+<p>This section is about an atomic flag as a stop signal, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand an atomic flag as a stop signal, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about an atomic flag as a stop signal is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use an atomic flag as a stop signal in your own code, start with the simplest correct version and add complexity only when you have a reason.</p>
+<pre><code>// An atomic flag as a stop signal
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is an atomic flag as a stop signal, and when would you use it?</p>
+<h2>Section 39</h2>
+<p>This section is about returning results through references, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand returning results through references, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about returning results through references is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use returning results through references in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Returning results through references
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is returning results through references, and when would you use it?</p>
+<h2>Section 40</h2>
+<p>This section is about many threads running the same function, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand many threads running the same function, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about many threads running the same function is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use many threads running the same function in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Many threads running the same function
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is many threads running the same function, and when would you use it?</p>
+<h2>Section 41</h2>
+<p>This section is about why thread order is not predictable, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand why thread order is not predictable, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about why thread order is not predictable is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use why thread order is not predictable in your own code, start with the simplest correct version and add complexity only when you have a reason.</p>
+<pre><code>// Why thread order is not predictable
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is why thread order is not predictable, and when would you use it?</p>
+<h2>Section 42</h2>
+<p>This section is about testing threaded code, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand testing threaded code, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about testing threaded code is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use testing threaded code in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Testing threaded code
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is testing threaded code, and when would you use it?</p>
+<h2>Section 43</h2>
+<p>This section is about logging from several threads, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand logging from several threads, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about logging from several threads is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use logging from several threads in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Logging from several threads
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is logging from several threads, and when would you use it?</p>
+<h2>Section 44</h2>
+<p>This section is about threads versus processes, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand threads versus processes, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about threads versus processes is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When a threaded program behaves differently on every run, that is usually a clue, not bad luck: some shared state is being read and written without protection. Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use threads versus processes in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Threads versus processes
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is threads versus processes, and when would you use it?</p>
+<h2>Section 45</h2>
+<p>This section is about threads and user interfaces, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand threads and user interfaces, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about threads and user interfaces is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Keep each thread&#x27;s job clear and self-contained, pass it the data it needs, and decide in advance how its result will come back. Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use threads and user interfaces in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Threads and user interfaces
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is threads and user interfaces, and when would you use it?</p>
+<h2>Section 46</h2>
+<p>This section is about thread-safe design patterns in outline, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand thread-safe design patterns in outline, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about thread-safe design patterns in outline is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A thread that outlives the data it uses is a classic bug, so joining, and keeping objects alive until the join, deserves your full attention. If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use thread-safe design patterns in outline in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Thread-safe design patterns in outline
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::thread t([] { std::cout &lt;&lt; &quot;lambda thread\n&quot;; });
+    if (t.joinable()) t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is thread-safe design patterns in outline, and when would you use it?</p>
+<h2>Section 47</h2>
+<p>This section is about the producer and consumer idea, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand the producer and consumer idea, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about the producer and consumer idea is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Testing threaded code means running it many times, with different workloads, because a bug that appears once in a hundred runs is still a bug. The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use the producer and consumer idea in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// The producer and consumer idea
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;functional&gt;
+void add(int a, int b, int&amp; out) { out = a + b; }
+int main() {
+    int result = 0;
+    std::thread t(add, 3, 4, std::ref(result));
+    t.join();
+    std::cout &lt;&lt; result &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is the producer and consumer idea, and when would you use it?</p>
+<h2>Section 48</h2>
+<p>This section is about worker threads in outline, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand worker threads in outline, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about worker threads in outline is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Threads are a tool for genuine parallelism and for waiting without freezing a program, not a way to make every program automatically faster. A thread is not free, and creating one for a tiny job can cost more than the job itself, so think about the size of the work before you split it. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use worker threads in outline in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Worker threads in outline
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;chrono&gt;
+int main() {
+    std::thread t([] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout &lt;&lt; &quot;awake\n&quot;;
+    });
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is worker threads in outline, and when would you use it?</p>
+<h2>Section 49</h2>
+<p>This section is about measuring speedup honestly, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand measuring speedup honestly, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about measuring speedup honestly is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>If a problem can be solved cleanly on one thread, do that first, and add threads only when the work is large, independent, and worth splitting. Because the operating system decides when each thread runs, you must never rely on one thread finishing before another unless you synchronise them. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use measuring speedup honestly in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Measuring speedup honestly
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+int main() {
+    std::cout &lt;&lt; &quot;cores: &quot; &lt;&lt; std::thread::hardware_concurrency() &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is measuring speedup honestly, and when would you use it?</p>
+<h2>Section 50</h2>
+<p>This section is about a threaded program design from start to finish, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand a threaded program design from start to finish, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about a threaded program design from start to finish is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The key insight is that threads share the same memory, which is both the power of threads and the source of most of their bugs. The simplest threaded program is often the best teacher: start one extra thread, join it, and print its result before you try anything more ambitious. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use a threaded program design from start to finish in your own code, start with the simplest correct version and add complexity only when you have a reason.</p>
+<pre><code>// A threaded program design from start to finish
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+void work() { std::cout &lt;&lt; &quot;hello from a thread\n&quot;; }
+int main() {
+    std::thread t(work);
+    t.join();
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is a threaded program design from start to finish, and when would you use it?</p>
+<h2>Practical Task</h2>
+<p>Write a program that splits adding the numbers 1 to 1,000,000 across four threads, combines the partial sums, joins every thread, and prints the total and the time taken.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Why must a thread be joined or detached, and what goes wrong if it is neither?</li>
+<li>How do you pass a reference safely to a thread function?</li>
+<li>Why is the order in which threads run not predictable?</li>
+<li>When does adding more threads make a program slower rather than faster?</li>
+<li>How would you return a result from a thread to the main program?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-31.html">← Chapter 31</a> <a href="index.html">All chapters</a> <a href="chapter-33.html">Chapter 33 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/cpp-developer/chapter-32.html'; this.page.identifier = 'book-cpp-developer-chapter-32'; this.page.title = 'Chapter 32: Threads: Running Code at the Same Time'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

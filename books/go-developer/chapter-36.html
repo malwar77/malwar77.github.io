@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 36 — Regular Expressions in Plain Words — Go Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 36 of the Go Developer teaching book: Regular Expressions in Plain Words.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Go Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 36: Regular Expressions in Plain Words</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-36.svg" alt="Design for Chapter 36" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What a Regular Expression Really Is</h2>
+<p>This section looks closely at what a Regular Expression Really Is and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of what a Regular Expression Really Is is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax.</p>
+<p>A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs.</p>
+<p>Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on.</p>
+<p>Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished.</p>
+<p>A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe1(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe1(&quot;example-1&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what a Regular Expression Really Is mean, and when would you use it in a Go program?</p>
+<h2>Section 2: Literal Characters and Exact Matches</h2>
+<p>This section looks closely at literal Characters and Exact Matches and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of literal Characters and Exact Matches is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself.</p>
+<p>Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output.</p>
+<p>Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first.</p>
+<p>Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers.</p>
+<p>Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does literal Characters and Exact Matches mean, and when would you use it in a Go program?</p>
+<h2>Section 3: The Dot and Matching Any Character</h2>
+<p>This section looks closely at the Dot and Matching Any Character and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of the Dot and Matching Any Character is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later.</p>
+<p>Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end.</p>
+<p>When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change.</p>
+<p>Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion.</p>
+<p>Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 3, &quot;second&quot;: 4}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the Dot and Matching Any Character mean, and when would you use it in a Go program?</p>
+<h2>Section 4: Character Classes and Ranges</h2>
+<p>This section looks closely at character Classes and Ranges and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of character Classes and Ranges is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it.</p>
+<p>Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave.</p>
+<p>Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made.</p>
+<p>Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match.</p>
+<p>When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record4 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record4{Name: &quot;sample-4&quot;, Value: 4}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does character Classes and Ranges mean, and when would you use it in a Go program?</p>
+<h2>Section 5: Negated Character Classes</h2>
+<p>This section looks closely at negated Character Classes and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of negated Character Classes is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases.</p>
+<p>Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find.</p>
+<p>A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step.</p>
+<p>Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition.</p>
+<p>Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total5(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total5([]int{5, 6, 7}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does negated Character Classes mean, and when would you use it in a Go program?</p>
+<h2>Section 6: Shorthand Classes for Digits and Words</h2>
+<p>This section looks closely at shorthand Classes for Digits and Words and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of shorthand Classes for Digits and Words is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern.</p>
+<p>Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately.</p>
+<p>Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge.</p>
+<p>Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program.</p>
+<p>Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does shorthand Classes for Digits and Words mean, and when would you use it in a Go program?</p>
+<h2>Section 7: Anchors for Start and End</h2>
+<p>This section looks closely at anchors for Start and End and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of anchors for Start and End is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches.</p>
+<p>Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever.</p>
+<p>Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user.</p>
+<p>Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom.</p>
+<p>Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe7(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe7(&quot;example-7&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does anchors for Start and End mean, and when would you use it in a Go program?</p>
+<h2>Section 8: Word Boundaries in Text</h2>
+<p>This section looks closely at word Boundaries in Text and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of word Boundaries in Text is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does.</p>
+<p>When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length.</p>
+<p>Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user.</p>
+<p>Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful.</p>
+<p>Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does word Boundaries in Text mean, and when would you use it in a Go program?</p>
+<h2>Section 9: Quantifiers Star Plus and Question</h2>
+<p>This section looks closely at quantifiers Star Plus and Question and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of quantifiers Star Plus and Question is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning.</p>
+<p>Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made.</p>
+<p>When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks.</p>
+<p>Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone.</p>
+<p>Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 9, &quot;second&quot;: 10}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does quantifiers Star Plus and Question mean, and when would you use it in a Go program?</p>
+<h2>Section 10: Greedy Versus Lazy Matching</h2>
+<p>This section looks closely at greedy Versus Lazy Matching and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of greedy Versus Lazy Matching is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on.</p>
+<p>Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished.</p>
+<p>A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear.</p>
+<p>Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader.</p>
+<p>Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record10 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record10{Name: &quot;sample-10&quot;, Value: 10}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does greedy Versus Lazy Matching mean, and when would you use it in a Go program?</p>
+<h2>Section 11: Exact and Ranged Repetition Counts</h2>
+<p>This section looks closely at exact and Ranged Repetition Counts and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of exact and Ranged Repetition Counts is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first.</p>
+<p>Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers.</p>
+<p>Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward.</p>
+<p>When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once.</p>
+<p>Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total11(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total11([]int{11, 12, 13}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does exact and Ranged Repetition Counts mean, and when would you use it in a Go program?</p>
+<h2>Section 12: Grouping with Parentheses</h2>
+<p>This section looks closely at grouping with Parentheses and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of grouping with Parentheses is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change.</p>
+<p>Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion.</p>
+<p>Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results.</p>
+<p>Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match.</p>
+<p>Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does grouping with Parentheses mean, and when would you use it in a Go program?</p>
+<h2>Section 13: Alternation with the Pipe Symbol</h2>
+<p>This section looks closely at alternation with the Pipe Symbol and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of alternation with the Pipe Symbol is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made.</p>
+<p>Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match.</p>
+<p>When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape.</p>
+<p>Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it.</p>
+<p>Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe13(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe13(&quot;example-13&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does alternation with the Pipe Symbol mean, and when would you use it in a Go program?</p>
+<h2>Section 14: Escaping Special Characters</h2>
+<p>This section looks closely at escaping Special Characters and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of escaping Special Characters is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step.</p>
+<p>Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition.</p>
+<p>Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix.</p>
+<p>Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax.</p>
+<p>A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does escaping Special Characters mean, and when would you use it in a Go program?</p>
+<h2>Section 15: Matching Whitespace and Newlines</h2>
+<p>This section looks closely at matching Whitespace and Newlines and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of matching Whitespace and Newlines is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge.</p>
+<p>Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program.</p>
+<p>Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step.</p>
+<p>Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself.</p>
+<p>Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 15, &quot;second&quot;: 16}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does matching Whitespace and Newlines mean, and when would you use it in a Go program?</p>
+<h2>Section 16: Case Sensitivity and Flags</h2>
+<p>This section looks closely at case Sensitivity and Flags and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of case Sensitivity and Flags is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user.</p>
+<p>Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom.</p>
+<p>Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others.</p>
+<p>Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later.</p>
+<p>Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record16 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record16{Name: &quot;sample-16&quot;, Value: 16}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does case Sensitivity and Flags mean, and when would you use it in a Go program?</p>
+<h2>Section 17: Compiling Patterns in Go</h2>
+<p>This section looks closely at compiling Patterns in Go and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of compiling Patterns in Go is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user.</p>
+<p>Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful.</p>
+<p>Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today.</p>
+<p>If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it.</p>
+<p>Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total17(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total17([]int{17, 18, 19}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does compiling Patterns in Go mean, and when would you use it in a Go program?</p>
+<h2>Section 18: The regexp Package at a Glance</h2>
+<p>This section looks closely at the regexp Package at a Glance and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of the regexp Package at a Glance is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks.</p>
+<p>Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone.</p>
+<p>Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next.</p>
+<p>Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases.</p>
+<p>Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the regexp Package at a Glance mean, and when would you use it in a Go program?</p>
+<h2>Section 19: MatchString and Simple Checks</h2>
+<p>This section looks closely at matchString and Simple Checks and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of matchString and Simple Checks is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear.</p>
+<p>Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader.</p>
+<p>Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly.</p>
+<p>Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern.</p>
+<p>Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe19(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe19(&quot;example-19&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does matchString and Simple Checks mean, and when would you use it in a Go program?</p>
+<h2>Section 20: FindString and Finding Matches</h2>
+<p>This section looks closely at findString and Finding Matches and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of findString and Finding Matches is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward.</p>
+<p>When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once.</p>
+<p>Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern.</p>
+<p>Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches.</p>
+<p>Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does findString and Finding Matches mean, and when would you use it in a Go program?</p>
+<h2>Section 21: FindAllString and Collecting Results</h2>
+<p>This section looks closely at findAllString and Collecting Results and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of findAllString and Collecting Results is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results.</p>
+<p>Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match.</p>
+<p>Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form.</p>
+<p>Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does.</p>
+<p>When something fails, read the error message slowly and check the exact line it names before changing anything else in the program.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 21, &quot;second&quot;: 22}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does findAllString and Collecting Results mean, and when would you use it in a Go program?</p>
+<h2>Section 22: FindStringSubmatch and Captured Groups</h2>
+<p>This section looks closely at findStringSubmatch and Captured Groups and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of findStringSubmatch and Captured Groups is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape.</p>
+<p>Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it.</p>
+<p>Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow.</p>
+<p>Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning.</p>
+<p>Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record22 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record22{Name: &quot;sample-22&quot;, Value: 22}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does findStringSubmatch and Captured Groups mean, and when would you use it in a Go program?</p>
+<h2>Section 23: Named Groups and Clearer Captures</h2>
+<p>This section looks closely at named Groups and Clearer Captures and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of named Groups and Clearer Captures is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix.</p>
+<p>Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax.</p>
+<p>A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs.</p>
+<p>Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on.</p>
+<p>Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total23(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total23([]int{23, 24, 25}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does named Groups and Clearer Captures mean, and when would you use it in a Go program?</p>
+<h2>Section 24: Replacing Text with ReplaceAllString</h2>
+<p>This section looks closely at replacing Text with ReplaceAllString and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of replacing Text with ReplaceAllString is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step.</p>
+<p>Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself.</p>
+<p>Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output.</p>
+<p>Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first.</p>
+<p>Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does replacing Text with ReplaceAllString mean, and when would you use it in a Go program?</p>
+<h2>Section 25: Splitting Text with Split</h2>
+<p>This section looks closely at splitting Text with Split and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of splitting Text with Split is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others.</p>
+<p>Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later.</p>
+<p>Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end.</p>
+<p>When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change.</p>
+<p>Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe25(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe25(&quot;example-25&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does splitting Text with Split mean, and when would you use it in a Go program?</p>
+<h2>Section 26: Validating Email Addresses Carefully</h2>
+<p>This section looks closely at validating Email Addresses Carefully and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of validating Email Addresses Carefully is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today.</p>
+<p>If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it.</p>
+<p>Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave.</p>
+<p>Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made.</p>
+<p>Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does validating Email Addresses Carefully mean, and when would you use it in a Go program?</p>
+<h2>Section 27: Validating Phone Numbers Without Overreach</h2>
+<p>This section looks closely at validating Phone Numbers Without Overreach and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of validating Phone Numbers Without Overreach is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next.</p>
+<p>Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases.</p>
+<p>Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find.</p>
+<p>A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step.</p>
+<p>Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 27, &quot;second&quot;: 28}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does validating Phone Numbers Without Overreach mean, and when would you use it in a Go program?</p>
+<h2>Section 28: Checking Password Strength Patterns</h2>
+<p>This section looks closely at checking Password Strength Patterns and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of checking Password Strength Patterns is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly.</p>
+<p>Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern.</p>
+<p>Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately.</p>
+<p>Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge.</p>
+<p>Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record28 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record28{Name: &quot;sample-28&quot;, Value: 28}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does checking Password Strength Patterns mean, and when would you use it in a Go program?</p>
+<h2>Section 29: Finding Dates in Free Text</h2>
+<p>This section looks closely at finding Dates in Free Text and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of finding Dates in Free Text is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern.</p>
+<p>Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches.</p>
+<p>Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever.</p>
+<p>Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user.</p>
+<p>Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total29(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total29([]int{29, 30, 31}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does finding Dates in Free Text mean, and when would you use it in a Go program?</p>
+<h2>Section 30: Extracting Numbers from Sentences</h2>
+<p>This section looks closely at extracting Numbers from Sentences and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of extracting Numbers from Sentences is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form.</p>
+<p>Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does.</p>
+<p>When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length.</p>
+<p>Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user.</p>
+<p>Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does extracting Numbers from Sentences mean, and when would you use it in a Go program?</p>
+<h2>Section 31: Cleaning Up Extra Spaces</h2>
+<p>This section looks closely at cleaning Up Extra Spaces and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of cleaning Up Extra Spaces is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow.</p>
+<p>Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning.</p>
+<p>Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made.</p>
+<p>When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks.</p>
+<p>Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe31(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe31(&quot;example-31&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does cleaning Up Extra Spaces mean, and when would you use it in a Go program?</p>
+<h2>Section 32: Matching URLs in a Document</h2>
+<p>This section looks closely at matching URLs in a Document and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of matching URLs in a Document is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs.</p>
+<p>Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on.</p>
+<p>Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished.</p>
+<p>A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear.</p>
+<p>Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does matching URLs in a Document mean, and when would you use it in a Go program?</p>
+<h2>Section 33: Handling Multiline Text</h2>
+<p>This section looks closely at handling Multiline Text and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of handling Multiline Text is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output.</p>
+<p>Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first.</p>
+<p>Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers.</p>
+<p>Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward.</p>
+<p>When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 33, &quot;second&quot;: 34}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling Multiline Text mean, and when would you use it in a Go program?</p>
+<h2>Section 34: DotAll and Matching Across Lines</h2>
+<p>This section looks closely at dotAll and Matching Across Lines and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of dotAll and Matching Across Lines is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end.</p>
+<p>When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change.</p>
+<p>Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion.</p>
+<p>Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results.</p>
+<p>Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record34 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record34{Name: &quot;sample-34&quot;, Value: 34}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does dotAll and Matching Across Lines mean, and when would you use it in a Go program?</p>
+<h2>Section 35: Performance and Catastrophic Backtracking</h2>
+<p>This section looks closely at performance and Catastrophic Backtracking and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of performance and Catastrophic Backtracking is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave.</p>
+<p>Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made.</p>
+<p>Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match.</p>
+<p>When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape.</p>
+<p>Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total35(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total35([]int{35, 36, 37}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does performance and Catastrophic Backtracking mean, and when would you use it in a Go program?</p>
+<h2>Section 36: When Not to Use Regular Expressions</h2>
+<p>This section looks closely at when Not to Use Regular Expressions and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of when Not to Use Regular Expressions is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find.</p>
+<p>A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step.</p>
+<p>Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition.</p>
+<p>Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix.</p>
+<p>Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does when Not to Use Regular Expressions mean, and when would you use it in a Go program?</p>
+<h2>Section 37: Testing Patterns Before Shipping Code</h2>
+<p>This section looks closely at testing Patterns Before Shipping Code and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of testing Patterns Before Shipping Code is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately.</p>
+<p>Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge.</p>
+<p>Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program.</p>
+<p>Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step.</p>
+<p>Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe37(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe37(&quot;example-37&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing Patterns Before Shipping Code mean, and when would you use it in a Go program?</p>
+<h2>Section 38: Common Regex Mistakes in Go</h2>
+<p>This section looks closely at common Regex Mistakes in Go and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of common Regex Mistakes in Go is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever.</p>
+<p>Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user.</p>
+<p>Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom.</p>
+<p>Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others.</p>
+<p>Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does common Regex Mistakes in Go mean, and when would you use it in a Go program?</p>
+<h2>Section 39: Reading a Pattern Aloud</h2>
+<p>This section looks closely at reading a Pattern Aloud and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of reading a Pattern Aloud is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length.</p>
+<p>Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user.</p>
+<p>Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful.</p>
+<p>Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today.</p>
+<p>If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 39, &quot;second&quot;: 40}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reading a Pattern Aloud mean, and when would you use it in a Go program?</p>
+<h2>Section 40: Building Patterns Step by Step</h2>
+<p>This section looks closely at building Patterns Step by Step and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of building Patterns Step by Step is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made.</p>
+<p>When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks.</p>
+<p>Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone.</p>
+<p>Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next.</p>
+<p>Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record40 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record40{Name: &quot;sample-40&quot;, Value: 40}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does building Patterns Step by Step mean, and when would you use it in a Go program?</p>
+<h2>Section 41: Combining Classes and Quantifiers</h2>
+<p>This section looks closely at combining Classes and Quantifiers and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of combining Classes and Quantifiers is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished.</p>
+<p>A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear.</p>
+<p>Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader.</p>
+<p>Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly.</p>
+<p>Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total41(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total41([]int{41, 42, 43}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does combining Classes and Quantifiers mean, and when would you use it in a Go program?</p>
+<h2>Section 42: Matching Repeated Words</h2>
+<p>This section looks closely at matching Repeated Words and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of matching Repeated Words is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers.</p>
+<p>Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward.</p>
+<p>When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once.</p>
+<p>Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern.</p>
+<p>Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does matching Repeated Words mean, and when would you use it in a Go program?</p>
+<h2>Section 43: Optional Parts of a Pattern</h2>
+<p>This section looks closely at optional Parts of a Pattern and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of optional Parts of a Pattern is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion.</p>
+<p>Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results.</p>
+<p>Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match.</p>
+<p>Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form.</p>
+<p>Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe43(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe43(&quot;example-43&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does optional Parts of a Pattern mean, and when would you use it in a Go program?</p>
+<h2>Section 44: Anchoring a Full String Match</h2>
+<p>This section looks closely at anchoring a Full String Match and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of anchoring a Full String Match is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern. Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match.</p>
+<p>When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately. Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape.</p>
+<p>Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition. Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it.</p>
+<p>Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow.</p>
+<p>Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does anchoring a Full String Match mean, and when would you use it in a Go program?</p>
+<h2>Section 45: Using Regex in a Small Filter Tool</h2>
+<p>This section looks closely at using Regex in a Small Filter Tool and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of using Regex in a Small Filter Tool is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches. Performance matters when a pattern runs on large input, so prefer simple shapes and avoid needless repetition inside repetition.</p>
+<p>Clarity is the final test for a pattern, and if you cannot explain it plainly, it probably needs rewriting in simpler form. Start by stating the goal in one plain sentence before you write any code, because a clear goal makes every later choice easier to judge. Go rewards small functions that do one job well, and that habit keeps a program readable long after you first wrote it. Read your code aloud as if you were explaining it to a friend, and rewrite any sentence that sounds confusing or overly clever. Test with a tiny example first, then grow the example step by step, so a mistake shows up early while it is still cheap to fix.</p>
+<p>Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program. Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax.</p>
+<p>A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs.</p>
+<p>Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	scores := map[string]int{&quot;first&quot;: 45, &quot;second&quot;: 46}
+	for key, value := range scores {
+		fmt.Printf(&quot;%s has %d\n&quot;, key, value)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does using Regex in a Small Filter Tool mean, and when would you use it in a Go program?</p>
+<h2>Section 46: Sanitising Input Before Matching</h2>
+<p>This section looks closely at sanitising Input Before Matching and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of sanitising Input Before Matching is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Good names matter more than clever tricks, so choose a name that tells the next reader exactly what a value holds or a function does. When something fails, read the error message slowly and check the exact line it names before changing anything else in the program.</p>
+<p>Keep the happy path visible at the top of a function and move unusual cases into helpers, so the main story stays easy to follow. Write the simplest version that works, run it, and only then ask whether a fancier version would genuinely help the user. Comments should explain why a choice was made, not repeat what the code already says in plain Go syntax. A short program you understand fully beats a long program that only partly works, so prefer understanding over impressive length. Break a large job into smaller steps and finish one step at a time, checking the result before you move on to the next step.</p>
+<p>Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom. Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself.</p>
+<p>Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output.</p>
+<p>Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+type record46 struct {
+	Name string
+	Value int
+}
+
+func main() {
+	r := record46{Name: &quot;sample-46&quot;, Value: 46}
+	fmt.Printf(&quot;%s holds %d\n&quot;, r.Name, r.Value)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does sanitising Input Before Matching mean, and when would you use it in a Go program?</p>
+<h2>Section 47: Error Handling for Bad Patterns</h2>
+<p>This section looks closely at error Handling for Bad Patterns and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of error Handling for Bad Patterns is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Think about empty input, missing input and unexpected input, because real users will eventually provide all three without warning. Keep functions short enough that you can hold the whole function in your head while you read it from top to bottom.</p>
+<p>Use the standard library first when it already solves your problem, since well tested code saves time and avoids new bugs. Return errors honestly instead of hiding them, and let the caller decide how an error should be reported to the user. Format your code with the usual Go tools so spacing and layout never distract a reader from the logic itself. Try your program with data you did not invent for the happy path, because realistic data exposes assumptions you forgot you made. When you change a function, check every place that calls it, since a small change in one place can quietly affect many others.</p>
+<p>Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful. Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later.</p>
+<p>Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end.</p>
+<p>When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func total47(numbers []int) int {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	return sum
+}
+
+func main() {
+	fmt.Println(total47([]int{47, 48, 49}))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error Handling for Bad Patterns mean, and when would you use it in a Go program?</p>
+<h2>Section 48: Benchmarking a Pattern Simply</h2>
+<p>This section looks closely at benchmarking a Pattern Simply and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of benchmarking a Pattern Simply is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Prefer explicit code over hidden magic, especially when another person will maintain the program after you have moved on. Ask yourself what the user sees when the program succeeds and what they see when it fails, and make both messages helpful.</p>
+<p>Learning happens by doing, so type the example yourself, run it, change one thing, and watch carefully what changes in the output. Do not copy a pattern you do not understand into production code, because an unexplained pattern becomes a mystery the first time it breaks. Separate input, processing and output in your mind even in a tiny program, since that separation makes testing much simpler later. Check edge cases deliberately, such as an empty list, a single item, and a very long item, before you declare a job finished. A readable program is a kind program to your future self, who will return to this code with far less context than you have today.</p>
+<p>If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone. Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it.</p>
+<p>Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave.</p>
+<p>Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	items := []string{&quot;alpha&quot;, &quot;beta&quot;, &quot;gamma&quot;}
+	for i, item := range items {
+		fmt.Printf(&quot;item %d is %s\n&quot;, i, item)
+	}
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does benchmarking a Pattern Simply mean, and when would you use it in a Go program?</p>
+<h2>Section 49: Regex and Unicode Text</h2>
+<p>This section looks closely at regex and Unicode Text and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of regex and Unicode Text is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. If a piece of code feels hard to explain, that feeling is useful information, and it often means the design needs simplifying first. Use examples in your own notes to capture what worked, because a working example is easier to reuse than an abstract rule alone.</p>
+<p>Run your program often while you build it, rather than writing a large amount of code and testing everything only at the end. When you are stuck, reduce the problem to the smallest case that still fails, and study that small case until the cause becomes clear. Choose data structures that match the job, and let the shape of the data guide the shape of the code that processes it. Document the limits of your program honestly, including inputs it does not handle, so users are not surprised by silent wrong answers. Consistency beats novelty in naming, layout and error handling, because consistent code lets readers predict what comes next.</p>
+<p>Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader. Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases.</p>
+<p>Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly. Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find.</p>
+<p>A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func describe49(value string) string {
+	return &quot;value: &quot; + value
+}
+
+func main() {
+	fmt.Println(describe49(&quot;example-49&quot;))
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does regex and Unicode Text mean, and when would you use it in a Go program?</p>
+<h2>Section 50: Choosing Clarity Over Cleverness</h2>
+<p>This section looks closely at choosing Clarity Over Cleverness and explains it in plain words before any code appears, so you can follow the idea even if the technical term is new to you. The heart of choosing Clarity Over Cleverness is a simple job that stays the same even when the examples change, and naming that job clearly is the first step toward using it well in Go. As you read, keep a small example in mind and ask what should happen for ordinary input, for empty input, and for input that does not fit the pattern you expect. Refactor only after the program works, and keep each refactoring small enough that you can test it immediately after the change. Think about who will read the output, whether a person at a terminal or another program, and shape the output for that reader.</p>
+<p>Small, focused tests give you confidence to change code later, and they also serve as examples of how a function should behave. Avoid global state when a function argument will do, because arguments make dependencies visible and testing straightforward. When a library function exists for your task, read its documentation carefully and note what it returns in unusual cases. Keep the user in mind at every step, and judge a feature by whether it helps them finish their task with less confusion. Practice explaining a concept without jargon first, then add the technical term once the plain explanation has landed clearly.</p>
+<p>Version control and regular saving protect your work, and a short commit message helps you remember why a change was made. Review your own code after a short break, because fresh eyes often spot a confusing name or a missing check at once. Regular expressions describe patterns in text, and a pattern is simply a precise description of the shapes you want to find. A pattern that matches too much is often worse than one that matches too little, because extra matches create confusing results. Build a pattern from the smallest piece that works, test it on real examples, and only then add the next piece to the pattern.</p>
+<p>Always keep sample text beside your pattern while you work, including examples that should match and examples that should not match. When a pattern grows long, split the job into stages, since several simple patterns are usually clearer than one enormous pattern. Remember that Go compiles a pattern before it can run, and a pattern with a syntax mistake will fail at that compile step. Captured groups let you keep part of a match, which is useful when you need a piece of the text rather than the whole match. Replacing and splitting text with patterns can clean messy input, but only when the pattern describes the mess accurately.</p>
+<p>Validation with patterns should be generous where people vary and strict only where a format truly has a fixed shape. Unicode text needs care, because characters are not always single bytes, and a pattern should respect the text it searches.</p>
+<pre><code>package main
+
+import &quot;fmt&quot;
+
+func main() {
+	count := 0
+	for count &lt; 3 {
+		fmt.Printf(&quot;step %d\n&quot;, count)
+		count++
+	}
+	fmt.Println(&quot;done&quot;)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does choosing Clarity Over Cleverness mean, and when would you use it in a Go program?</p>
+<h2>Practical Task</h2>
+<p>Build a small text filter program in Go that reads lines from standard input, applies three patterns you compile with the regexp package (one for email-like strings, one for numbers, and one for repeated spaces), prints only the lines that match a pattern chosen by a flag-like argument, and reports a clear error when a pattern fails to compile. Test it with matching lines, non-matching lines, empty lines, and Unicode text, then write a short note explaining which pattern was hardest to get right and why you kept it simple rather than clever.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What is a regular expression, and how does a pattern differ from the plain text it searches?</li>
+<li>When would you use a character class instead of listing every character you want to match?</li>
+<li>Why can a greedy quantifier produce a surprising match, and how would you make it lazy?</li>
+<li>How do captured groups help when you need part of a match rather than the whole match?</li>
+<li>When is a regular expression the wrong tool, and what simpler approach would you use instead?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-35.html">← Chapter 35</a> <a href="index.html">All chapters</a> <a href="chapter-37.html">Chapter 37 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/go-developer/chapter-36.html'; this.page.identifier = 'book-go-developer-chapter-36'; this.page.title = 'Chapter 36: Regular Expressions in Plain Words'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

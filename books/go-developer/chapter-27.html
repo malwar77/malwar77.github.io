@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 27 — HTTP Clients: Fetching JSON — Go Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 27 of the Go Developer teaching book: HTTP Clients: Fetching JSON.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Go Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 27: HTTP Clients: Fetching JSON</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-27.svg" alt="Design for Chapter 27" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What an HTTP Client Does</h2>
+<p>Think of what an http client does as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for what an http client does is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain what an http client does aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of what an http client does, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When what an http client does goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past what an http client does and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, what an http client does rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with what an http client does is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find what an http client does confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for what an http client does uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists.</p>
+<p>When you test what an http client does by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output. The standard library is your friend for what an http client does, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what an http client does mean, and when would you use it in a small Go program?</p>
+<h2>Section 2: Making a Simple GET Request</h2>
+<p>A useful habit is to start with the smallest working example of making a simple get request, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When making a simple get request goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past making a simple get request and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, making a simple get request rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with making a simple get request is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find making a simple get request confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for making a simple get request uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test making a simple get request by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for making a simple get request, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember making a simple get request is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down.</p>
+<p>Do not be surprised if your first attempt at making a simple get request needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt. When you finish an example of making a simple get request, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does making a simple get request mean, and when would you use it in a small Go program?</p>
+<h2>Section 3: Checking the Status Code</h2>
+<p>In a real program, checking the status code rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with checking the status code is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find checking the status code confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for checking the status code uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test checking the status code by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for checking the status code, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember checking the status code is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at checking the status code needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of checking the status code, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, checking the status code should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once.</p>
+<p>If a teammate read your code for checking the status code tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line. It is worth keeping your examples for checking the status code short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does checking the status code mean, and when would you use it in a small Go program?</p>
+<h2>Section 4: Reading the Response Body</h2>
+<p>If you find reading the response body confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for reading the response body uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test reading the response body by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for reading the response body, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember reading the response body is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at reading the response body needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of reading the response body, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, reading the response body should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for reading the response body tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for reading the response body short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of reading the response body instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later.</p>
+<p>As you practise reading the response body, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens. The goal of learning reading the response body is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reading the response body mean, and when would you use it in a small Go program?</p>
+<h2>Section 5: Closing the Body Every Time</h2>
+<p>The standard library is your friend for closing the body every time, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember closing the body every time is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at closing the body every time needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of closing the body every time, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, closing the body every time should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for closing the body every time tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for closing the body every time short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of closing the body every time instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise closing the body every time, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning closing the body every time is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write closing the body every time in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it.</p>
+<p>When you compare two ways of doing closing the body every time, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter. Small programs that practise closing the body every time are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does closing the body every time mean, and when would you use it in a small Go program?</p>
+<h2>Section 6: Handling Network Errors</h2>
+<p>When you finish an example of handling network errors, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, handling network errors should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for handling network errors tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for handling network errors short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of handling network errors instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise handling network errors, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning handling network errors is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write handling network errors in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing handling network errors, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise handling network errors are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on handling network errors, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that handling network errors is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with handling network errors in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for handling network errors first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling network errors mean, and when would you use it in a small Go program?</p>
+<h2>Section 7: Handling a Non-200 Response</h2>
+<p>It is worth keeping your examples for handling a non-200 response short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of handling a non-200 response instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise handling a non-200 response, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning handling a non-200 response is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write handling a non-200 response in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing handling a non-200 response, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise handling a non-200 response are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on handling a non-200 response, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that handling a non-200 response is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with handling a non-200 response in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for handling a non-200 response first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<p>In the context of HTTP Clients: Fetching JSON, the idea behind handling a non-200 response is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up. Think of handling a non-200 response as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling a non-200 response mean, and when would you use it in a small Go program?</p>
+<h2>Section 8: Timeouts for HTTP Requests</h2>
+<p>The goal of learning timeouts for http requests is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write timeouts for http requests in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing timeouts for http requests, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise timeouts for http requests are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on timeouts for http requests, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that timeouts for http requests is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with timeouts for http requests in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for timeouts for http requests first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind timeouts for http requests is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of timeouts for http requests as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for timeouts for http requests is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain timeouts for http requests aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of timeouts for http requests, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does timeouts for http requests mean, and when would you use it in a small Go program?</p>
+<h2>Section 9: Using http.Client with a Timeout</h2>
+<p>Small programs that practise using http.client with a timeout are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on using http.client with a timeout, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that using http.client with a timeout is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with using http.client with a timeout in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for using http.client with a timeout first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind using http.client with a timeout is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of using http.client with a timeout as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for using http.client with a timeout is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain using http.client with a timeout aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of using http.client with a timeout, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<p>When using http.client with a timeout goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past using http.client with a timeout and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does using http.client with a timeout mean, and when would you use it in a small Go program?</p>
+<h2>Section 10: Requests with Context</h2>
+<p>When you work with requests with context in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for requests with context first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind requests with context is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of requests with context as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for requests with context is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain requests with context aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of requests with context, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When requests with context goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past requests with context and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, requests with context rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with requests with context is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output.</p>
+<p>Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too. If you find requests with context confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does requests with context mean, and when would you use it in a small Go program?</p>
+<h2>Section 11: Cancelling a Slow Request</h2>
+<p>Think of cancelling a slow request as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for cancelling a slow request is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain cancelling a slow request aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of cancelling a slow request, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When cancelling a slow request goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past cancelling a slow request and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, cancelling a slow request rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with cancelling a slow request is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find cancelling a slow request confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for cancelling a slow request uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists.</p>
+<p>When you test cancelling a slow request by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output. The standard library is your friend for cancelling a slow request, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does cancelling a slow request mean, and when would you use it in a small Go program?</p>
+<h2>Section 12: Adding Headers to a Request</h2>
+<p>A useful habit is to start with the smallest working example of adding headers to a request, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When adding headers to a request goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past adding headers to a request and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, adding headers to a request rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with adding headers to a request is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find adding headers to a request confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for adding headers to a request uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test adding headers to a request by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for adding headers to a request, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember adding headers to a request is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down.</p>
+<p>Do not be surprised if your first attempt at adding headers to a request needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt. When you finish an example of adding headers to a request, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does adding headers to a request mean, and when would you use it in a small Go program?</p>
+<h2>Section 13: Sending an Accept Header</h2>
+<p>In a real program, sending an accept header rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with sending an accept header is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find sending an accept header confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for sending an accept header uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test sending an accept header by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for sending an accept header, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember sending an accept header is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at sending an accept header needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of sending an accept header, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, sending an accept header should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once.</p>
+<p>If a teammate read your code for sending an accept header tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line. It is worth keeping your examples for sending an accept header short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does sending an accept header mean, and when would you use it in a small Go program?</p>
+<h2>Section 14: User-Agent in Plain Words</h2>
+<p>If you find user-agent in plain words confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for user-agent in plain words uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test user-agent in plain words by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for user-agent in plain words, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember user-agent in plain words is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at user-agent in plain words needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of user-agent in plain words, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, user-agent in plain words should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for user-agent in plain words tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for user-agent in plain words short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of user-agent in plain words instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later.</p>
+<p>As you practise user-agent in plain words, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens. The goal of learning user-agent in plain words is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does user-agent in plain words mean, and when would you use it in a small Go program?</p>
+<h2>Section 15: Query Parameters in a URL</h2>
+<p>The standard library is your friend for query parameters in a url, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember query parameters in a url is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at query parameters in a url needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of query parameters in a url, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, query parameters in a url should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for query parameters in a url tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for query parameters in a url short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of query parameters in a url instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise query parameters in a url, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning query parameters in a url is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write query parameters in a url in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it.</p>
+<p>When you compare two ways of doing query parameters in a url, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter. Small programs that practise query parameters in a url are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does query parameters in a url mean, and when would you use it in a small Go program?</p>
+<h2>Section 16: Building URLs Safely</h2>
+<p>When you finish an example of building urls safely, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, building urls safely should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for building urls safely tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for building urls safely short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of building urls safely instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise building urls safely, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning building urls safely is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write building urls safely in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing building urls safely, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise building urls safely are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on building urls safely, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that building urls safely is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with building urls safely in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for building urls safely first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does building urls safely mean, and when would you use it in a small Go program?</p>
+<h2>Section 17: Decoding JSON into a Struct</h2>
+<p>It is worth keeping your examples for decoding json into a struct short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of decoding json into a struct instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise decoding json into a struct, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning decoding json into a struct is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write decoding json into a struct in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing decoding json into a struct, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise decoding json into a struct are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on decoding json into a struct, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that decoding json into a struct is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with decoding json into a struct in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for decoding json into a struct first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<p>In the context of HTTP Clients: Fetching JSON, the idea behind decoding json into a struct is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up. Think of decoding json into a struct as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does decoding json into a struct mean, and when would you use it in a small Go program?</p>
+<h2>Section 18: Matching JSON Field Names</h2>
+<p>The goal of learning matching json field names is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write matching json field names in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing matching json field names, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise matching json field names are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on matching json field names, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that matching json field names is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with matching json field names in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for matching json field names first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind matching json field names is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of matching json field names as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for matching json field names is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain matching json field names aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of matching json field names, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does matching json field names mean, and when would you use it in a small Go program?</p>
+<h2>Section 19: Using Struct Tags for JSON</h2>
+<p>Small programs that practise using struct tags for json are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on using struct tags for json, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that using struct tags for json is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with using struct tags for json in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for using struct tags for json first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind using struct tags for json is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of using struct tags for json as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for using struct tags for json is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain using struct tags for json aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of using struct tags for json, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<p>When using struct tags for json goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past using struct tags for json and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does using struct tags for json mean, and when would you use it in a small Go program?</p>
+<h2>Section 20: Decoding Nested JSON</h2>
+<p>When you work with decoding nested json in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for decoding nested json first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind decoding nested json is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of decoding nested json as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for decoding nested json is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain decoding nested json aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of decoding nested json, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When decoding nested json goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past decoding nested json and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, decoding nested json rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with decoding nested json is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output.</p>
+<p>Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too. If you find decoding nested json confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does decoding nested json mean, and when would you use it in a small Go program?</p>
+<h2>Section 21: Decoding a JSON List</h2>
+<p>Think of decoding a json list as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for decoding a json list is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain decoding a json list aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of decoding a json list, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When decoding a json list goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past decoding a json list and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, decoding a json list rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with decoding a json list is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find decoding a json list confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for decoding a json list uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists.</p>
+<p>When you test decoding a json list by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output. The standard library is your friend for decoding a json list, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does decoding a json list mean, and when would you use it in a small Go program?</p>
+<h2>Section 22: Handling Missing JSON Fields</h2>
+<p>A useful habit is to start with the smallest working example of handling missing json fields, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When handling missing json fields goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past handling missing json fields and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, handling missing json fields rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with handling missing json fields is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find handling missing json fields confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for handling missing json fields uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test handling missing json fields by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for handling missing json fields, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember handling missing json fields is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down.</p>
+<p>Do not be surprised if your first attempt at handling missing json fields needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt. When you finish an example of handling missing json fields, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling missing json fields mean, and when would you use it in a small Go program?</p>
+<h2>Section 23: Handling Unexpected JSON Types</h2>
+<p>In a real program, handling unexpected json types rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with handling unexpected json types is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find handling unexpected json types confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for handling unexpected json types uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test handling unexpected json types by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for handling unexpected json types, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember handling unexpected json types is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at handling unexpected json types needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of handling unexpected json types, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, handling unexpected json types should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once.</p>
+<p>If a teammate read your code for handling unexpected json types tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line. It is worth keeping your examples for handling unexpected json types short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling unexpected json types mean, and when would you use it in a small Go program?</p>
+<h2>Section 24: Streaming Large JSON Responses</h2>
+<p>If you find streaming large json responses confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for streaming large json responses uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test streaming large json responses by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for streaming large json responses, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember streaming large json responses is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at streaming large json responses needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of streaming large json responses, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, streaming large json responses should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for streaming large json responses tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for streaming large json responses short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of streaming large json responses instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later.</p>
+<p>As you practise streaming large json responses, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens. The goal of learning streaming large json responses is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does streaming large json responses mean, and when would you use it in a small Go program?</p>
+<h2>Section 25: POST Requests with JSON</h2>
+<p>The standard library is your friend for post requests with json, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember post requests with json is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at post requests with json needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of post requests with json, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, post requests with json should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for post requests with json tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for post requests with json short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of post requests with json instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise post requests with json, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning post requests with json is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write post requests with json in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it.</p>
+<p>When you compare two ways of doing post requests with json, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter. Small programs that practise post requests with json are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does post requests with json mean, and when would you use it in a small Go program?</p>
+<h2>Section 26: Encoding a Struct to JSON</h2>
+<p>When you finish an example of encoding a struct to json, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, encoding a struct to json should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for encoding a struct to json tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for encoding a struct to json short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of encoding a struct to json instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise encoding a struct to json, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning encoding a struct to json is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write encoding a struct to json in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing encoding a struct to json, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise encoding a struct to json are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on encoding a struct to json, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step.</p>
+<p>Finally, remember that encoding a struct to json is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again. When you work with encoding a struct to json in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does encoding a struct to json mean, and when would you use it in a small Go program?</p>
+<h2>Section 27: Setting Content-Type for JSON</h2>
+<p>It is worth keeping your examples for setting content-type for json short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of setting content-type for json instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise setting content-type for json, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning setting content-type for json is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write setting content-type for json in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing setting content-type for json, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise setting content-type for json are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on setting content-type for json, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that setting content-type for json is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with setting content-type for json in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for setting content-type for json first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<p>In the context of HTTP Clients: Fetching JSON, the idea behind setting content-type for json is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up. Think of setting content-type for json as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does setting content-type for json mean, and when would you use it in a small Go program?</p>
+<h2>Section 28: Reading a POST Response</h2>
+<p>The goal of learning reading a post response is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write reading a post response in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing reading a post response, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise reading a post response are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on reading a post response, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that reading a post response is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with reading a post response in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for reading a post response first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind reading a post response is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of reading a post response as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for reading a post response is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain reading a post response aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of reading a post response, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reading a post response mean, and when would you use it in a small Go program?</p>
+<h2>Section 29: PUT and PATCH in Plain Words</h2>
+<p>Small programs that practise put and patch in plain words are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on put and patch in plain words, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that put and patch in plain words is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with put and patch in plain words in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for put and patch in plain words first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind put and patch in plain words is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of put and patch in plain words as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for put and patch in plain words is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain put and patch in plain words aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of put and patch in plain words, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<p>When put and patch in plain words goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past put and patch in plain words and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does put and patch in plain words mean, and when would you use it in a small Go program?</p>
+<h2>Section 30: DELETE Requests</h2>
+<p>When you work with delete requests in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for delete requests first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind delete requests is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of delete requests as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for delete requests is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain delete requests aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of delete requests, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When delete requests goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past delete requests and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, delete requests rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with delete requests is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output.</p>
+<p>Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too. If you find delete requests confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does delete requests mean, and when would you use it in a small Go program?</p>
+<h2>Section 31: Handling Redirects</h2>
+<p>Think of handling redirects as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for handling redirects is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain handling redirects aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of handling redirects, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When handling redirects goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past handling redirects and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, handling redirects rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with handling redirects is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find handling redirects confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for handling redirects uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test handling redirects by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for handling redirects, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember handling redirects is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling redirects mean, and when would you use it in a small Go program?</p>
+<h2>Section 32: Custom Transport Settings</h2>
+<p>A useful habit is to start with the smallest working example of custom transport settings, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When custom transport settings goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past custom transport settings and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, custom transport settings rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with custom transport settings is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find custom transport settings confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for custom transport settings uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test custom transport settings by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for custom transport settings, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember custom transport settings is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down.</p>
+<p>Do not be surprised if your first attempt at custom transport settings needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt. When you finish an example of custom transport settings, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does custom transport settings mean, and when would you use it in a small Go program?</p>
+<h2>Section 33: Reusing One Client</h2>
+<p>In a real program, reusing one client rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with reusing one client is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find reusing one client confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for reusing one client uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test reusing one client by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for reusing one client, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember reusing one client is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at reusing one client needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of reusing one client, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, reusing one client should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once.</p>
+<p>If a teammate read your code for reusing one client tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line. It is worth keeping your examples for reusing one client short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reusing one client mean, and when would you use it in a small Go program?</p>
+<h2>Section 34: Retrying a Failed Request</h2>
+<p>If you find retrying a failed request confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for retrying a failed request uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test retrying a failed request by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for retrying a failed request, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember retrying a failed request is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at retrying a failed request needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of retrying a failed request, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, retrying a failed request should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for retrying a failed request tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for retrying a failed request short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of retrying a failed request instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later.</p>
+<p>As you practise retrying a failed request, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens. The goal of learning retrying a failed request is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does retrying a failed request mean, and when would you use it in a small Go program?</p>
+<h2>Section 35: Backoff for HTTP Retries</h2>
+<p>The standard library is your friend for backoff for http retries, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember backoff for http retries is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at backoff for http retries needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of backoff for http retries, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, backoff for http retries should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for backoff for http retries tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for backoff for http retries short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of backoff for http retries instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise backoff for http retries, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning backoff for http retries is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write backoff for http retries in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it.</p>
+<p>When you compare two ways of doing backoff for http retries, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter. Small programs that practise backoff for http retries are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does backoff for http retries mean, and when would you use it in a small Go program?</p>
+<h2>Section 36: Rate Limits and 429 Responses</h2>
+<p>When you finish an example of rate limits and 429 responses, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, rate limits and 429 responses should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for rate limits and 429 responses tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for rate limits and 429 responses short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of rate limits and 429 responses instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise rate limits and 429 responses, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning rate limits and 429 responses is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write rate limits and 429 responses in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing rate limits and 429 responses, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise rate limits and 429 responses are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on rate limits and 429 responses, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step.</p>
+<p>Finally, remember that rate limits and 429 responses is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again. When you work with rate limits and 429 responses in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does rate limits and 429 responses mean, and when would you use it in a small Go program?</p>
+<h2>Section 37: Reading Error Bodies Helpfully</h2>
+<p>It is worth keeping your examples for reading error bodies helpfully short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of reading error bodies helpfully instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise reading error bodies helpfully, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning reading error bodies helpfully is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write reading error bodies helpfully in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing reading error bodies helpfully, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise reading error bodies helpfully are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on reading error bodies helpfully, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that reading error bodies helpfully is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with reading error bodies helpfully in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for reading error bodies helpfully first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<p>In the context of HTTP Clients: Fetching JSON, the idea behind reading error bodies helpfully is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up. Think of reading error bodies helpfully as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reading error bodies helpfully mean, and when would you use it in a small Go program?</p>
+<h2>Section 38: Logging Requests Without Leaking Secrets</h2>
+<p>The goal of learning logging requests without leaking secrets is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write logging requests without leaking secrets in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing logging requests without leaking secrets, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise logging requests without leaking secrets are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on logging requests without leaking secrets, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that logging requests without leaking secrets is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with logging requests without leaking secrets in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for logging requests without leaking secrets first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<p>In the context of HTTP Clients: Fetching JSON, the idea behind logging requests without leaking secrets is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up. Think of logging requests without leaking secrets as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case.</p>
+<p>Good Go code for logging requests without leaking secrets is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain logging requests without leaking secrets aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does logging requests without leaking secrets mean, and when would you use it in a small Go program?</p>
+<h2>Section 39: Authentication with a Bearer Token</h2>
+<p>Small programs that practise authentication with a bearer token are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on authentication with a bearer token, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that authentication with a bearer token is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with authentication with a bearer token in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for authentication with a bearer token first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind authentication with a bearer token is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of authentication with a bearer token as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for authentication with a bearer token is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain authentication with a bearer token aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of authentication with a bearer token, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<p>When authentication with a bearer token goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past authentication with a bearer token and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does authentication with a bearer token mean, and when would you use it in a small Go program?</p>
+<h2>Section 40: Basic Authentication in Plain Words</h2>
+<p>When you work with basic authentication in plain words in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for basic authentication in plain words first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind basic authentication in plain words is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of basic authentication in plain words as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for basic authentication in plain words is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain basic authentication in plain words aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of basic authentication in plain words, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When basic authentication in plain words goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong.</p>
+<p>Many learners rush past basic authentication in plain words and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time. In a real program, basic authentication in plain words rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special.</p>
+<p>One common mistake with basic authentication in plain words is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does basic authentication in plain words mean, and when would you use it in a small Go program?</p>
+<h2>Section 41: Environment Variables for API Keys</h2>
+<p>Think of environment variables for api keys as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for environment variables for api keys is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain environment variables for api keys aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of environment variables for api keys, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When environment variables for api keys goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past environment variables for api keys and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, environment variables for api keys rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with environment variables for api keys is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find environment variables for api keys confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for environment variables for api keys uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists.</p>
+<p>When you test environment variables for api keys by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output. The standard library is your friend for environment variables for api keys, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does environment variables for api keys mean, and when would you use it in a small Go program?</p>
+<h2>Section 42: Testing a Client with httptest</h2>
+<p>A useful habit is to start with the smallest working example of testing a client with httptest, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When testing a client with httptest goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past testing a client with httptest and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, testing a client with httptest rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with testing a client with httptest is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find testing a client with httptest confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for testing a client with httptest uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test testing a client with httptest by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for testing a client with httptest, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember testing a client with httptest is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down.</p>
+<p>Do not be surprised if your first attempt at testing a client with httptest needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt. When you finish an example of testing a client with httptest, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing a client with httptest mean, and when would you use it in a small Go program?</p>
+<h2>Section 43: Mocking a Server Response</h2>
+<p>In a real program, mocking a server response rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with mocking a server response is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output. Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too.</p>
+<p>If you find mocking a server response confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for mocking a server response uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test mocking a server response by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for mocking a server response, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember mocking a server response is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at mocking a server response needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of mocking a server response, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, mocking a server response should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once.</p>
+<p>If a teammate read your code for mocking a server response tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line. It is worth keeping your examples for mocking a server response short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does mocking a server response mean, and when would you use it in a small Go program?</p>
+<h2>Section 44: Checking JSON Decoding in Tests</h2>
+<p>If you find checking json decoding in tests confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it. Readable code for checking json decoding in tests uses names that describe the data, not the type alone, so a reader can follow the story of the program without guessing what a variable holds or why it exists. When you test checking json decoding in tests by hand, use a small input you can check in your head, because a tiny example makes a wrong answer obvious, while a huge example can hide a mistake behind a wall of output.</p>
+<p>The standard library is your friend for checking json decoding in tests, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember checking json decoding in tests is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at checking json decoding in tests needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of checking json decoding in tests, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, checking json decoding in tests should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for checking json decoding in tests tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for checking json decoding in tests short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of checking json decoding in tests instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later.</p>
+<p>As you practise checking json decoding in tests, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens. The goal of learning checking json decoding in tests is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does checking json decoding in tests mean, and when would you use it in a small Go program?</p>
+<h2>Section 45: Handling Timeouts in Tests</h2>
+<p>The standard library is your friend for handling timeouts in tests, and learning to read its short documentation examples will help you far more than memorising every function, since the same patterns appear again and again. A good way to remember handling timeouts in tests is to connect it to something you already know, such as a queue, a letter, a form, or a checklist, and then notice where the comparison helps and where it breaks down. Do not be surprised if your first attempt at handling timeouts in tests needs a second or third try, because writing code is a process of trying, reading the result, and adjusting, not a test of getting it perfect on the first attempt.</p>
+<p>When you finish an example of handling timeouts in tests, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, handling timeouts in tests should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for handling timeouts in tests tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for handling timeouts in tests short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of handling timeouts in tests instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise handling timeouts in tests, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning handling timeouts in tests is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write handling timeouts in tests in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it.</p>
+<p>When you compare two ways of doing handling timeouts in tests, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter. Small programs that practise handling timeouts in tests are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling timeouts in tests mean, and when would you use it in a small Go program?</p>
+<h2>Section 46: Common HTTP Client Mistakes</h2>
+<p>When you finish an example of common http client mistakes, take a moment to delete a line, change a condition, or swap two values, and observe the result, because that playful experiment builds a deeper understanding than reading alone. In larger programs, common http client mistakes should be placed where its purpose is obvious, with a function or a handler that does one job well, rather than buried inside a long block that tries to do everything at once. If a teammate read your code for common http client mistakes tomorrow, they should be able to tell what it does from the names and the structure alone, without needing you beside them to explain every line.</p>
+<p>It is worth keeping your examples for common http client mistakes short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of common http client mistakes instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise common http client mistakes, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning common http client mistakes is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write common http client mistakes in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing common http client mistakes, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise common http client mistakes are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on common http client mistakes, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step.</p>
+<p>Finally, remember that common http client mistakes is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again. When you work with common http client mistakes in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does common http client mistakes mean, and when would you use it in a small Go program?</p>
+<h2>Section 47: When to Use a Library Instead</h2>
+<p>It is worth keeping your examples for when to use a library instead short enough to run quickly, because fast feedback keeps you learning, while a slow, complicated example discourages the small experiments that teach the most. A careful programmer checks the result of when to use a library instead instead of assuming it worked, and that habit of checking, handling errors, and printing a useful message saves hours of guessing later. As you practise when to use a library instead, notice which parts feel easy and which parts feel shaky, and spend your next practice session on the shaky part, because that is where real progress happens.</p>
+<p>The goal of learning when to use a library instead is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write when to use a library instead in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing when to use a library instead, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise when to use a library instead are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on when to use a library instead, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that when to use a library instead is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with when to use a library instead in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for when to use a library instead first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<p>In the context of HTTP Clients: Fetching JSON, the idea behind when to use a library instead is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up. Think of when to use a library instead as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does when to use a library instead mean, and when would you use it in a small Go program?</p>
+<h2>Section 48: A Small JSON Fetcher from Start to Finish</h2>
+<p>The goal of learning a small json fetcher from start to finish is not to pass a quiz, but to be able to use it calmly in a real program, explain it to someone else, and fix it when it breaks under real conditions. Try to write a small json fetcher from start to finish in your own words after you finish reading this section, even if your summary is only a few sentences, because turning an idea into your own words is one of the strongest ways to remember it. When you compare two ways of doing a small json fetcher from start to finish, ask which one is clearer, which one handles errors better, and which one a beginner could maintain, rather than asking only which one is shorter.</p>
+<p>Small programs that practise a small json fetcher from start to finish are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on a small json fetcher from start to finish, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that a small json fetcher from start to finish is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with a small json fetcher from start to finish in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for a small json fetcher from start to finish first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs.</p>
+<p>In the context of HTTP Clients: Fetching JSON, the idea behind a small json fetcher from start to finish is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up. Think of a small json fetcher from start to finish as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case.</p>
+<p>Good Go code for a small json fetcher from start to finish is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain a small json fetcher from start to finish aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does a small json fetcher from start to finish mean, and when would you use it in a small Go program?</p>
+<h2>Section 49: Organising Client Code into Functions</h2>
+<p>Small programs that practise organising client code into functions are the best preparation for larger projects, because the same careful habits, clear names, and error checks scale up even when the program grows much bigger. If you ever feel stuck on organising client code into functions, step away from the keyboard for a moment, restate the problem on paper, and list the inputs and outputs, because a clear problem statement often reveals the next step. Finally, remember that organising client code into functions is a building block, not the whole house, and your confidence will grow each time you use it in a new program, notice a mistake, fix it, and run the program successfully again.</p>
+<p>When you work with organising client code into functions in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for organising client code into functions first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind organising client code into functions is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of organising client code into functions as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for organising client code into functions is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today.</p>
+<p>Before you run anything, try to explain organising client code into functions aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first. A useful habit is to start with the smallest working example of organising client code into functions, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made.</p>
+<p>When organising client code into functions goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past organising client code into functions and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<pre><code>package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+	&quot;time&quot;
+)
+
+type User struct {
+	Name string `json:&quot;name&quot;`
+}
+
+func main() {
+	client := &amp;http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(&quot;https://example.com/user&quot;)
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&amp;user); err != nil {
+		fmt.Println(&quot;decode error:&quot;, err)
+		return
+	}
+	fmt.Println(user.Name)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does organising client code into functions mean, and when would you use it in a small Go program?</p>
+<h2>Section 50: Review: Fetching JSON Safely</h2>
+<p>When you work with review: fetching json safely in Go, the first step is to say in plain words what you want the program to do before you write any code, because a clear goal makes the code easier to write, easier to read, and easier to fix later. A beginner often tries to memorise the syntax for review: fetching json safely first, but it helps far more to understand the situation it solves, the input it receives, and the result a reader should expect when the program runs. In the context of HTTP Clients: Fetching JSON, the idea behind review: fetching json safely is not a trick to show off, but a practical tool that keeps a small program predictable when real data, real delays, and real mistakes show up.</p>
+<p>Think of review: fetching json safely as one small job inside a larger program, and ask yourself what would happen if that job succeeded, what would happen if it failed, and what the rest of the program should do in each case. Good Go code for review: fetching json safely is usually short, honest, and easy to follow, which means you should prefer a plain name, a simple structure, and one clear purpose over a clever shortcut that only you understand today. Before you run anything, try to explain review: fetching json safely aloud as if you were teaching a friend, because if you cannot explain it simply, you probably need a smaller example and a slower walk through the idea first.</p>
+<p>A useful habit is to start with the smallest working example of review: fetching json safely, run it, watch what it prints, and only then add one new idea at a time, so that any mistake points clearly to the last change you made. When review: fetching json safely goes wrong, the error message, the output, and the missing result are clues, not insults, and reading them slowly will often tell you exactly which assumption was wrong. Many learners rush past review: fetching json safely and move on to the next topic, but spending a little longer here pays off, because later chapters build directly on this idea and assume you can use it without looking it up every time.</p>
+<p>In a real program, review: fetching json safely rarely appears alone, so practise combining it with the ideas from earlier chapters, such as functions, structs, errors, and slices, until the combination feels ordinary rather than special. One common mistake with review: fetching json safely is to copy a long example without changing it, and a better approach is to change one value, one name, or one condition, run the program again, and notice what changes in the output.</p>
+<p>Another common mistake is to ignore the unhappy path, yet a program that only works when everything is perfect will fail in exactly the situations where a user needs it most, so always test the failure case too. If you find review: fetching json safely confusing, break it into three questions: what data goes in, what work happens in the middle, and what result comes out, and answer each question with a short sentence before you code it.</p>
+<pre><code>package main
+
+import (
+	&quot;bytes&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;net/http&quot;
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]string{&quot;name&quot;: &quot;Kel&quot;})
+	resp, err := http.Post(&quot;https://example.com/users&quot;, &quot;application/json&quot;, bytes.NewReader(body))
+	if err != nil {
+		fmt.Println(&quot;error:&quot;, err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(&quot;status:&quot;, resp.Status)
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does review: fetching json safely mean, and when would you use it in a small Go program?</p>
+<h2>Practical Task</h2>
+<p>Build a small JSON fetcher in Go using only the standard library: use an http.Client with a ten-second timeout, fetch a public JSON endpoint you choose, check the status code, decode the body into a struct with json tags, print two fields, and handle both a network error and a non-200 response with a helpful message. Run it, then test the error path by using a wrong address, and note what your program prints in each case.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Why must you always close a response body, and what can go wrong if you forget?</li>
+<li>How do struct tags help JSON decoding, and what happens when a JSON field name does not match your struct?</li>
+<li>When should an HTTP client use a timeout, and what timeout length is sensible for a small fetcher?</li>
+<li>How should your program handle a 404 or a 500 response differently from a network error?</li>
+<li>Why should API keys live in environment variables rather than in your source code?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-26.html">← Chapter 26</a> <a href="index.html">All chapters</a> <a href="chapter-28.html">Chapter 28 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/go-developer/chapter-27.html'; this.page.identifier = 'book-go-developer-chapter-27'; this.page.title = 'Chapter 27: HTTP Clients: Fetching JSON'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

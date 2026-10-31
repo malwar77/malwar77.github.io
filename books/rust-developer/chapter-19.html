@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 19 — Handling Errors Well — Rust Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 19 of the Rust Developer teaching book: Handling Errors Well.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Rust Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 19: Handling Errors Well</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-19.svg" alt="Design for Chapter 19" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What Good Error Handling Looks Like</h2>
+<p>Think of what good error handling looks like as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand what good error handling looks like without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for what good error handling looks like, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of what good error handling looks like rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and what good error handling looks like helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for what good error handling looks like, and what a sensible failure or empty case would look like. A good habit is to test what good error handling looks like with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with what good error handling looks like come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how what good error handling looks like fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When what good error handling looks like feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make what good error handling looks like easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for what good error handling looks like, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain what good error handling looks like to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, what good error handling looks like often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for what good error handling looks like on the first attempt, because a working version can be improved after you understand it. Compare what good error handling looks like with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what what good error handling looks like returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain what good error handling looks like aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about what good error handling looks like, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what good error handling looks like mean, and when would you use it in a Rust program?</p>
+<h2>Section 2: Handling Errors at the Right Layer</h2>
+<p>A beginner can understand handling errors at the right layer without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for handling errors at the right layer, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of handling errors at the right layer rather than on decoration. Rust rewards code that says what it means, and handling errors at the right layer helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for handling errors at the right layer, and what a sensible failure or empty case would look like. A good habit is to test handling errors at the right layer with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with handling errors at the right layer come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how handling errors at the right layer fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When handling errors at the right layer feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make handling errors at the right layer easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for handling errors at the right layer, since it points out missing cases and type mismatches before the program runs. Choose names that explain handling errors at the right layer to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, handling errors at the right layer often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for handling errors at the right layer on the first attempt, because a working version can be improved after you understand it. Compare handling errors at the right layer with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what handling errors at the right layer returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain handling errors at the right layer aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about handling errors at the right layer, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when handling errors at the right layer is handled in one clear place instead of being repeated in many scattered places.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling errors at the right layer mean, and when would you use it in a Rust program?</p>
+<h2>Section 3: User-Friendly Error Messages</h2>
+<p>When you write code for user-friendly error messages, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of user-friendly error messages rather than on decoration. Rust rewards code that says what it means, and user-friendly error messages helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for user-friendly error messages, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test user-friendly error messages with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with user-friendly error messages come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how user-friendly error messages fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When user-friendly error messages feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make user-friendly error messages easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for user-friendly error messages, since it points out missing cases and type mismatches before the program runs. Choose names that explain user-friendly error messages to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, user-friendly error messages often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for user-friendly error messages on the first attempt, because a working version can be improved after you understand it. Compare user-friendly error messages with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what user-friendly error messages returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain user-friendly error messages aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about user-friendly error messages, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when user-friendly error messages is handled in one clear place instead of being repeated in many scattered places. If a test fails around user-friendly error messages, read the expected value and the actual value carefully before changing the code at random. Documentation helps user-friendly error messages stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for user-friendly error messages, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does user-friendly error messages mean, and when would you use it in a Rust program?</p>
+<h2>Section 4: Developer-Friendly Error Details</h2>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of developer-friendly error details rather than on decoration. Rust rewards code that says what it means, and developer-friendly error details helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for developer-friendly error details, and what a sensible failure or empty case would look like. A good habit is to test developer-friendly error details with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with developer-friendly error details come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how developer-friendly error details fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When developer-friendly error details feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make developer-friendly error details easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for developer-friendly error details, since it points out missing cases and type mismatches before the program runs. Choose names that explain developer-friendly error details to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, developer-friendly error details often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for developer-friendly error details on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare developer-friendly error details with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what developer-friendly error details returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain developer-friendly error details aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about developer-friendly error details, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when developer-friendly error details is handled in one clear place instead of being repeated in many scattered places. If a test fails around developer-friendly error details, read the expected value and the actual value carefully before changing the code at random. Documentation helps developer-friendly error details stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for developer-friendly error details, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind developer-friendly error details transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does developer-friendly error details mean, and when would you use it in a Rust program?</p>
+<h2>Section 5: Adding Context to an Error</h2>
+<p>Rust rewards code that says what it means, and adding context to an error helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for adding context to an error, and what a sensible failure or empty case would look like. A good habit is to test adding context to an error with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with adding context to an error come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how adding context to an error fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When adding context to an error feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make adding context to an error easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for adding context to an error, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain adding context to an error to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, adding context to an error often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for adding context to an error on the first attempt, because a working version can be improved after you understand it. Compare adding context to an error with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what adding context to an error returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain adding context to an error aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about adding context to an error, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when adding context to an error is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around adding context to an error, read the expected value and the actual value carefully before changing the code at random. Documentation helps adding context to an error stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for adding context to an error, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does adding context to an error mean, and when would you use it in a Rust program?</p>
+<h2>Section 6: Custom Error Types in Outline</h2>
+<p>Before you type anything, ask yourself what success looks like for custom error types in outline, and what a sensible failure or empty case would look like. A good habit is to test custom error types in outline with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with custom error types in outline come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how custom error types in outline fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When custom error types in outline feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make custom error types in outline easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for custom error types in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain custom error types in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, custom error types in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for custom error types in outline on the first attempt, because a working version can be improved after you understand it. Compare custom error types in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what custom error types in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain custom error types in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about custom error types in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when custom error types in outline is handled in one clear place instead of being repeated in many scattered places. If a test fails around custom error types in outline, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps custom error types in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for custom error types in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind custom error types in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does custom error types in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 7: One Error Type per Module</h2>
+<p>A good habit is to test one error type per module with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with one error type per module come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how one error type per module fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When one error type per module feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make one error type per module easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for one error type per module, since it points out missing cases and type mismatches before the program runs. Choose names that explain one error type per module to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, one error type per module often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for one error type per module on the first attempt, because a working version can be improved after you understand it. Compare one error type per module with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what one error type per module returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain one error type per module aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about one error type per module, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when one error type per module is handled in one clear place instead of being repeated in many scattered places. If a test fails around one error type per module, read the expected value and the actual value carefully before changing the code at random. Documentation helps one error type per module stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for one error type per module, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind one error type per module transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice one error type per module by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does one error type per module mean, and when would you use it in a Rust program?</p>
+<h2>Section 8: Grouping Related Errors</h2>
+<p>Many mistakes with grouping related errors come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how grouping related errors fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When grouping related errors feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make grouping related errors easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for grouping related errors, since it points out missing cases and type mismatches before the program runs. Choose names that explain grouping related errors to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, grouping related errors often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for grouping related errors on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare grouping related errors with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what grouping related errors returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain grouping related errors aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about grouping related errors, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when grouping related errors is handled in one clear place instead of being repeated in many scattered places. If a test fails around grouping related errors, read the expected value and the actual value carefully before changing the code at random. Documentation helps grouping related errors stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for grouping related errors, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind grouping related errors transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice grouping related errors by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for grouping related errors, because a small example that runs teaches more than a large example that confuses. When you feel stuck on grouping related errors, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about grouping related errors is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does grouping related errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 9: Displaying Errors Clearly</h2>
+<p>Notice how displaying errors clearly fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When displaying errors clearly feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make displaying errors clearly easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for displaying errors clearly, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain displaying errors clearly to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, displaying errors clearly often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for displaying errors clearly on the first attempt, because a working version can be improved after you understand it. Compare displaying errors clearly with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what displaying errors clearly returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain displaying errors clearly aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about displaying errors clearly, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when displaying errors clearly is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around displaying errors clearly, read the expected value and the actual value carefully before changing the code at random. Documentation helps displaying errors clearly stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for displaying errors clearly, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind displaying errors clearly transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice displaying errors clearly by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for displaying errors clearly, because a small example that runs teaches more than a large example that confuses. When you feel stuck on displaying errors clearly, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about displaying errors clearly is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe displaying errors clearly, write a short working example, and explain why your example behaves as it does.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does displaying errors clearly mean, and when would you use it in a Rust program?</p>
+<h2>Section 10: Debug Versus Display for Errors</h2>
+<p>When debug versus display for errors feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make debug versus display for errors easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for debug versus display for errors, since it points out missing cases and type mismatches before the program runs. Choose names that explain debug versus display for errors to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, debug versus display for errors often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for debug versus display for errors on the first attempt, because a working version can be improved after you understand it. Compare debug versus display for errors with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what debug versus display for errors returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain debug versus display for errors aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about debug versus display for errors, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when debug versus display for errors is handled in one clear place instead of being repeated in many scattered places. If a test fails around debug versus display for errors, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps debug versus display for errors stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for debug versus display for errors, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind debug versus display for errors transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice debug versus display for errors by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for debug versus display for errors, because a small example that runs teaches more than a large example that confuses. When you feel stuck on debug versus display for errors, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about debug versus display for errors is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does debug versus display for errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 11: Using thiserror in Outline</h2>
+<p>Short functions make using thiserror in outline easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for using thiserror in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain using thiserror in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, using thiserror in outline often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for using thiserror in outline on the first attempt, because a working version can be improved after you understand it. Compare using thiserror in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what using thiserror in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain using thiserror in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about using thiserror in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when using thiserror in outline is handled in one clear place instead of being repeated in many scattered places. If a test fails around using thiserror in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps using thiserror in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for using thiserror in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind using thiserror in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice using thiserror in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for using thiserror in outline, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on using thiserror in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about using thiserror in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe using thiserror in outline, write a short working example, and explain why your example behaves as it does. This section explores using thiserror in outline as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does using thiserror in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 12: Using anyhow in Outline</h2>
+<p>The compiler is a helpful partner for using anyhow in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain using anyhow in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, using anyhow in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for using anyhow in outline on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare using anyhow in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what using anyhow in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain using anyhow in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about using anyhow in outline, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when using anyhow in outline is handled in one clear place instead of being repeated in many scattered places. If a test fails around using anyhow in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps using anyhow in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for using anyhow in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind using anyhow in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice using anyhow in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for using anyhow in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on using anyhow in outline, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about using anyhow in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe using anyhow in outline, write a short working example, and explain why your example behaves as it does. This section explores using anyhow in outline as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of using anyhow in outline as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does using anyhow in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 13: When a Library Should Define Errors</h2>
+<p>Choose names that explain when a library should define errors to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, when a library should define errors often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for when a library should define errors on the first attempt, because a working version can be improved after you understand it. Compare when a library should define errors with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what when a library should define errors returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain when a library should define errors aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about when a library should define errors, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when when a library should define errors is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around when a library should define errors, read the expected value and the actual value carefully before changing the code at random. Documentation helps when a library should define errors stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for when a library should define errors, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind when a library should define errors transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice when a library should define errors by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for when a library should define errors, because a small example that runs teaches more than a large example that confuses. When you feel stuck on when a library should define errors, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about when a library should define errors is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe when a library should define errors, write a short working example, and explain why your example behaves as it does. This section explores when a library should define errors as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does when a library should define errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 14: When an Application Can Box Errors</h2>
+<p>In real programs, when an application can box errors often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for when an application can box errors on the first attempt, because a working version can be improved after you understand it. Compare when an application can box errors with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what when an application can box errors returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain when an application can box errors aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about when an application can box errors, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when when an application can box errors is handled in one clear place instead of being repeated in many scattered places. If a test fails around when an application can box errors, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps when an application can box errors stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for when an application can box errors, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind when an application can box errors transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice when an application can box errors by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for when an application can box errors, because a small example that runs teaches more than a large example that confuses. When you feel stuck on when an application can box errors, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about when an application can box errors is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe when an application can box errors, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores when an application can box errors as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of when an application can box errors as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does when an application can box errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 15: Recovering and Trying Again</h2>
+<p>You do not need a perfect design for recovering and trying again on the first attempt, because a working version can be improved after you understand it. Compare recovering and trying again with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what recovering and trying again returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain recovering and trying again aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about recovering and trying again, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when recovering and trying again is handled in one clear place instead of being repeated in many scattered places. If a test fails around recovering and trying again, read the expected value and the actual value carefully before changing the code at random. Documentation helps recovering and trying again stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for recovering and trying again, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind recovering and trying again transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice recovering and trying again by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for recovering and trying again, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on recovering and trying again, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about recovering and trying again is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe recovering and trying again, write a short working example, and explain why your example behaves as it does. This section explores recovering and trying again as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of recovering and trying again as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand recovering and trying again without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for recovering and trying again, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of recovering and trying again rather than on decoration.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does recovering and trying again mean, and when would you use it in a Rust program?</p>
+<h2>Section 16: Retrying a Fallible Operation</h2>
+<p>Compare retrying a fallible operation with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what retrying a fallible operation returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain retrying a fallible operation aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about retrying a fallible operation, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when retrying a fallible operation is handled in one clear place instead of being repeated in many scattered places. If a test fails around retrying a fallible operation, read the expected value and the actual value carefully before changing the code at random. Documentation helps retrying a fallible operation stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for retrying a fallible operation, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind retrying a fallible operation transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice retrying a fallible operation by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for retrying a fallible operation, because a small example that runs teaches more than a large example that confuses. When you feel stuck on retrying a fallible operation, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about retrying a fallible operation is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe retrying a fallible operation, write a short working example, and explain why your example behaves as it does. This section explores retrying a fallible operation as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of retrying a fallible operation as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand retrying a fallible operation without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for retrying a fallible operation, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of retrying a fallible operation rather than on decoration. Rust rewards code that says what it means, and retrying a fallible operation helps you say it plainly instead of hiding the meaning in comments.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does retrying a fallible operation mean, and when would you use it in a Rust program?</p>
+<h2>Section 17: Falling Back to a Default</h2>
+<p>Pay attention to what falling back to a default returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain falling back to a default aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about falling back to a default, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when falling back to a default is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around falling back to a default, read the expected value and the actual value carefully before changing the code at random. Documentation helps falling back to a default stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for falling back to a default, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind falling back to a default transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice falling back to a default by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for falling back to a default, because a small example that runs teaches more than a large example that confuses. When you feel stuck on falling back to a default, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about falling back to a default is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe falling back to a default, write a short working example, and explain why your example behaves as it does. This section explores falling back to a default as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of falling back to a default as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand falling back to a default without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for falling back to a default, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of falling back to a default rather than on decoration. Rust rewards code that says what it means, and falling back to a default helps you say it plainly instead of hiding the meaning in comments.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does falling back to a default mean, and when would you use it in a Rust program?</p>
+<h2>Section 18: Partial Success and Partial Failure</h2>
+<p>A useful exercise is to explain partial success and partial failure aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about partial success and partial failure, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when partial success and partial failure is handled in one clear place instead of being repeated in many scattered places. If a test fails around partial success and partial failure, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps partial success and partial failure stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for partial success and partial failure, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind partial success and partial failure transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice partial success and partial failure by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for partial success and partial failure, because a small example that runs teaches more than a large example that confuses. When you feel stuck on partial success and partial failure, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about partial success and partial failure is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe partial success and partial failure, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores partial success and partial failure as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of partial success and partial failure as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand partial success and partial failure without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for partial success and partial failure, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of partial success and partial failure rather than on decoration. Rust rewards code that says what it means, and partial success and partial failure helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for partial success and partial failure, and what a sensible failure or empty case would look like.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does partial success and partial failure mean, and when would you use it in a Rust program?</p>
+<h2>Section 19: Errors in User Input</h2>
+<p>When you review code about errors in user input, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when errors in user input is handled in one clear place instead of being repeated in many scattered places. If a test fails around errors in user input, read the expected value and the actual value carefully before changing the code at random. Documentation helps errors in user input stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for errors in user input, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind errors in user input transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice errors in user input by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for errors in user input, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on errors in user input, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about errors in user input is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe errors in user input, write a short working example, and explain why your example behaves as it does. This section explores errors in user input as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of errors in user input as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors in user input without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for errors in user input, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of errors in user input rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and errors in user input helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for errors in user input, and what a sensible failure or empty case would look like. A good habit is to test errors in user input with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with errors in user input come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors in user input mean, and when would you use it in a Rust program?</p>
+<h2>Section 20: Validating Before You Act</h2>
+<p>Rust programs become easier to maintain when validating before you act is handled in one clear place instead of being repeated in many scattered places. If a test fails around validating before you act, read the expected value and the actual value carefully before changing the code at random. Documentation helps validating before you act stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for validating before you act, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind validating before you act transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice validating before you act by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for validating before you act, because a small example that runs teaches more than a large example that confuses. When you feel stuck on validating before you act, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about validating before you act is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe validating before you act, write a short working example, and explain why your example behaves as it does. This section explores validating before you act as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of validating before you act as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand validating before you act without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for validating before you act, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of validating before you act rather than on decoration. Rust rewards code that says what it means, and validating before you act helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for validating before you act, and what a sensible failure or empty case would look like. A good habit is to test validating before you act with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with validating before you act come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how validating before you act fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does validating before you act mean, and when would you use it in a Rust program?</p>
+<h2>Section 21: Errors from External Services in Outline</h2>
+<p>If a test fails around errors from external services in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps errors from external services in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for errors from external services in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind errors from external services in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice errors from external services in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for errors from external services in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on errors from external services in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about errors from external services in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe errors from external services in outline, write a short working example, and explain why your example behaves as it does. This section explores errors from external services in outline as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of errors from external services in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors from external services in outline without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for errors from external services in outline, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of errors from external services in outline rather than on decoration. Rust rewards code that says what it means, and errors from external services in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for errors from external services in outline, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test errors from external services in outline with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with errors from external services in outline come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors from external services in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 22: Timeouts in Outline</h2>
+<p>Documentation helps timeouts in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for timeouts in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind timeouts in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice timeouts in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for timeouts in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on timeouts in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about timeouts in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe timeouts in outline, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores timeouts in outline as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of timeouts in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand timeouts in outline without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for timeouts in outline, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of timeouts in outline rather than on decoration. Rust rewards code that says what it means, and timeouts in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for timeouts in outline, and what a sensible failure or empty case would look like. A good habit is to test timeouts in outline with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with timeouts in outline come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how timeouts in outline fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When timeouts in outline feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make timeouts in outline easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for timeouts in outline, since it points out missing cases and type mismatches before the program runs.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does timeouts in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 23: Distinguishing Temporary and Permanent Errors</h2>
+<p>Edge cases matter for distinguishing temporary and permanent errors, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind distinguishing temporary and permanent errors transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice distinguishing temporary and permanent errors by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for distinguishing temporary and permanent errors, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on distinguishing temporary and permanent errors, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about distinguishing temporary and permanent errors is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe distinguishing temporary and permanent errors, write a short working example, and explain why your example behaves as it does. This section explores distinguishing temporary and permanent errors as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of distinguishing temporary and permanent errors as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand distinguishing temporary and permanent errors without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for distinguishing temporary and permanent errors, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of distinguishing temporary and permanent errors rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and distinguishing temporary and permanent errors helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for distinguishing temporary and permanent errors, and what a sensible failure or empty case would look like. A good habit is to test distinguishing temporary and permanent errors with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with distinguishing temporary and permanent errors come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how distinguishing temporary and permanent errors fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When distinguishing temporary and permanent errors feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make distinguishing temporary and permanent errors easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does distinguishing temporary and permanent errors mean, and when would you use it in a Rust program?</p>
+<h2>Section 24: Logging Errors for Later Review</h2>
+<p>The ideas behind logging errors for later review transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice logging errors for later review by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for logging errors for later review, because a small example that runs teaches more than a large example that confuses. When you feel stuck on logging errors for later review, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about logging errors for later review is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe logging errors for later review, write a short working example, and explain why your example behaves as it does. This section explores logging errors for later review as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of logging errors for later review as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand logging errors for later review without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for logging errors for later review, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of logging errors for later review rather than on decoration. Rust rewards code that says what it means, and logging errors for later review helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for logging errors for later review, and what a sensible failure or empty case would look like. A good habit is to test logging errors for later review with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with logging errors for later review come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how logging errors for later review fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When logging errors for later review feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make logging errors for later review easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for logging errors for later review, since it points out missing cases and type mismatches before the program runs.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does logging errors for later review mean, and when would you use it in a Rust program?</p>
+<h2>Section 25: Not Leaking Sensitive Details</h2>
+<p>Practice not leaking sensitive details by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for not leaking sensitive details, because a small example that runs teaches more than a large example that confuses. When you feel stuck on not leaking sensitive details, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about not leaking sensitive details is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe not leaking sensitive details, write a short working example, and explain why your example behaves as it does. This section explores not leaking sensitive details as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of not leaking sensitive details as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand not leaking sensitive details without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for not leaking sensitive details, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of not leaking sensitive details rather than on decoration. Rust rewards code that says what it means, and not leaking sensitive details helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for not leaking sensitive details, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test not leaking sensitive details with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with not leaking sensitive details come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how not leaking sensitive details fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When not leaking sensitive details feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make not leaking sensitive details easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for not leaking sensitive details, since it points out missing cases and type mismatches before the program runs. Choose names that explain not leaking sensitive details to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, not leaking sensitive details often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does not leaking sensitive details mean, and when would you use it in a Rust program?</p>
+<h2>Section 26: Panicking Only for True Bugs</h2>
+<p>Keep your examples honest and small for panicking only for true bugs, because a small example that runs teaches more than a large example that confuses. When you feel stuck on panicking only for true bugs, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about panicking only for true bugs is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe panicking only for true bugs, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores panicking only for true bugs as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of panicking only for true bugs as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand panicking only for true bugs without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for panicking only for true bugs, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of panicking only for true bugs rather than on decoration. Rust rewards code that says what it means, and panicking only for true bugs helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for panicking only for true bugs, and what a sensible failure or empty case would look like. A good habit is to test panicking only for true bugs with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with panicking only for true bugs come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how panicking only for true bugs fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When panicking only for true bugs feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make panicking only for true bugs easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for panicking only for true bugs, since it points out missing cases and type mismatches before the program runs. Choose names that explain panicking only for true bugs to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, panicking only for true bugs often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does panicking only for true bugs mean, and when would you use it in a Rust program?</p>
+<h2>Section 27: assert and debug_assert in Outline</h2>
+<p>When you feel stuck on assert and debug_assert in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about assert and debug_assert in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe assert and debug_assert in outline, write a short working example, and explain why your example behaves as it does. This section explores assert and debug_assert in outline as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of assert and debug_assert in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand assert and debug_assert in outline without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for assert and debug_assert in outline, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of assert and debug_assert in outline rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and assert and debug_assert in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for assert and debug_assert in outline, and what a sensible failure or empty case would look like. A good habit is to test assert and debug_assert in outline with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with assert and debug_assert in outline come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how assert and debug_assert in outline fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When assert and debug_assert in outline feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make assert and debug_assert in outline easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for assert and debug_assert in outline, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain assert and debug_assert in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, assert and debug_assert in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for assert and debug_assert in outline on the first attempt, because a working version can be improved after you understand it.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does assert and debug_assert in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 28: Graceful Shutdown After an Error</h2>
+<p>Strong Rust code about graceful shutdown after an error is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe graceful shutdown after an error, write a short working example, and explain why your example behaves as it does. This section explores graceful shutdown after an error as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of graceful shutdown after an error as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand graceful shutdown after an error without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for graceful shutdown after an error, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of graceful shutdown after an error rather than on decoration. Rust rewards code that says what it means, and graceful shutdown after an error helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for graceful shutdown after an error, and what a sensible failure or empty case would look like. A good habit is to test graceful shutdown after an error with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with graceful shutdown after an error come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how graceful shutdown after an error fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When graceful shutdown after an error feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make graceful shutdown after an error easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for graceful shutdown after an error, since it points out missing cases and type mismatches before the program runs. Choose names that explain graceful shutdown after an error to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, graceful shutdown after an error often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for graceful shutdown after an error on the first attempt, because a working version can be improved after you understand it. Compare graceful shutdown after an error with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does graceful shutdown after an error mean, and when would you use it in a Rust program?</p>
+<h2>Section 29: Cleaning Up After a Failure</h2>
+<p>By the end of this section, you should be able to describe cleaning up after a failure, write a short working example, and explain why your example behaves as it does. This section explores cleaning up after a failure as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of cleaning up after a failure as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand cleaning up after a failure without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for cleaning up after a failure, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of cleaning up after a failure rather than on decoration. Rust rewards code that says what it means, and cleaning up after a failure helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for cleaning up after a failure, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test cleaning up after a failure with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with cleaning up after a failure come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how cleaning up after a failure fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When cleaning up after a failure feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make cleaning up after a failure easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for cleaning up after a failure, since it points out missing cases and type mismatches before the program runs. Choose names that explain cleaning up after a failure to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, cleaning up after a failure often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for cleaning up after a failure on the first attempt, because a working version can be improved after you understand it. Compare cleaning up after a failure with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what cleaning up after a failure returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does cleaning up after a failure mean, and when would you use it in a Rust program?</p>
+<h2>Section 30: Errors in Concurrent Code in Outline</h2>
+<p>This section explores errors in concurrent code in outline as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of errors in concurrent code in outline as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand errors in concurrent code in outline without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for errors in concurrent code in outline, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of errors in concurrent code in outline rather than on decoration. Rust rewards code that says what it means, and errors in concurrent code in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for errors in concurrent code in outline, and what a sensible failure or empty case would look like. A good habit is to test errors in concurrent code in outline with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with errors in concurrent code in outline come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how errors in concurrent code in outline fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When errors in concurrent code in outline feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make errors in concurrent code in outline easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for errors in concurrent code in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain errors in concurrent code in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, errors in concurrent code in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for errors in concurrent code in outline on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare errors in concurrent code in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what errors in concurrent code in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain errors in concurrent code in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does errors in concurrent code in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 31: Testing Happy and Unhappy Paths</h2>
+<p>Think of testing happy and unhappy paths as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand testing happy and unhappy paths without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for testing happy and unhappy paths, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of testing happy and unhappy paths rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and testing happy and unhappy paths helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for testing happy and unhappy paths, and what a sensible failure or empty case would look like. A good habit is to test testing happy and unhappy paths with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with testing happy and unhappy paths come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how testing happy and unhappy paths fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When testing happy and unhappy paths feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make testing happy and unhappy paths easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for testing happy and unhappy paths, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain testing happy and unhappy paths to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, testing happy and unhappy paths often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for testing happy and unhappy paths on the first attempt, because a working version can be improved after you understand it. Compare testing happy and unhappy paths with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what testing happy and unhappy paths returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain testing happy and unhappy paths aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about testing happy and unhappy paths, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing happy and unhappy paths mean, and when would you use it in a Rust program?</p>
+<h2>Section 32: Testing Error Messages</h2>
+<p>A beginner can understand testing error messages without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for testing error messages, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of testing error messages rather than on decoration. Rust rewards code that says what it means, and testing error messages helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for testing error messages, and what a sensible failure or empty case would look like. A good habit is to test testing error messages with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with testing error messages come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how testing error messages fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When testing error messages feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make testing error messages easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for testing error messages, since it points out missing cases and type mismatches before the program runs. Choose names that explain testing error messages to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, testing error messages often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for testing error messages on the first attempt, because a working version can be improved after you understand it. Compare testing error messages with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what testing error messages returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain testing error messages aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about testing error messages, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when testing error messages is handled in one clear place instead of being repeated in many scattered places. If a test fails around testing error messages, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps testing error messages stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing error messages mean, and when would you use it in a Rust program?</p>
+<h2>Section 33: Property Tests for Error Paths in Outline</h2>
+<p>When you write code for property tests for error paths in outline, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of property tests for error paths in outline rather than on decoration. Rust rewards code that says what it means, and property tests for error paths in outline helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for property tests for error paths in outline, and what a sensible failure or empty case would look like.</p>
+<p>A good habit is to test property tests for error paths in outline with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with property tests for error paths in outline come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how property tests for error paths in outline fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When property tests for error paths in outline feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make property tests for error paths in outline easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for property tests for error paths in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain property tests for error paths in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, property tests for error paths in outline often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for property tests for error paths in outline on the first attempt, because a working version can be improved after you understand it. Compare property tests for error paths in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what property tests for error paths in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain property tests for error paths in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about property tests for error paths in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when property tests for error paths in outline is handled in one clear place instead of being repeated in many scattered places.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does property tests for error paths in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 34: Refactoring Messy Error Code</h2>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of refactoring messy error code rather than on decoration. Rust rewards code that says what it means, and refactoring messy error code helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for refactoring messy error code, and what a sensible failure or empty case would look like. A good habit is to test refactoring messy error code with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<p>Many mistakes with refactoring messy error code come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how refactoring messy error code fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When refactoring messy error code feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make refactoring messy error code easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for refactoring messy error code, since it points out missing cases and type mismatches before the program runs. Choose names that explain refactoring messy error code to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, refactoring messy error code often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for refactoring messy error code on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare refactoring messy error code with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what refactoring messy error code returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain refactoring messy error code aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about refactoring messy error code, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when refactoring messy error code is handled in one clear place instead of being repeated in many scattered places. If a test fails around refactoring messy error code, read the expected value and the actual value carefully before changing the code at random. Documentation helps refactoring messy error code stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for refactoring messy error code, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does refactoring messy error code mean, and when would you use it in a Rust program?</p>
+<h2>Section 35: Removing unwrap from Production Paths</h2>
+<p>Rust rewards code that says what it means, and removing unwrap from production paths helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for removing unwrap from production paths, and what a sensible failure or empty case would look like. A good habit is to test removing unwrap from production paths with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with removing unwrap from production paths come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<p>Notice how removing unwrap from production paths fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When removing unwrap from production paths feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make removing unwrap from production paths easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for removing unwrap from production paths, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain removing unwrap from production paths to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, removing unwrap from production paths often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for removing unwrap from production paths on the first attempt, because a working version can be improved after you understand it. Compare removing unwrap from production paths with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what removing unwrap from production paths returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain removing unwrap from production paths aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about removing unwrap from production paths, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when removing unwrap from production paths is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around removing unwrap from production paths, read the expected value and the actual value carefully before changing the code at random. Documentation helps removing unwrap from production paths stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for removing unwrap from production paths, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does removing unwrap from production paths mean, and when would you use it in a Rust program?</p>
+<h2>Section 36: Replacing Panics with Results</h2>
+<p>Before you type anything, ask yourself what success looks like for replacing panics with results, and what a sensible failure or empty case would look like. A good habit is to test replacing panics with results with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with replacing panics with results come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how replacing panics with results fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design.</p>
+<p>When replacing panics with results feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make replacing panics with results easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for replacing panics with results, since it points out missing cases and type mismatches before the program runs. Choose names that explain replacing panics with results to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, replacing panics with results often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for replacing panics with results on the first attempt, because a working version can be improved after you understand it. Compare replacing panics with results with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what replacing panics with results returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain replacing panics with results aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about replacing panics with results, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when replacing panics with results is handled in one clear place instead of being repeated in many scattered places. If a test fails around replacing panics with results, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps replacing panics with results stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for replacing panics with results, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind replacing panics with results transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice replacing panics with results by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does replacing panics with results mean, and when would you use it in a Rust program?</p>
+<h2>Section 37: Error Handling Checklists</h2>
+<p>A good habit is to test error handling checklists with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with error handling checklists come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how error handling checklists fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When error handling checklists feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step.</p>
+<p>Short functions make error handling checklists easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for error handling checklists, since it points out missing cases and type mismatches before the program runs. Choose names that explain error handling checklists to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, error handling checklists often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for error handling checklists on the first attempt, because a working version can be improved after you understand it. Compare error handling checklists with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what error handling checklists returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error handling checklists aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about error handling checklists, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling checklists is handled in one clear place instead of being repeated in many scattered places. If a test fails around error handling checklists, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling checklists stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for error handling checklists, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling checklists transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error handling checklists by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling checklists, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on error handling checklists, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling checklists mean, and when would you use it in a Rust program?</p>
+<h2>Section 38: Reviewing Error Code with a Partner</h2>
+<p>Many mistakes with reviewing error code with a partner come from rushing, so slow down, read the compiler message, and change one thing at a time. Notice how reviewing error code with a partner fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When reviewing error code with a partner feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make reviewing error code with a partner easier to read, because each function can focus on one decision instead of many decisions at once.</p>
+<p>The compiler is a helpful partner for reviewing error code with a partner, since it points out missing cases and type mismatches before the program runs. Choose names that explain reviewing error code with a partner to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, reviewing error code with a partner often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for reviewing error code with a partner on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare reviewing error code with a partner with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what reviewing error code with a partner returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain reviewing error code with a partner aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about reviewing error code with a partner, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when reviewing error code with a partner is handled in one clear place instead of being repeated in many scattered places. If a test fails around reviewing error code with a partner, read the expected value and the actual value carefully before changing the code at random. Documentation helps reviewing error code with a partner stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for reviewing error code with a partner, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind reviewing error code with a partner transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice reviewing error code with a partner by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for reviewing error code with a partner, because a small example that runs teaches more than a large example that confuses.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reviewing error code with a partner mean, and when would you use it in a Rust program?</p>
+<h2>Section 39: Documenting Error Behaviour</h2>
+<p>Notice how documenting error behaviour fits with the ideas from earlier chapters, especially ownership, borrowing, and clear function design. When documenting error behaviour feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make documenting error behaviour easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for documenting error behaviour, since it points out missing cases and type mismatches before the program runs.</p>
+<p>Choose names that explain documenting error behaviour to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, documenting error behaviour often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for documenting error behaviour on the first attempt, because a working version can be improved after you understand it. Compare documenting error behaviour with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what documenting error behaviour returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain documenting error behaviour aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about documenting error behaviour, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when documenting error behaviour is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around documenting error behaviour, read the expected value and the actual value carefully before changing the code at random. Documentation helps documenting error behaviour stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for documenting error behaviour, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind documenting error behaviour transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice documenting error behaviour by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for documenting error behaviour, because a small example that runs teaches more than a large example that confuses. When you feel stuck on documenting error behaviour, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about documenting error behaviour is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe documenting error behaviour, write a short working example, and explain why your example behaves as it does.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does documenting error behaviour mean, and when would you use it in a Rust program?</p>
+<h2>Section 40: Error Handling in Command-Line Tools</h2>
+<p>When error handling in command-line tools feels confusing, rewrite the same idea in plain words on paper, then translate those words into Rust step by step. Short functions make error handling in command-line tools easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for error handling in command-line tools, since it points out missing cases and type mismatches before the program runs. Choose names that explain error handling in command-line tools to a future reader, including yourself in a few weeks, rather than names that only make sense today.</p>
+<p>In real programs, error handling in command-line tools often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for error handling in command-line tools on the first attempt, because a working version can be improved after you understand it. Compare error handling in command-line tools with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what error handling in command-line tools returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain error handling in command-line tools aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error handling in command-line tools, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling in command-line tools is handled in one clear place instead of being repeated in many scattered places. If a test fails around error handling in command-line tools, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps error handling in command-line tools stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error handling in command-line tools, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling in command-line tools transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error handling in command-line tools by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for error handling in command-line tools, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error handling in command-line tools, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about error handling in command-line tools is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in command-line tools mean, and when would you use it in a Rust program?</p>
+<h2>Section 41: Error Handling in Web Services in Outline</h2>
+<p>Short functions make error handling in web services in outline easier to read, because each function can focus on one decision instead of many decisions at once. The compiler is a helpful partner for error handling in web services in outline, since it points out missing cases and type mismatches before the program runs. Choose names that explain error handling in web services in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, error handling in web services in outline often appears in small places, such as checking input, building a list, or choosing the next step.</p>
+<p>You do not need a perfect design for error handling in web services in outline on the first attempt, because a working version can be improved after you understand it. Compare error handling in web services in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what error handling in web services in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error handling in web services in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about error handling in web services in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling in web services in outline is handled in one clear place instead of being repeated in many scattered places. If a test fails around error handling in web services in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling in web services in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for error handling in web services in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling in web services in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error handling in web services in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling in web services in outline, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on error handling in web services in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about error handling in web services in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in web services in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 42: Error Handling in File Tools</h2>
+<p>The compiler is a helpful partner for error handling in file tools, since it points out missing cases and type mismatches before the program runs. Choose names that explain error handling in file tools to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, error handling in file tools often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for error handling in file tools on the first attempt, because a working version can be improved after you understand it.</p>
+<p>Compare error handling in file tools with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what error handling in file tools returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error handling in file tools aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error handling in file tools, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when error handling in file tools is handled in one clear place instead of being repeated in many scattered places. If a test fails around error handling in file tools, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling in file tools stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error handling in file tools, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind error handling in file tools transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error handling in file tools by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling in file tools, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error handling in file tools, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about error handling in file tools is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe error handling in file tools, write a short working example, and explain why your example behaves as it does. This section explores error handling in file tools as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in file tools mean, and when would you use it in a Rust program?</p>
+<h2>Section 43: Error Handling and Security in Outline</h2>
+<p>Choose names that explain error handling and security in outline to a future reader, including yourself in a few weeks, rather than names that only make sense today. In real programs, error handling and security in outline often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for error handling and security in outline on the first attempt, because a working version can be improved after you understand it. Compare error handling and security in outline with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely.</p>
+<p>Pay attention to what error handling and security in outline returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error handling and security in outline aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error handling and security in outline, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling and security in outline is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around error handling and security in outline, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling and security in outline stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error handling and security in outline, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling and security in outline transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice error handling and security in outline by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling and security in outline, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error handling and security in outline, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about error handling and security in outline is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe error handling and security in outline, write a short working example, and explain why your example behaves as it does. This section explores error handling and security in outline as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling and security in outline mean, and when would you use it in a Rust program?</p>
+<h2>Section 44: Keeping Error Handling Simple</h2>
+<p>In real programs, keeping error handling simple often appears in small places, such as checking input, building a list, or choosing the next step. You do not need a perfect design for keeping error handling simple on the first attempt, because a working version can be improved after you understand it. Compare keeping error handling simple with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what keeping error handling simple returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it.</p>
+<p>A useful exercise is to explain keeping error handling simple aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about keeping error handling simple, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when keeping error handling simple is handled in one clear place instead of being repeated in many scattered places. If a test fails around keeping error handling simple, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps keeping error handling simple stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for keeping error handling simple, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind keeping error handling simple transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice keeping error handling simple by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for keeping error handling simple, because a small example that runs teaches more than a large example that confuses. When you feel stuck on keeping error handling simple, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about keeping error handling simple is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe keeping error handling simple, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores keeping error handling simple as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of keeping error handling simple as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand keeping error handling simple without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for keeping error handling simple, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does keeping error handling simple mean, and when would you use it in a Rust program?</p>
+<h2>Section 45: Keeping Error Handling Consistent</h2>
+<p>You do not need a perfect design for keeping error handling consistent on the first attempt, because a working version can be improved after you understand it. Compare keeping error handling consistent with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what keeping error handling consistent returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain keeping error handling consistent aloud in one minute, without looking at code, and notice which part of the explanation feels weakest.</p>
+<p>When you review code about keeping error handling consistent, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when keeping error handling consistent is handled in one clear place instead of being repeated in many scattered places. If a test fails around keeping error handling consistent, read the expected value and the actual value carefully before changing the code at random. Documentation helps keeping error handling consistent stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for keeping error handling consistent, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind keeping error handling consistent transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice keeping error handling consistent by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for keeping error handling consistent, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on keeping error handling consistent, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about keeping error handling consistent is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe keeping error handling consistent, write a short working example, and explain why your example behaves as it does. This section explores keeping error handling consistent as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of keeping error handling consistent as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand keeping error handling consistent without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for keeping error handling consistent, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of keeping error handling consistent rather than on decoration.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does keeping error handling consistent mean, and when would you use it in a Rust program?</p>
+<h2>Section 46: When to Stop Adding Error Types</h2>
+<p>Compare when to stop adding error types with a simpler alternative, and prefer the simpler one whenever it already expresses the idea clearly and safely. Pay attention to what when to stop adding error types returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain when to stop adding error types aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about when to stop adding error types, look first for correctness, then for clarity, and only then for cleverness or brevity.</p>
+<p>Rust programs become easier to maintain when when to stop adding error types is handled in one clear place instead of being repeated in many scattered places. If a test fails around when to stop adding error types, read the expected value and the actual value carefully before changing the code at random. Documentation helps when to stop adding error types stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for when to stop adding error types, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind when to stop adding error types transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice when to stop adding error types by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for when to stop adding error types, because a small example that runs teaches more than a large example that confuses. When you feel stuck on when to stop adding error types, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about when to stop adding error types is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe when to stop adding error types, write a short working example, and explain why your example behaves as it does. This section explores when to stop adding error types as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of when to stop adding error types as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand when to stop adding error types without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for when to stop adding error types, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does when to stop adding error types mean, and when would you use it in a Rust program?</p>
+<h2>Section 47: Error Handling in Tests</h2>
+<p>Pay attention to what error handling in tests returns, what it borrows, and what it owns, because those details decide how the rest of the code can use it. A useful exercise is to explain error handling in tests aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error handling in tests, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling in tests is handled in one clear place instead of being repeated in many scattered places.</p>
+<p>If a test fails around error handling in tests, read the expected value and the actual value carefully before changing the code at random. Documentation helps error handling in tests stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error handling in tests, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling in tests transfer to other languages too, even though Rust expresses them with its own syntax and safety rules.</p>
+<p>Practice error handling in tests by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for error handling in tests, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error handling in tests, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about error handling in tests is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly.</p>
+<p>By the end of this section, you should be able to describe error handling in tests, write a short working example, and explain why your example behaves as it does. This section explores error handling in tests as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of error handling in tests as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand error handling in tests without knowing every advanced feature of Rust, because the core idea stays small and practical.</p>
+<p>When you write code for error handling in tests, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of error handling in tests rather than on decoration. Rust rewards code that says what it means, and error handling in tests helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for error handling in tests, and what a sensible failure or empty case would look like.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in tests mean, and when would you use it in a Rust program?</p>
+<h2>Section 48: Error Handling in Examples and Demos</h2>
+<p>A useful exercise is to explain error handling in examples and demos aloud in one minute, without looking at code, and notice which part of the explanation feels weakest. When you review code about error handling in examples and demos, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when error handling in examples and demos is handled in one clear place instead of being repeated in many scattered places. If a test fails around error handling in examples and demos, read the expected value and the actual value carefully before changing the code at random.</p>
+<p>Documentation helps error handling in examples and demos stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for error handling in examples and demos, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind error handling in examples and demos transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice error handling in examples and demos by changing one part of the example at a time, running the code, and observing exactly what changes in the output.</p>
+<p>Keep your examples honest and small for error handling in examples and demos, because a small example that runs teaches more than a large example that confuses. When you feel stuck on error handling in examples and demos, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about error handling in examples and demos is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe error handling in examples and demos, write a short working example, and explain why your example behaves as it does.</p>
+<p>This section explores error handling in examples and demos as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of error handling in examples and demos as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand error handling in examples and demos without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for error handling in examples and demos, begin by naming what you want to happen, and only then decide how Rust should express it.</p>
+<p>The examples in this section keep the syntax short, so your attention stays on the meaning of error handling in examples and demos rather than on decoration. Rust rewards code that says what it means, and error handling in examples and demos helps you say it plainly instead of hiding the meaning in comments.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error handling in examples and demos mean, and when would you use it in a Rust program?</p>
+<h2>Section 49: When Error Handling Becomes Over-Engineering</h2>
+<p>When you review code about when error handling becomes over-engineering, look first for correctness, then for clarity, and only then for cleverness or brevity. Rust programs become easier to maintain when when error handling becomes over-engineering is handled in one clear place instead of being repeated in many scattered places. If a test fails around when error handling becomes over-engineering, read the expected value and the actual value carefully before changing the code at random. Documentation helps when error handling becomes over-engineering stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself.</p>
+<p>Edge cases matter for when error handling becomes over-engineering, so ask what happens with empty input, a single item, a large input, and an unexpected value. The ideas behind when error handling becomes over-engineering transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice when error handling becomes over-engineering by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for when error handling becomes over-engineering, because a small example that runs teaches more than a large example that confuses.</p>
+<p>When you feel stuck on when error handling becomes over-engineering, take a break, reread the section goal, and try the smallest possible version of the problem again. Strong Rust code about when error handling becomes over-engineering is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe when error handling becomes over-engineering, write a short working example, and explain why your example behaves as it does. This section explores when error handling becomes over-engineering as part of handling errors well in Rust, starting from a simple idea you can picture clearly.</p>
+<p>Think of when error handling becomes over-engineering as a tool you reach for when a program must handle a clear choice or a changing set of values. A beginner can understand when error handling becomes over-engineering without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for when error handling becomes over-engineering, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of when error handling becomes over-engineering rather than on decoration.</p>
+<p>Rust rewards code that says what it means, and when error handling becomes over-engineering helps you say it plainly instead of hiding the meaning in comments. Before you type anything, ask yourself what success looks like for when error handling becomes over-engineering, and what a sensible failure or empty case would look like. A good habit is to test when error handling becomes over-engineering with a tiny example first, then grow the example only after the tiny version behaves as expected.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does when error handling becomes over-engineering mean, and when would you use it in a Rust program?</p>
+<h2>Section 50: Review: Handling Errors with Care</h2>
+<p>Rust programs become easier to maintain when review: handling errors with care is handled in one clear place instead of being repeated in many scattered places. If a test fails around review: handling errors with care, read the expected value and the actual value carefully before changing the code at random. Documentation helps review: handling errors with care stay understandable, so write a short comment when the reason for a choice is not obvious from the code itself. Edge cases matter for review: handling errors with care, so ask what happens with empty input, a single item, a large input, and an unexpected value.</p>
+<p>The ideas behind review: handling errors with care transfer to other languages too, even though Rust expresses them with its own syntax and safety rules. Practice review: handling errors with care by changing one part of the example at a time, running the code, and observing exactly what changes in the output. Keep your examples honest and small for review: handling errors with care, because a small example that runs teaches more than a large example that confuses. When you feel stuck on review: handling errors with care, take a break, reread the section goal, and try the smallest possible version of the problem again.</p>
+<p>Strong Rust code about review: handling errors with care is usually boring in a good way, because it follows familiar patterns that other programmers can follow quickly. By the end of this section, you should be able to describe review: handling errors with care, write a short working example, and explain why your example behaves as it does. This section explores review: handling errors with care as part of handling errors well in Rust, starting from a simple idea you can picture clearly. Think of review: handling errors with care as a tool you reach for when a program must handle a clear choice or a changing set of values.</p>
+<p>A beginner can understand review: handling errors with care without knowing every advanced feature of Rust, because the core idea stays small and practical. When you write code for review: handling errors with care, begin by naming what you want to happen, and only then decide how Rust should express it. The examples in this section keep the syntax short, so your attention stays on the meaning of review: handling errors with care rather than on decoration. Rust rewards code that says what it means, and review: handling errors with care helps you say it plainly instead of hiding the meaning in comments.</p>
+<p>Before you type anything, ask yourself what success looks like for review: handling errors with care, and what a sensible failure or empty case would look like. A good habit is to test review: handling errors with care with a tiny example first, then grow the example only after the tiny version behaves as expected. Many mistakes with review: handling errors with care come from rushing, so slow down, read the compiler message, and change one thing at a time.</p>
+<pre><code>use std::fmt;
+
+#[derive(Debug)]
+enum AppError {
+    NotFound(String),
+    InvalidInput(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;&#x27;_&gt;) -&gt; fmt::Result {
+        match self {
+            AppError::NotFound(item) =&gt; write!(f, &quot;not found: {item}&quot;),
+            AppError::InvalidInput(reason) =&gt; write!(f, &quot;invalid input: {reason}&quot;),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
+fn main() {
+    let error = AppError::NotFound(&quot;notes.txt&quot;.to_string());
+    println!(&quot;{error}&quot;);
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does review: handling errors with care mean, and when would you use it in a Rust program?</p>
+<h2>Practical Task</h2>
+<p>Build a small Rust program that puts handling errors well into practice: write a complete example using the ideas from this chapter, run it, try an empty or unexpected input, and write a short note explaining what worked, what failed, and what you changed.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Explain one key idea from this chapter about handling errors well and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about handling errors well and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about handling errors well and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about handling errors well and give a short example that shows it working.</li>
+<li>Explain one key idea from this chapter about handling errors well and give a short example that shows it working.</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-18.html">← Chapter 18</a> <a href="index.html">All chapters</a> <a href="chapter-20.html">Chapter 20 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/rust-developer/chapter-19.html'; this.page.identifier = 'book-rust-developer-chapter-19'; this.page.title = 'Chapter 19: Handling Errors Well'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

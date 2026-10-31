@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 32 — Testing in Swift in Plain Words — Swift Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 32 of the Swift Developer teaching book: Testing in Swift in Plain Words.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Swift Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 32: Testing in Swift in Plain Words</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-32.svg" alt="Design for Chapter 32" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: Why Testing Matters</h2>
+<p>Testing is the habit of checking that your code does what you think it does, and it matters because human beings are unreliable judges of their own work. When you write a function, you hold a picture of it in your head, and that picture is usually optimistic. You imagine the normal case, where the input is sensible and everything works, and you forget the strange cases, where the input is empty, or negative, or far larger than expected. A test forces you to write down, in code, what you expect to happen for a particular input, and then the computer checks your expectation against reality. If they disagree, you have learned something valuable, and you have learned it early, while the code is still fresh and cheap to fix. Without tests, the same disagreement might surface weeks later, in front of a user, when fixing it is expensive and embarrassing. Testing also gives you courage to change code. When you want to improve a function or fix a bug, tests act as a safety net: if your change breaks something that used to work, a test will fail and tell you immediately. Without that net, every change feels risky, and programmers start avoiding improvements, which lets code slowly rot. Testing is therefore not a chore added at the end of a project; it is a working method that makes the whole project calmer, faster, and more trustworthy. It is also a kindness to your future self, who will return to this code in six months and wonder whether it still works. A suite of passing tests answers that question in seconds.</p>
+<pre><code>func add(_ a: Int, _ b: Int) -&gt; Int {
+    return a + b
+}
+
+let result = add(2, 3)
+print(result == 5)</code></pre>
+<p>The tiny example above is the seed of all testing. It calls a function with known inputs and checks whether the result matches the expected value. A real test does the same thing, but in a structured way, with a name, a clear expectation, and a report when the expectation fails. The print statement here is a manual check; a testing framework turns that check into an assertion that can pass or fail and be counted. The difference between manual checking and automated testing is repeatability. You can run an automated test a thousand times, after every change, without effort, while a manual check depends on you remembering to do it and doing it correctly. That repeatability is what makes testing powerful. It turns a one-time verification into a permanent guard that watches your code forever. As you learn testing in this chapter, keep this simple picture in mind: a test is a written expectation, checked automatically, that protects your code from your own future mistakes.</p>
+<p>A useful way to start testing is to pick the most important function in a program, the one whose failure would cause the most harm, and write tests for it first. Important code deserves the strongest protection, and starting there gives the best return on a small amount of testing effort.</p>
+<p class="check"><strong>Check:</strong> Why is an automated test more valuable than checking a result once by hand?</p>
+<h2>Section 2: Your First Test in Swift</h2>
+<p>Swift&#x27;s standard testing tool is called XCTest, and it is included with the tools you use to build Swift programs, so you do not need to install anything extra to begin. A test lives in a test target, which is a separate part of your project that can see your program&#x27;s code and check it. Inside the test target, you write test classes or, in newer Swift, test functions, each containing small methods that verify one behaviour. Each test method has a name that starts with the word test, which is how the framework recognises it as a test rather than an ordinary helper. Inside the method, you arrange the situation, act by calling the code you want to test, and assert that the result matches your expectation. The assertion is the heart of the test: it is a statement that must be true, and if it is false, the test fails and reports the mismatch. For example, a test for an addition function would call the function with two and three and assert that the result equals five. If the function returned six, the test would fail with a clear message showing the expected and actual values. That clarity is one of testing&#x27;s great gifts: a failing test does not just say something is wrong, it shows you what was expected and what actually happened, which often points straight at the bug. Writing your first test feels strange, because you are writing code whose only job is to check other code, but after a few tests it becomes natural, and you will start to feel uneasy about code that has no tests at all.</p>
+<pre><code>import XCTest
+
+final class AdditionTests: XCTestCase {
+    func testAddingTwoAndThreeGivesFive() {
+        let result = add(2, 3)
+        XCTAssertEqual(result, 5)
+    }
+}</code></pre>
+<p>The test class above follows the classic XCTest shape. It imports XCTest, defines a class that inherits from XCTestCase, and contains one test method whose name describes the behaviour it checks. Inside, it calls the add function and asserts with XCTAssertEqual that the result equals five. If you run this test and the function is correct, the test passes quietly. If the function is wrong, the test fails loudly, with a message naming the expected and actual values. That loud failure is the point: a test that cannot fail is not a test, it is a decoration. As you write tests, you will meet many assertion functions, such as XCTAssertTrue, XCTAssertNil, and XCTAssertThrowsError, each suited to a different kind of expectation. They all share the same idea: state what must be true, and let the framework check it. The test target setup varies slightly between project types, but the shape of a test method stays the same, which means the skill transfers everywhere you write Swift.</p>
+<p>If your project does not yet have a test target, creating one is usually a matter of adding it through your project&#x27;s settings or your package manifest, depending on how the project is organised. Once it exists, it stays out of the way until you run the tests, and it never affects the program that users run.</p>
+<p class="check"><strong>Check:</strong> What are the three parts of a test method, and what does the assertion do?</p>
+<h2>Section 3: Naming Tests So They Explain Themselves</h2>
+<p>A test&#x27;s name is more important than most beginners realise, because test names are the documentation of what your program is supposed to do. When a test fails, its name is often the first thing you see, and a good name tells you immediately which behaviour broke, without you having to read the test&#x27;s code. A bad name, such as testOne or testFunction, tells you nothing, and you must dig into the code to understand the failure. Good test names describe the situation and the expected outcome in plain words, such as testAddingTwoAndThreeGivesFive or testEmptyBasketHasZeroItems. They read like sentences, with the word test at the start followed by the behaviour being checked. Some programmers use a three-part naming style: the method or feature, the situation, and the expected result, joined into one long name. That style produces names like testWithdrawMoreThanBalanceFails, which is long but wonderfully clear. Length is not a problem in test names, because they are rarely typed by hand after they are written, and clarity is worth far more than brevity. Another naming habit is to name tests after the behaviour, not the implementation. A test called testCounterIncrements is tied to how the code works, while testScoreIncreasesAfterCorrectAnswer describes what the user experiences. Behaviour names survive refactoring better, because the behaviour stays the same even when the implementation changes. When you name a test, imagine reading its name in a failure report at midnight. If the name alone tells you what broke, it is a good name. If it leaves you guessing, rewrite it before moving on.</p>
+<pre><code>import XCTest
+
+final class BasketTests: XCTestCase {
+    func testEmptyBasketHasZeroItems() {
+        let basket: [String] = []
+        XCTAssertEqual(basket.count, 0)
+    }
+
+    func testAddingAnItemIncreasesCountToOne() {
+        var basket: [String] = []
+        basket.append(&quot;Apples&quot;)
+        XCTAssertEqual(basket.count, 1)
+    }
+}</code></pre>
+<p>The two tests above have names that explain themselves. Reading testEmptyBasketHasZeroItems tells you the situation, an empty basket, and the expectation, zero items, without opening the test. Reading testAddingAnItemIncreasesCountToOne tells you the action, adding an item, and the result, a count of one. If either test failed, you would know immediately which behaviour to investigate. Contrast that with names like testOne and testTwo, which would leave you guessing. Good naming is a small effort that pays off every time a test fails, which is exactly when you are under pressure and need clarity most. It also helps teammates, who can read a list of test names and understand what the program promises, without reading any implementation code. Treat test names as sentences you are writing for a future reader, and you will rarely go wrong.</p>
+<p>Another naming tip is to avoid the word test repeated inside the name, and to avoid vague words such as works, handles, or correctly. A name that says what happens is always clearer than a name that merely says the code works. Specificity is the whole point of a test name.</p>
+<p>Finally, review test names as a group from time to time. A list of clear test names reads like a specification of the program, and gaps in that list reveal behaviours that have no test yet.</p>
+<p class="check"><strong>Check:</strong> Why is testEmptyBasketHasZeroItems a better test name than testOne?</p>
+<h2>Section 4: Arrange, Act, Assert</h2>
+<p>Arrange, Act, Assert is a simple three-step pattern that makes tests easy to write and easy to read, and it is worth adopting from your very first test. In the Arrange step, you set up everything the test needs: you create objects, prepare inputs, and put the program into the starting state you want to check. In the Act step, you perform the single action you are testing, such as calling a function, adding an item, or pressing a virtual button. In the Assert step, you check that the result matches your expectation, using one or more assertions. Keeping these steps separate, often with a blank line between them, makes the test&#x27;s story clear: here is the starting point, here is what happened, and here is what should be true afterwards. Tests that mix the steps together are harder to read, because the reader cannot tell which lines are setup, which are the action, and which are the checks. A stricter version of the pattern says that a test should have exactly one Act, meaning it tests one behaviour at a time. That discipline pays off when a test fails, because a single action means a single suspect. If a test performs five actions and then asserts, a failure could be caused by any of them, and finding the culprit takes longer. One action per test also keeps tests short, which makes them faster to understand and faster to run. Arrange, Act, Assert is not a rule enforced by any tool; it is a habit enforced by you, and it is one of those habits that separates tidy test suites from tangled ones. Adopt it early, and your tests will stay readable as they grow into the hundreds.</p>
+<pre><code>import XCTest
+
+final class GreeterTests: XCTestCase {
+    func testGreetingUsesTheGivenName() {
+        // Arrange
+        let name = &quot;Ada&quot;
+
+        // Act
+        let greeting = &quot;Hello, \(name)!&quot;
+
+        // Assert
+        XCTAssertEqual(greeting, &quot;Hello, Ada!&quot;)
+    }
+}</code></pre>
+<p>The greeter test shows the three steps labelled with comments, which is a helpful habit while you are learning, though experienced programmers often leave the comments out once the structure is obvious. The Arrange step prepares the name, the Act step builds the greeting, and the Assert step checks it. Each step is short, and the test reads like a tiny story. In a real test, the Act step would call a function from your program rather than building a string inline, but the shape is identical. When you write your own tests, start by writing the three comments, then fill in each section. That scaffolding prevents the common beginner mistake of writing a test that is really a jumble of setup, action, and checks with no clear story. Over time, the pattern becomes automatic, and you will find yourself structuring even informal checks this way, which is a sign that testing has become part of how you think.</p>
+<p>When a test fails, read its name first, then its assertion, and only then its setup. That order usually leads you to the broken behaviour fastest, because the name states the promise, the assertion states the exact expectation, and the setup explains the situation in which the promise broke.</p>
+<p class="check"><strong>Check:</strong> What does each step of Arrange, Act, Assert do, and why should a test have only one Act?</p>
+<h2>Section 5: Testing Functions with Assertions</h2>
+<p>Functions are the easiest things to test, because they take inputs and return outputs, and a test simply checks that known inputs produce expected outputs. The main tool for that checking is the assertion, and XCTest provides a family of them for different kinds of expectations. XCTAssertEqual checks that two values are equal, and it is the workhorse for numbers, strings, and other equatable values. XCTAssertTrue and XCTAssertFalse check boolean conditions, which is useful when a function returns whether something succeeded or whether a condition holds. XCTAssertNil and XCTAssertNotNil check optionals, which is essential when a function might return nothing. XCTAssertGreaterThan and XCTAssertLessThan check ordering, which suits functions that compute sizes, scores, or counts. Each assertion, when it fails, reports the expected and actual values, or the condition that was false, which helps you diagnose the problem. A useful habit is to test a function with several inputs, not just one, because a function can be correct for one input and wrong for another. Test the normal case, the empty case, the smallest case, and the largest case you expect, and you will catch far more bugs. Another habit is to write the assertion before you are sure the function is correct, because the test is supposed to check the function, not to agree with it. If you write the test by copying the function&#x27;s logic, the test will share the function&#x27;s bugs, and both will be wrong together. Instead, work out the expected result independently, by hand or by reasoning, and let the test be an independent check.</p>
+<pre><code>import XCTest
+
+func double(_ number: Int) -&gt; Int {
+    return number * 2
+}
+
+final class DoubleTests: XCTestCase {
+    func testDoublingThreeGivesSix() {
+        XCTAssertEqual(double(3), 6)
+    }
+
+    func testDoublingZeroGivesZero() {
+        XCTAssertEqual(double(0), 0)
+    }
+
+    func testDoublingNegativeGivesNegative() {
+        XCTAssertEqual(double(-4), -8)
+    }
+}</code></pre>
+<p>The doubling tests show a function checked with three different inputs: a normal positive number, zero, and a negative number. Each test is small, each has a clear name, and together they cover more ground than any single test could. If the function had a bug that only affected negative numbers, the third test would catch it while the first two passed, which is exactly how a good suite behaves: it narrows the failure down to a specific case. Notice that the expected values were worked out by hand, not by running the function, which keeps the tests independent. As you test your own functions, build a small table of inputs and expected outputs before writing the tests, and include the edge cases that are easy to forget. That table is the real test design; the test methods are just its expression in code.</p>
+<p>It is also worth testing a function with inputs in a different order, where order matters, and with inputs that are equal to each other, where equality is a special case. Ordering and equality bugs are common, and they are easy to miss when every test uses tidy, increasing inputs.</p>
+<p class="check"><strong>Check:</strong> Why should you work out a test&#x27;s expected result by hand rather than by running the function?</p>
+<h2>Section 6: Testing Structs and Their Behaviour</h2>
+<p>Structs are tested much like functions, because a struct&#x27;s methods take inputs and produce results or change the struct&#x27;s state in predictable ways. The arrange step creates a struct with known values, the act step calls a method or changes a property, and the assert step checks the resulting state. Because structs are value types, testing them has a pleasant property: a test can create a struct, modify its copy, and check the copy without worrying that the modification affected anything else. That isolation makes struct tests reliable and easy to reason about. A good struct test covers the struct&#x27;s main behaviours, not just its stored properties. For example, a test for a shopping basket struct should check that adding an item increases the count, that removing an item decreases it, and that the total price is computed correctly, rather than merely checking that a basket can be created. It should also check edge cases, such as removing an item that is not present, or computing the total of an empty basket. Those edge cases are where bugs often live, because the normal path gets the most attention during development. Another useful practice is to test a struct&#x27;s methods in combination, such as adding several items and then removing one, to check that the methods work together, not just alone. A struct that passes isolated tests but fails combined tests has a hidden interaction bug, and combined tests are how you find it. Struct tests are usually quick to write and quick to run, which makes them an excellent place to build a testing habit.</p>
+<pre><code>import XCTest
+
+struct Basket {
+    private(set) var items: [String] = []
+
+    mutating func add(_ item: String) {
+        items.append(item)
+    }
+
+    mutating func remove(_ item: String) {
+        items.removeAll { $0 == item }
+    }
+}
+
+final class BasketTests: XCTestCase {
+    func testAddingAnItemIncreasesTheCount() {
+        var basket = Basket()
+        basket.add(&quot;Bread&quot;)
+        XCTAssertEqual(basket.items.count, 1)
+    }
+
+    func testRemovingAnItemDecreasesTheCount() {
+        var basket = Basket()
+        basket.add(&quot;Bread&quot;)
+        basket.add(&quot;Milk&quot;)
+        basket.remove(&quot;Bread&quot;)
+        XCTAssertEqual(basket.items, [&quot;Milk&quot;])
+    }
+}</code></pre>
+<p>The basket tests check both single actions and a combination of actions. The second test adds two items and removes one, then checks the remaining contents exactly, which verifies that adding and removing cooperate correctly. That combined check is stronger than checking the count alone, because it also verifies which item remains. When you test your own structs, prefer exact checks, such as comparing a whole array, over loose checks, such as comparing only a count, when the exact check is easy to write. Exact checks catch more bugs, because they notice when the right number of items are present but the wrong ones. At the same time, avoid over-specifying: a test should check the behaviour that matters, not incidental details that might legitimately change. Finding that balance is a skill that grows with practice, and struct tests are a forgiving place to practise it.</p>
+<p>When a struct has a method that returns a new struct rather than changing itself, test that the original is unchanged as well as that the new one is correct. Immutability promises are easy to break by accident, and a test that checks both sides of the promise catches the break immediately.</p>
+<p class="check"><strong>Check:</strong> Why is it useful to test struct methods in combination, not just one at a time?</p>
+<h2>Section 7: Testing Optionals Safely</h2>
+<p>Optionals appear everywhere in Swift, and testing code that returns optionals requires a little care, because a test must handle both the case where a value is present and the case where it is absent. XCTest provides XCTAssertNil and XCTAssertNotNil for the simple checks, and for the present case, you will often unwrap the optional inside the test and then assert on the unwrapped value. A safe way to do that is with guard let or if let, so that a test that unexpectedly finds nil fails with a clear message rather than crashing. Another approach is XCTAssertEqual on the optional itself, which works when the wrapped type is equatable, because Swift can compare two optionals directly. That approach is concise and avoids unwrapping entirely, which is a bonus. The important testing habit is to cover both branches: test an input that should produce a value, and test an input that should produce nil, and make sure each test expects the correct branch. Bugs in optional handling often show up as the wrong branch being taken, such as returning a value when nil was expected, or returning nil when a value was expected. A test that only checks the present case will miss the second kind of bug entirely. Edge cases for optionals include empty strings, empty collections, and missing keys in a dictionary, all of which are situations where a function might reasonably return nil. By testing those inputs explicitly, you document the function&#x27;s contract: for these inputs, expect nil, and for those inputs, expect a value. That contract is valuable documentation for anyone who uses the function later.</p>
+<pre><code>import XCTest
+
+func firstWord(of text: String) -&gt; String? {
+    return text.split(separator: &quot; &quot;).first.map(String.init)
+}
+
+final class FirstWordTests: XCTestCase {
+    func testFirstWordOfSentenceIsFirstWord() {
+        XCTAssertEqual(firstWord(of: &quot;Hello world&quot;), &quot;Hello&quot;)
+    }
+
+    func testFirstWordOfEmptyTextIsNil() {
+        XCTAssertNil(firstWord(of: &quot;&quot;))
+    }
+}</code></pre>
+<p>The first-word tests cover both branches of the optional: a normal sentence produces a word, and empty text produces nil. Each test uses the assertion suited to its branch, XCTAssertEqual for the value case and XCTAssertNil for the absent case. If the function mistakenly returned an empty string instead of nil for empty text, the second test would fail, because an empty string is not nil, and that failure would point at a real contract violation. Notice how short these tests are, and how much they communicate about the function&#x27;s intended behaviour. A reader who sees these two tests understands the function&#x27;s contract without reading its implementation. That is one of testing&#x27;s quiet benefits: tests document intent, and they keep documenting it even as the implementation changes. When you write functions that return optionals, write both branches of tests before moving on.</p>
+<p>For functions that return an optional string, also test input that is only spaces, and input that contains leading or trailing spaces. Whitespace is a classic edge case, and different reasonable implementations treat it differently, so the test pins down which treatment your program intends.</p>
+<p class="check"><strong>Check:</strong> Why should a function returning an optional be tested with both a value case and a nil case?</p>
+<h2>Section 8: Testing Code That Throws Errors</h2>
+<p>Code that throws errors needs tests that check both success and failure, because a throwing function has two kinds of outcome, and a test that only checks success leaves the failure paths unverified. XCTest provides XCTAssertThrowsError for checking that a function throws, and you can inspect the thrown error to make sure it is the specific error you expected, not just any error. The usual shape is a do-catch block in the test, or an assertion with a closure that checks the error, depending on how much detail you need. For a simple check, XCTAssertThrowsError with the throwing call is enough to prove that an invalid input is rejected. For a stronger check, you catch the error and assert that it equals the expected case of your error enum, which proves that the right failure is reported, not just any failure. That distinction matters, because a function that throws the wrong error is still wrong, even though it technically failed. Success tests for throwing functions use try in the test, and the test method itself is often marked throws, so that an unexpected throw fails the test automatically. That is a neat feature: a test method that throws lets XCTest treat any unexpected error as a failure, without you writing extra handling. The habit to build is the same as with optionals: cover both outcomes, and for failures, check the specific error when it matters. Error paths are where programs meet the real world, with invalid input, missing files, and failed operations, so testing them is not optional polish; it is central to reliability.</p>
+<pre><code>import XCTest
+
+enum ScoreError: Error, Equatable {
+    case negativeScore
+}
+
+func checkScore(_ score: Int) throws {
+    if score &lt; 0 {
+        throw ScoreError.negativeScore
+    }
+}
+
+final class ScoreTests: XCTestCase {
+    func testNegativeScoreThrows() {
+        XCTAssertThrowsError(try checkScore(-5)) { error in
+            XCTAssertEqual(error as? ScoreError, .negativeScore)
+        }
+    }
+
+    func testValidScoreDoesNotThrow() throws {
+        try checkScore(10)
+    }
+}</code></pre>
+<p>The score tests show both sides of a throwing function. The first test asserts that a negative score throws, and checks that the error is specifically the negative-score error. The second test is marked throws itself, so calling the function with a valid score either succeeds quietly or fails the test if it unexpectedly throws. Together they pin down the function&#x27;s contract: negative scores are rejected with a specific error, and valid scores pass. If the function later changed to throw a different error for negative scores, the first test would catch it, because the error comparison would fail. That specificity is worth the extra line, because vague failure tests can pass while the program still misbehaves. When you write throwing functions, design their error enums carefully, and then test each error case by name, so that the tests document exactly which failure means what.</p>
+<p>When a throwing function has several error cases, write one test per case, with a name that states the input and the expected error. A single test that checks several errors at once is harder to read, and when it fails, it does not say which error case broke.</p>
+<p class="check"><strong>Check:</strong> Why is it better to check the specific error thrown, rather than just that some error was thrown?</p>
+<h2>Section 9: Testing Collections and Transformations</h2>
+<p>Collections and their transformations, such as filtering, mapping, and sorting, are common in Swift programs, and they deserve thorough tests because their bugs are often subtle. A filter that uses the wrong condition, a map that transforms incorrectly, or a sort that orders by the wrong key can all produce results that look plausible but are wrong in detail. Tests for collections should check the exact resulting collection, not just its count, because a wrong filter can return the right number of items but the wrong items. They should also check the order of the result when order matters, because a sort test that only checks membership will miss an ordering bug. Edge cases for collections include empty inputs, inputs where every item matches, inputs where no item matches, and inputs with duplicate items. Each of those cases can expose a different bug, such as a filter that crashes on empty input, or a transformation that drops duplicates it should keep. A useful technique is to write the expected collection by hand in the test, as a literal, and compare it with XCTAssertEqual. That literal is an independent statement of what the result should be, and it makes the test easy to read: here is the input, and here is the output I expect. When a transformation is complex, break the test into smaller checks, one per step, rather than testing the whole chain at once. Smaller checks localise failures, so a failing test points at the step that broke, not just at the chain as a whole.</p>
+<pre><code>import XCTest
+
+func evenNumbers(from numbers: [Int]) -&gt; [Int] {
+    return numbers.filter { $0 % 2 == 0 }
+}
+
+final class EvenNumberTests: XCTestCase {
+    func testFilteringMixedNumbersKeepsOnlyEvens() {
+        XCTAssertEqual(evenNumbers(from: [1, 2, 3, 4, 5]), [2, 4])
+    }
+
+    func testFilteringEmptyListGivesEmptyList() {
+        XCTAssertEqual(evenNumbers(from: []), [])
+    }
+
+    func testFilteringAllOddNumbersGivesEmptyList() {
+        XCTAssertEqual(evenNumbers(from: [1, 3, 5]), [])
+    }
+}</code></pre>
+<p>The even-number tests check the exact output for three cases: a mixed list, an empty list, and a list with no matches. Each test compares the whole resulting array, so a filter that returned the wrong items, or the right items in the wrong order, would fail. The empty and no-match cases are the ones beginners most often skip, and they are the ones that catch crashes and off-by-one errors. When you test your own collection code, write the expected output as a literal first, before running the function, so that the test is an independent check rather than a copy of the function&#x27;s behaviour. Then add the edge cases, even when they feel obvious, because obvious cases are exactly the ones that get broken by later changes. Collection tests are cheap to write and they catch a disproportionate number of bugs, which makes them excellent value.</p>
+<p>For sorting tests, include an input that is already sorted, one that is in reverse order, and one with equal elements. Those three cases expose different sorting bugs, and together they give much stronger coverage than a single random-looking input.</p>
+<p>Sorting tests should also check that no element is lost or duplicated by the sort. Comparing the sorted result with the expected sorted list does this automatically, because a lost or duplicated element changes the list.</p>
+<p class="check"><strong>Check:</strong> Why should a collection test compare the exact result rather than just its count?</p>
+<h2>Section 10: setUp, tearDown and Shared Test Setup</h2>
+<p>When many tests need the same starting situation, repeating the setup in every test becomes tedious and error-prone, because a change to the setup must be made in every test, and it is easy to miss one. XCTest provides setUp and tearDown methods to solve this: setUp runs before each test method, preparing a fresh starting state, and tearDown runs after each test method, cleaning up. The key word is each: setUp runs before every test, not just once, so each test starts from a clean slate and cannot be affected by changes made by a previous test. That isolation is crucial, because tests that depend on each other&#x27;s leftovers are fragile and fail in confusing orders. A common use of setUp is to create the object being tested with known values, so that each test method can focus on its action and assertion without repeating the creation code. TearDown is used less often in simple tests, but it is the right place to release resources, close files, or reset global state that a test might have changed. A caution: setUp should only contain setup that every test genuinely needs. If only one test needs a particular object, creating it in that test is clearer than putting it in setUp, where it might confuse readers about what the other tests depend on. Shared setup is a balance between avoiding repetition and keeping each test understandable on its own. When the balance is right, tests become shorter, the setup lives in one place, and changes to the starting state are made once, not many times.</p>
+<pre><code>import XCTest
+
+struct Counter {
+    private(set) var value = 0
+
+    mutating func increment() {
+        value += 1
+    }
+}
+
+final class CounterTests: XCTestCase {
+    var counter: Counter!
+
+    override func setUp() {
+        super.setUp()
+        counter = Counter()
+    }
+
+    override func tearDown() {
+        counter = nil
+        super.tearDown()
+    }
+
+    func testNewCounterStartsAtZero() {
+        XCTAssertEqual(counter.value, 0)
+    }
+
+    func testIncrementingIncreasesValueToOne() {
+        counter.increment()
+        XCTAssertEqual(counter.value, 1)
+    }
+}</code></pre>
+<p>The counter tests use setUp to create a fresh counter before each test, so each test starts at zero regardless of what previous tests did. The first test checks the fresh state, and the second test increments and checks the result, without either test needing to create the counter itself. TearDown clears the counter afterwards, which is a tidy habit even when it is not strictly necessary. Notice that the tests remain readable: each one shows its action and assertion clearly, and the shared setup is visible in one place at the top. If the counter&#x27;s starting value ever changed, only setUp would need updating, not every test. That single-point-of-change benefit is the main reason to use setUp, and it grows more valuable as a test suite grows. Use setUp for genuinely shared starting state, keep it simple, and let each test tell its own story on top of it.</p>
+<p>If setUp becomes long or complicated, that is a signal that the object being tested may itself be complicated, or that the tests are sharing more than they should. Simplify the setup, or move some of it into helper methods with clear names, so that setUp stays a short, readable starting point.</p>
+<p class="check"><strong>Check:</strong> Why does setUp run before each test rather than just once for the whole test class?</p>
+<h2>Section 11: Test Doubles: Fakes, Stubs and Mocks</h2>
+<p>Real programs depend on things that are slow, unpredictable, or hard to set up in a test, such as a network service, a database, a clock, or a file system. Testing code that depends on those things directly would make tests slow and flaky, so programmers use test doubles: stand-in objects that imitate the real dependency in a controlled way. A stub is a double that returns fixed, pre-arranged answers, so the code being tested can run without the real service. A fake is a double with a simple working implementation, such as an in-memory store that behaves like a database but keeps everything in a dictionary. A mock is a double that also records how it was used, so the test can check that the code called it with the right arguments, or called it the right number of times. The differences matter less than the shared idea: a double replaces a difficult dependency with something predictable, so the test can focus on the code under test rather than on the outside world. The way to make doubles easy is to depend on protocols rather than concrete types. If your code talks to a storage protocol, a test can supply a fake storage actor or struct that conforms to the same protocol, and the code will work unchanged. That is one of the practical payoffs of the protocol design you learned in earlier chapters. Doubles should be simple and boring; a double with complicated logic of its own can hide bugs just as surely as a real dependency can. Keep the double&#x27;s behaviour obvious, set its answers explicitly in each test, and let the test check the code, not the double.</p>
+<pre><code>import XCTest
+
+protocol Storing {
+    func save(_ value: String, for key: String)
+    func load(for key: String) -&gt; String?
+}
+
+struct FakeStore: Storing {
+    var data: [String: String] = [:]
+
+    func save(_ value: String, for key: String) {
+    }
+
+    func load(for key: String) -&gt; String? {
+        return data[key]
+    }
+}</code></pre>
+<p>The fake store above is intentionally simple, though it contains a deliberate flaw for teaching: its save method does nothing, so a test that saves and then loads would fail. Spotting that flaw is a useful exercise, because it shows why doubles must be checked too. A correct fake would store the value in its dictionary, and a test using it could then verify that the code under test saves and loads correctly without touching a real database. In practice, you would write the fake carefully, test it lightly, and then reuse it across many tests. The key lesson is not the fake itself, but the pattern: depend on a protocol, supply a predictable double in tests, and keep the double simple enough that its behaviour is never in doubt. That pattern makes otherwise untestable code testable, which is one of the most valuable skills in this chapter.</p>
+<p>A good rule is to name your doubles clearly, such as FakeStore or StubNetwork, so that a reader instantly knows they are looking at a stand-in rather than the real thing. Clear naming prevents the embarrassing mistake of shipping a fake to production.</p>
+<p class="check"><strong>Check:</strong> What is the difference between a stub, a fake, and a mock, in plain words?</p>
+<h2>Section 12: Testing with Protocols and Dependency Injection</h2>
+<p>Dependency injection is a plain name for a simple idea: instead of a piece of code creating its own dependencies, the dependencies are handed to it from outside, usually through its initialiser or as method parameters. That handing-over is what makes testing with doubles possible, because a test can hand the code a fake dependency while the real program hands it the real one, and the code itself does not change. Without injection, code that creates its own network client or database connection inside its methods is very hard to test, because the test cannot replace those hidden dependencies. With injection, the code declares what it needs, and whoever creates it supplies something that satisfies the need. Protocols make injection flexible: the code depends on a protocol, such as a storage protocol or a clock protocol, and any type conforming to that protocol can be injected, real or fake. This design also improves the production code, not just the tests, because it makes dependencies visible and interchangeable. A program built this way can swap a file store for a memory store, or a real clock for a fixed clock, without changing the code that uses them. The cost is a little extra wiring at the point where objects are created, which is a small price for testability and flexibility. When you design a new type, ask yourself what it depends on, and whether those dependencies should be injected rather than created inside. If the answer is yes, inject them through the initialiser, depend on protocols, and your future tests will thank you. That habit, applied consistently, is what makes large programs testable at all.</p>
+<pre><code>import XCTest
+
+protocol Clock {
+    func now() -&gt; Int
+}
+
+struct FixedClock: Clock {
+    let fixedTime: Int
+
+    func now() -&gt; Int {
+        return fixedTime
+    }
+}
+
+struct Greeter {
+    let clock: Clock
+
+    func greeting() -&gt; String {
+        if clock.now() &lt; 12 {
+            return &quot;Good morning&quot;
+        }
+        return &quot;Good afternoon&quot;
+    }
+}
+
+final class GreeterTests: XCTestCase {
+    func testMorningClockGivesMorningGreeting() {
+        let greeter = Greeter(clock: FixedClock(fixedTime: 9))
+        XCTAssertEqual(greeter.greeting(), &quot;Good morning&quot;)
+    }
+}</code></pre>
+<p>The greeter example shows injection in miniature. The greeter depends on a clock protocol, not on the real system clock, so a test can inject a fixed clock that always says nine in the morning and check the morning greeting reliably. With a real clock, the same test would pass in the morning and fail in the afternoon, which is the definition of a flaky test. The fixed clock removes time from the test entirely, making it deterministic. That determinism is the goal of injection: tests that give the same result every time, regardless of when or where they run. Notice how small the production change is: the greeter takes a clock in its initialiser and asks it for the time, instead of reading the system clock directly. That small change is the difference between testable and untestable code. Apply it to network clients, databases, file access, and random number generators, and whole categories of testing problems disappear.</p>
+<p>Injection also makes it easy to test error paths. A stub that always throws lets you check how your code handles failure, without needing to arrange a real failure, which is often difficult or impossible to arrange on demand.</p>
+<p class="check"><strong>Check:</strong> How does dependency injection make a time-dependent function testable?</p>
+<h2>Section 13: Testing Async Code with await</h2>
+<p>Async code is tested much like ordinary code, except that test methods themselves can be async, which allows them to use await when calling the code under test. That is a welcome simplicity: Swift&#x27;s testing support understands async tests, so you do not need special waiting tricks or callbacks to test asynchronous functions. A test for an async function is marked async, calls the function with await, and asserts on the result, just as a synchronous test would, with await added where the boundary requires it. The same Arrange, Act, Assert structure applies, and the same naming habits apply. One thing to be careful about is that async tests can be slow if the code under test waits for real time, such as sleeping for several seconds or calling a real network service. In tests, prefer injected fakes that return immediately, or short waits, so that the test suite stays fast. A slow test suite is a test suite that developers stop running, which defeats its purpose. Another care point is ordering: async tests that launch tasks should wait for those tasks to finish before asserting, usually with a task group, so that assertions are not made on incomplete work. That waiting is the same pattern you learned for actors, and it applies here too. Async testing feels unfamiliar at first, but it quickly becomes routine, because the shape of the test does not change; only await appears, marking the same boundaries you already understand. Practise by writing async tests for simple async functions first, and the pattern will soon feel as natural as testing synchronous code.</p>
+<pre><code>import XCTest
+
+func fetchGreeting() async -&gt; String {
+    try? await Task.sleep(nanoseconds: 10_000_000)
+    return &quot;Hello!&quot;
+}
+
+final class GreetingTests: XCTestCase {
+    func testFetchGreetingReturnsHello() async {
+        let greeting = await fetchGreeting()
+        XCTAssertEqual(greeting, &quot;Hello!&quot;)
+    }
+}</code></pre>
+<p>The async test above is almost identical to a synchronous test, with two differences: the test method is marked async, and the call uses await. Those two differences are all that async testing requires at this level. The test waits for the greeting, checks it, and reports a failure if it differs, just as any test would. If the function under test were slow, the test would be slow too, which is why fakes and short waits matter in real test suites. You can extend this example by testing an async function that throws, which combines async with the throwing-test pattern from an earlier section, using try await together. Combining patterns this way is normal in real tests, and each combination follows the same rules as its parts. Async testing is not a separate subject; it is ordinary testing with await added, and once you see that, it loses its mystery.</p>
+<p>When an async test needs to check that tasks completed in a particular order, prefer checking the final state rather than the order itself, unless order is genuinely part of the contract. Final-state checks are less brittle and fail less often for harmless scheduling differences.</p>
+<p class="check"><strong>Check:</strong> What two changes make a test method able to test an async function?</p>
+<h2>Section 14: Testing Actors</h2>
+<p>Testing an actor follows the same principles as testing any type, with the added reality that the test is outside the actor and must use await for every call. A basic actor test creates the actor, calls its methods with await, and asserts on the results, which verifies its ordinary behaviour. A concurrent actor test goes further: it launches many tasks that use the actor at once, waits for all of them with a task group, and then checks that the final state is exactly what it should be. That second kind of test is the one that proves the actor&#x27;s safety, because a race would show up as a wrong final count or a missing item. Because races are timing-dependent, a good concurrent test runs the scenario many times, or with many tasks, to increase the chance of catching a rare failure. It is also worth testing an actor&#x27;s edge cases concurrently, such as many tasks trying to book the last ticket, where exactly one should succeed. That test checks not just that the count is right, but that the actor&#x27;s rules hold under pressure. Actor tests are usually async tests, because they use await, and they follow Arrange, Act, Assert like any other test, with the Act step being the launch of the concurrent tasks and the waiting for them. When an actor test fails, the failure often points to a design problem rather than a typo, such as a check and a change separated by an await, which is a valuable kind of failure to catch early. Writing actor tests is therefore both a verification step and a design review, and it is worth doing for every actor you build.</p>
+<pre><code>import XCTest
+
+actor Counter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -&gt; Int {
+        return value
+    }
+}
+
+final class CounterTests: XCTestCase {
+    func testOneHundredConcurrentIncrementsGiveOneHundred() async {
+        let counter = Counter()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 1...100 {
+                group.addTask {
+                    await counter.increment()
+                }
+            }
+        }
+        let total = await counter.currentValue()
+        XCTAssertEqual(total, 100)
+    }
+}</code></pre>
+<p>The counter test launches one hundred tasks, each incrementing once, waits for the group, and checks that the total is one hundred. With an actor, that total is guaranteed. With a plain shared variable, it would often be lower, and the test would fail intermittently, which is exactly the behaviour the test is designed to catch. Running this test repeatedly and seeing it pass every time builds confidence in the actor, while a single passing run proves little, because a race might simply not have occurred that time. That is why concurrent tests should be run many times, or in a loop, during development. Adapt this test shape to your own actors: many tasks, a clear expected final state, and a wait for completion before asserting. It is a simple template, but it catches the most important class of actor bugs, and it is the template you will use most often when testing concurrent code.</p>
+<p>An actor test that checks a rule, such as exactly one winner for the last ticket, should use enough tasks to make the race likely, and run the test several times. A rule test with only two tasks may pass by luck even when the rule is broken.</p>
+<p class="check"><strong>Check:</strong> Why should a concurrent actor test be run many times rather than just once?</p>
+<h2>Section 15: Flaky Tests and How to Fix Them</h2>
+<p>A flaky test is one that sometimes passes and sometimes fails without any change to the code, and flaky tests are poisonous to a test suite, because they teach developers to ignore failures. When a test fails randomly, people start assuming every failure is just flakiness, and real bugs slip through ignored. The most common causes of flakiness are dependence on time, dependence on ordering, dependence on shared state, and dependence on the outside world, such as a network or a file system. A time-dependent test fails when it runs at a different time of day or on a slower machine. An ordering-dependent test fails when tests run in a different order and one test&#x27;s leftovers affect another. A shared-state test fails when two tests change the same global value. A network-dependent test fails when the network is slow or unavailable. The fixes follow directly from the causes: inject a fixed clock instead of reading the real time, make each test independent with fresh setup in setUp, avoid shared mutable state between tests, and replace network calls with fakes. When you meet a flaky test, resist the urge to simply run it again until it passes. Instead, investigate why it failed, reproduce the failure if you can, and fix the underlying dependence. A test that is flaky is telling you something about your code&#x27;s design, usually that it depends on something it should not depend on, or that it shares state it should not share. Fixing flakiness therefore improves the design, not just the test. A suite with no flaky tests is a suite developers trust, and trust is what makes a suite useful.</p>
+<pre><code>import XCTest
+
+func isMorning(hour: Int) -&gt; Bool {
+    return hour &lt; 12
+}
+
+final class MorningTests: XCTestCase {
+    func testNineIsMorning() {
+        XCTAssertTrue(isMorning(hour: 9))
+    }
+
+    func testFifteenIsNotMorning() {
+        XCTAssertFalse(isMorning(hour: 15))
+    }
+}</code></pre>
+<p>The morning tests avoid flakiness by testing a pure function that takes the hour as a parameter, rather than reading the current time. A test that read the real clock and asserted it was morning would pass in the morning and fail in the afternoon, which is a classic flaky test. By passing the hour in, the tests become deterministic: nine is always morning, and fifteen is never morning, no matter when the tests run. That determinism is the goal. When you write a test, ask yourself whether its result could change depending on when it runs, what order it runs in, or what else is happening on the machine. If the answer is yes, find the dependence and remove it, usually by injecting a value, a fake, or a fixed input. Deterministic tests are trustworthy tests, and trustworthy tests are the ones developers actually run and believe.</p>
+<p>Shared state between tests also includes files and folders that tests create. Give each test its own temporary folder, or clean up in tearDown, so that one test&#x27;s leftovers cannot make another test fail mysteriously.</p>
+<p class="check"><strong>Check:</strong> Name three common causes of flaky tests, and give the fix for one of them.</p>
+<h2>Section 16: Test-Driven Development in Plain Words</h2>
+<p>Test-driven development, often shortened to TDD, is a working style in which you write the test before you write the code it tests. The cycle has three steps, often called red, green, refactor. In the red step, you write a failing test for a behaviour that does not exist yet, and you watch it fail, which proves the test can actually detect the missing behaviour. In the green step, you write the simplest code that makes the test pass, without worrying about elegance. In the refactor step, you tidy the code, improving its structure while keeping the tests passing, which proves the tidying did not break anything. Then you repeat the cycle for the next behaviour. The benefit of this order is that it forces you to think about what the code should do before you think about how it will do it, which often leads to simpler designs and clearer interfaces. It also guarantees that every piece of code has a test, because no code is written except to make a failing test pass. TDD is not suitable for every situation: exploratory code, user interface experiments, and research spikes often benefit from freedom first and tests later. But for well-understood logic, such as calculations, validations, and data transformations, TDD is a reliable way to build correct code steadily. Even if you do not adopt full TDD, borrowing its habits, such as writing a failing test before fixing a bug, will improve your work. That particular habit, writing a test that reproduces a bug before fixing it, is valuable on its own, because it proves the fix actually addresses the bug, rather than merely appearing to.</p>
+<pre><code>import XCTest
+
+func isEven(_ number: Int) -&gt; Bool {
+    return number % 2 == 0
+}
+
+final class EvenTests: XCTestCase {
+    func testFourIsEven() {
+        XCTAssertTrue(isEven(4))
+    }
+
+    func testFiveIsNotEven() {
+        XCTAssertFalse(isEven(5))
+    }
+}</code></pre>
+<p>The even tests could have been written before the isEven function existed, in which case they would have failed in the red step, because the function did not exist. Writing the simple function then turns them green, and the refactor step might tidy the function without changing its behaviour. That tiny cycle is the whole of TDD in miniature. In a real project, the cycle repeats dozens of times a day, building up a suite test by test and a program feature by feature. The discipline feels slow at first, because writing tests takes time, but it saves time overall, because bugs are caught immediately, when they are cheapest to fix, rather than later, when they are expensive. Try TDD on a small feature, such as a validation function or a small calculator, and judge it by experience rather than by reputation. Many programmers who try it keep it, not because it is fashionable, but because it makes their work calmer.</p>
+<p>TDD also changes how you think about design, because a test is the first client of your code. If a function is hard to test, that difficulty is a warning that its interface may be awkward, and redesigning it before it is used elsewhere saves trouble later.</p>
+<p class="check"><strong>Check:</strong> What are the three steps of test-driven development, and what does each one achieve?</p>
+<h2>Section 17: Reading a Failing Test</h2>
+<p>A failing test is a message, and learning to read it well will save you a great deal of debugging time. The message usually contains the test&#x27;s name, the file and line where the assertion failed, and the expected and actual values. Start with the test&#x27;s name, because it tells you which behaviour broke. Then look at the expected and actual values, because their difference often points directly at the bug. For example, if a test expected five items and got four, something lost an item. If it expected a greeting with one name and got another, something used the wrong value. If the failure is a crash rather than an assertion, the message will point at the crashing line, and the crash itself is the clue: an unexpected nil, an out-of-range index, or a force unwrap that failed. After reading the message, reproduce the failure if you can, by running just that test on its own. A test that fails alone is easier to investigate than one that only fails as part of a suite, because suite-only failures often involve shared state or ordering. If the test fails alone, read the code it exercises, looking for the difference between what the code does and what the test expects. Often the test is right and the code is wrong, but sometimes the test is wrong, because the expectation was based on a misunderstanding. Distinguishing those two cases is part of the skill: check the requirement, not just the code, before deciding which side to fix. A failing test is not a punishment; it is the system working as intended, catching a disagreement before a user does.</p>
+<pre><code>import XCTest
+
+func add(_ a: Int, _ b: Int) -&gt; Int {
+    return a + b
+}
+
+final class AdditionTests: XCTestCase {
+    func testAddingTwoAndThreeGivesFive() {
+        XCTAssertEqual(add(2, 3), 5)
+    }
+}</code></pre>
+<p>The addition test above is correct, and it passes, but imagine it failed with a message saying it expected five and got six. That message would tell you immediately that the addition produced one too many, which might mean the function adds an extra value, or the test passed the wrong inputs. Either way, the investigation starts from the difference between five and six, not from a vague feeling that something is wrong. Good failure messages are one reason to prefer specific assertions, such as XCTAssertEqual, over vague ones, such as XCTAssertTrue with a complex condition, because the specific assertion shows the values involved. When you write assertions, choose the most specific one available, so that future failures carry the most information. Reading failures well is a skill that improves with practice, and it is closely related to writing good tests: clear tests produce clear failures, and clear failures are quick to fix.</p>
+<p>If a test fails only when the whole suite runs, look first at shared state and test ordering. Run the failing test together with the tests that run before it, and narrow down which earlier test leaves something behind that changes the result.</p>
+<p class="check"><strong>Check:</strong> When a test fails, what three pieces of information should you look at first?</p>
+<h2>Section 18: Fixing a Bug with a Test First</h2>
+<p>When you find a bug in a program, the most reliable way to fix it is to write a test that reproduces the bug before you change any production code. The new test should fail while the bug exists, which proves it actually captures the bug, and it should pass after your fix, which proves the fix addresses that bug. Without the reproducing test, you might fix something that looks related but is not the real cause, and the bug could return later without anyone noticing. With the test, the bug is pinned down permanently: if it ever returns, the test will fail and alert you. The steps are simple. First, understand the bug well enough to describe a failing case, such as a specific input that produces a wrong output. Second, write a test for that case, with a name that describes the bug, and run it to confirm it fails. Third, fix the production code, using the smallest change that makes the test pass. Fourth, run the full test suite to make sure the fix did not break anything else. This habit is valuable even when you are not practising full test-driven development, because it turns every bug fix into a permanent guard against regression, which is the name for a bug that returns after being fixed. Over time, a suite built this way becomes a record of every bug the program has ever had, and each one is guarded against returning. That record is worth far more than the time it takes to write the reproducing test, because regressions are among the most frustrating bugs to meet, precisely because they were fixed once already.</p>
+<pre><code>import XCTest
+
+func firstLetter(of text: String) -&gt; String {
+    return String(text.prefix(1))
+}
+
+final class FirstLetterTests: XCTestCase {
+    func testFirstLetterOfEmptyTextIsEmpty() {
+        XCTAssertEqual(firstLetter(of: &quot;&quot;), &quot;&quot;)
+    }
+
+    func testFirstLetterOfHelloIsH() {
+        XCTAssertEqual(firstLetter(of: &quot;Hello&quot;), &quot;H&quot;)
+    }
+}</code></pre>
+<p>The first-letter tests include an empty-text case, which is the kind of case that often reveals a bug. If the original function had crashed on empty text, a test for that case would have failed before the fix and passed after it, pinning the bug down. The function shown handles empty text safely, because prefix of an empty string is empty, but the test still documents that behaviour, so a future change that broke it would be caught. When you fix a real bug, write the reproducing test first, even if you already know the fix, because the test is the proof that the fix works and the guard that prevents the bug from returning. That discipline, repeated for every bug, builds a suite that genuinely protects the program, rather than a suite that merely looks impressive. It is one of the highest-value habits in this chapter.</p>
+<p>A reproducing test also helps when you hand a bug to someone else, because it shows the failure precisely, without a long written description. The test is the bug report, written in code, and it keeps working as a guard long after the conversation is forgotten.</p>
+<p class="check"><strong>Check:</strong> Why should you write a failing test before fixing a bug, even if you already know the fix?</p>
+<h2>Section 19: Code Coverage: What It Means and What It Does Not</h2>
+<p>Code coverage is a measure of how much of your program&#x27;s code is executed while the tests run, usually expressed as a percentage of lines or branches covered. A high coverage number feels reassuring, and it does carry some information: code that is never executed by any test is code whose behaviour is unverified. However, coverage is a limited measure, and it is important to understand what it does not tell you. Coverage tells you that a line ran, not that it ran correctly. A test can execute a line with the wrong input, or check the wrong result, and still count as covering it. Coverage also does not tell you whether the important cases were tested, because a single test can cover a function while missing its edge cases entirely. Chasing a coverage target, such as one hundred percent, can therefore lead to tests that execute code without really checking it, which inflates the number without improving safety. That kind of coverage theatre wastes time and creates false confidence. A healthier way to use coverage is as a discovery tool: run it occasionally, look at the code it says is uncovered, and ask whether that code matters. If uncovered code handles an important case, write a test for it. If uncovered code is trivial or unreachable, leave it alone. Coverage is most useful when it reveals gaps you did not know about, not when it is treated as a grade. Judge a test suite by whether its tests check meaningful behaviours, including edge cases and failure paths, not by a single percentage. A suite with eighty percent coverage and strong, thoughtful tests is far better than a suite with one hundred percent coverage and weak, decorative ones.</p>
+<pre><code>import XCTest
+
+func describe(_ number: Int) -&gt; String {
+    if number &lt; 0 {
+        return &quot;Negative&quot;
+    } else if number == 0 {
+        return &quot;Zero&quot;
+    } else {
+        return &quot;Positive&quot;
+    }
+}
+
+final class DescribeTests: XCTestCase {
+    func testNegativeNumberIsDescribedAsNegative() {
+        XCTAssertEqual(describe(-3), &quot;Negative&quot;)
+    }
+
+    func testZeroIsDescribedAsZero() {
+        XCTAssertEqual(describe(0), &quot;Zero&quot;)
+    }
+
+    func testPositiveNumberIsDescribedAsPositive() {
+        XCTAssertEqual(describe(5), &quot;Positive&quot;)
+    }
+}</code></pre>
+<p>The describe tests cover all three branches of the function, so the coverage for this function is complete, and the tests are also meaningful, because each one checks a distinct behaviour with a distinct expected value. That combination, full branch coverage plus meaningful assertions, is the ideal. If only the positive test existed, the function would still be partially covered, but the negative and zero branches would be unverified, and a bug in either would go unnoticed. Coverage reporting would reveal that gap, which is its proper use. Use coverage to find untested branches, then write real tests for them, with real expectations, rather than tests that merely execute the branch. That approach treats coverage as a map, not as a destination, and it leads to suites that are both well-covered and genuinely trustworthy.</p>
+<p>Coverage tools often report branch coverage separately from line coverage, and branch coverage is the more informative number, because it shows whether both sides of a decision were exercised. When you check coverage, look at branches first.</p>
+<p class="check"><strong>Check:</strong> Why can a program have high code coverage and still contain untested behaviour?</p>
+<h2>Section 20: Organising Tests into Suites</h2>
+<p>As a test suite grows, organising it well becomes as important as writing individual tests, because a disorganised suite is hard to navigate, hard to run selectively, and hard to trust. The most natural organisation mirrors the program&#x27;s structure: one test class per type or feature being tested, with a name that matches the type plus Tests, such as BasketTests for a Basket type. Within a class, tests are grouped by behaviour, and their names make the grouping clear. Test files are usually kept in a separate test target or folder, mirroring the source layout, so that finding the tests for a piece of code is straightforward. When a suite becomes large, you may also group tests by area, such as model tests, networking tests, or interface tests, but the per-type grouping remains the foundation. Another organisational habit is to keep helper code for tests, such as fake objects and factory functions that build test data, in shared test files, so that they can be reused without duplication. Duplicated test helpers are a maintenance burden, because a change must be made in every copy. Finally, organise tests so that they can be run selectively: when you are working on one feature, you should be able to run just its tests quickly, without waiting for the whole suite. That fast feedback loop keeps development pleasant and encourages frequent test runs. A well-organised suite feels like a well-organised workshop: everything has a place, you can find what you need quickly, and you can work on one part without disturbing the rest.</p>
+<pre><code>import XCTest
+
+final class BasketTests: XCTestCase {
+    func testEmptyBasketHasZeroItems() {
+        let basket: [String] = []
+        XCTAssertEqual(basket.count, 0)
+    }
+}
+
+final class GreeterTests: XCTestCase {
+    func testGreetingContainsName() {
+        let greeting = &quot;Hello, Ada!&quot;
+        XCTAssertTrue(greeting.contains(&quot;Ada&quot;))
+    }
+}</code></pre>
+<p>The two test classes above illustrate per-type organisation: basket tests live in BasketTests, and greeter tests live in GreeterTests, each with a clear name and a focused purpose. A reader looking for basket behaviour knows exactly where to look, and a developer working on greetings can run just the greeter tests for fast feedback. That clarity scales: with dozens of types, dozens of test classes, each small and focused, are far easier to navigate than a single giant test class containing everything. When you add a new type to your program, add a matching test class at the same time, and keep its tests focused on that type&#x27;s behaviour. That habit, repeated consistently, produces a suite that grows gracefully with the program, rather than collapsing into a tangle that nobody wants to touch. Organisation is not glamorous, but it is what keeps a large suite usable.</p>
+<p>Test organisation also includes naming test files clearly and keeping them close to the code they test in spirit, even when they live in a separate folder. A reader should be able to move from a source file to its tests without hunting.</p>
+<p>Finally, delete tests that no longer test anything meaningful, rather than letting them linger. A suite full of obsolete tests is slower to run and harder to trust than a smaller suite where every test earns its place.</p>
+<p class="check"><strong>Check:</strong> Why is it better to have one test class per type rather than one giant test class?</p>
+<h2>Section 21: Testing Strings and Formatting</h2>
+<p>Strings are tested by checking exact outputs for known inputs, because string bugs often hide in small details: a missing space, a wrong capital letter, a misplaced punctuation mark, or an extra newline. A test that checks only that a result contains a word will miss those details, while a test that checks the whole string will catch them. That exactness is appropriate for formatting functions, greetings, messages, and any text the user will see, because users notice those details even when programmers do not. Edge cases for strings include empty strings, strings with only spaces, strings with special characters, and very long strings. A formatting function that works for a normal name might fail for a name with an apostrophe, or for an empty name, and tests for those cases document the intended behaviour. Another useful string test checks that a function does not change its input unexpectedly, or that it handles mixed-case input consistently, such as treating a search as case-insensitive. When a string function involves formatting numbers or dates, test the formatted output exactly as well, because formatting rules vary by locale and by convention, and a test pins down which convention your program uses. String tests are usually short and fast, which makes them easy to write in quantity, and quantity matters here, because string edge cases are numerous. Build a small table of inputs and expected outputs, including the awkward cases, and turn each row into a test. That table-driven approach is a reliable way to cover string behaviour thoroughly without much effort.</p>
+<pre><code>import XCTest
+
+func greet(_ name: String) -&gt; String {
+    if name.isEmpty {
+        return &quot;Hello, guest!&quot;
+    }
+    return &quot;Hello, \(name)!&quot;
+}
+
+final class GreetTests: XCTestCase {
+    func testGreetingWithNameIncludesName() {
+        XCTAssertEqual(greet(&quot;Ada&quot;), &quot;Hello, Ada!&quot;)
+    }
+
+    func testGreetingWithEmptyNameGreetsGuest() {
+        XCTAssertEqual(greet(&quot;&quot;), &quot;Hello, guest!&quot;)
+    }
+
+    func testGreetingWithApostropheKeepsApostrophe() {
+        XCTAssertEqual(greet(&quot;O&#x27;Brien&quot;), &quot;Hello, O&#x27;Brien!&quot;)
+    }
+}</code></pre>
+<p>The greeting tests check exact strings for three cases: a normal name, an empty name, and a name with an apostrophe. Each test compares the whole result, so a missing exclamation mark or a dropped apostrophe would fail. The empty-name test documents a design decision: an empty name is treated as a guest, rather than producing a greeting with a blank. That decision might surprise a future reader, but the test makes it explicit and guards it against accidental change. When you test your own string functions, write the expected strings by hand, character for character, and include the awkward inputs that real users will eventually provide. Exact string tests are strict, but that strictness is their value: they catch the small errors that users notice first.</p>
+<p>String tests are also useful for checking that a function preserves important characters, such as hyphens in names or dots in file names. A function that strips or alters those characters by accident will fail an exact test immediately, while a loose test might let the damage pass unnoticed.</p>
+<p>Finally, string tests should check that the function handles a string that is already in the desired form, without changing it further. Idempotence, meaning that applying a function twice gives the same result as applying it once, is a useful property for formatting functions.</p>
+<p class="check"><strong>Check:</strong> Why should a string test compare the whole result rather than just checking it contains a word?</p>
+<h2>Section 22: Testing Dates and Times</h2>
+<p>Dates and times are notoriously tricky to test, because they depend on the current moment, on time zones, and on formatting rules that vary by locale. The key to testing date code is the same as for testing clocks: do not let the code read the current time directly. Instead, pass dates in as parameters, or inject a clock that returns a fixed time, so that tests are deterministic. A test for a function that formats a date should construct a specific date, such as a known day in a known year, and check the formatted string exactly. A test for a function that calculates an age or a difference between dates should use fixed dates and check the computed number, not a value derived from today. Time zone bugs are a particular hazard: a date that is one day in one time zone can be another day elsewhere, so tests should specify the time zone explicitly when it matters, or use dates at midday to avoid boundary effects. Another hazard is daylight saving time, which can make a day longer or shorter than twenty-four hours, so tests that add days should use calendar arithmetic rather than adding seconds. Date tests reward careful setup, because a test with a vague date will be flaky or locale-dependent, while a test with a precise date is rock solid. When you write date code, design it to accept dates as inputs from the start, and your tests will be straightforward. When you inherit date code that reads the current time directly, refactor it to accept a date or a clock, and the tests will follow naturally.</p>
+<pre><code>import XCTest
+import Foundation
+
+func isWeekend(_ date: Date, calendar: Calendar) -&gt; Bool {
+    let weekday = calendar.component(.weekday, from: date)
+    return weekday == 1 || weekday == 7
+}
+
+final class WeekendTests: XCTestCase {
+    func testKnownSaturdayIsWeekend() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 10
+        components.day = 31
+        let date = calendar.date(from: components)!
+        XCTAssertTrue(isWeekend(date, calendar: calendar))
+    }
+}</code></pre>
+<p>The weekend test constructs a specific date, the 31st of October 2026, which is a Saturday, in a specific time zone, and checks that it is recognised as a weekend day. Every part of the setup is explicit: the calendar, the time zone, and the date components. That explicitness is what makes the test deterministic. A test that asked whether today is a weekend would pass on Saturdays and fail on weekdays, which is useless as a guard. By fixing the date, the test checks the logic, not the calendar on the wall. When you test date code, follow this example: build the date from components, state the time zone, and check the result exactly. That discipline turns one of the trickiest areas of testing into a routine one.</p>
+<p>A related date-testing habit is to test around boundaries, such as the last day of a month, the first day of a year, and a leap day. Boundary dates expose off-by-one errors in calendar arithmetic that ordinary dates hide, and they are cheap to add once the fixed-date setup is in place.</p>
+<p class="check"><strong>Check:</strong> Why must a date test use a fixed, constructed date rather than today&#x27;s date?</p>
+<h2>Section 23: Testing File Reading and Writing</h2>
+<p>File code is tested with temporary files and folders, so that tests do not depend on, or damage, real user data. The pattern is to create a temporary folder for each test, write a known file into it, run the code under test against that file, and check the result, then delete the folder in tearDown or at the end of the test. That isolation keeps tests independent and safe: a test that writes to a fixed location could clash with another test, or with a user&#x27;s real files, while a temporary folder is private to the test. Tests for file reading should check both the success case, where the file exists and contains expected text, and the failure case, where the file is missing or contains unexpected content. Tests for file writing should write a file and then read it back, checking that the contents match exactly what was written, including line breaks and final newlines, which are easy to get wrong. Error handling deserves attention too: a function that reads a file should report a clear error when the file is missing, and a test should check that error, not just that the function fails somehow. File tests are slower than pure function tests, because they touch the disk, but they are still fast enough for a normal suite, and they are essential for code that persists data. Without them, file bugs, such as writing to the wrong path or forgetting a newline, go unnoticed until a user loses data. Temporary folders plus exact content checks are the whole technique, and they are worth mastering early.</p>
+<pre><code>import XCTest
+import Foundation
+
+func writeText(_ text: String, to path: String) throws {
+    try text.write(toFile: path, atomically: true, encoding: .utf8)
+}
+
+func readText(from path: String) throws -&gt; String {
+    return try String(contentsOfFile: path, encoding: .utf8)
+}
+
+final class FileTests: XCTestCase {
+    func testWritingThenReadingGivesSameText() throws {
+        let folder = FileManager.default.temporaryDirectory
+        let path = folder.appendingPathComponent(&quot;test-note.txt&quot;).path
+        try writeText(&quot;Hello, file!&quot;, to: path)
+        let readBack = try readText(from: path)
+        XCTAssertEqual(readBack, &quot;Hello, file!&quot;)
+        try? FileManager.default.removeItem(atPath: path)
+    }
+}</code></pre>
+<p>The file test writes a known string to a temporary file, reads it back, and checks that the two match exactly. The temporary directory keeps the test away from real data, and the cleanup at the end removes the file so that repeated runs start clean. The test is marked throws, so any unexpected file error fails the test automatically, which is the neat behaviour discussed earlier for throwing tests. You can extend this test with a missing-file case, checking that reading a nonexistent path throws, and with a multi-line case, checking that line breaks survive the round trip. Those extensions follow the same pattern: a temporary file, a known content, and an exact check. File tests built this way are safe, repeatable, and genuinely useful, which is all a test needs to be.</p>
+<p>File tests should also check that writing does not accidentally append to an existing file when it should replace it, and that reading a file with a trailing newline returns that newline. Replacement versus appending is a common source of duplicated content, and trailing newlines are a common source of off-by-one surprises.</p>
+<p class="check"><strong>Check:</strong> Why should file tests use a temporary folder rather than a fixed location?</p>
+<h2>Section 24: Testing JSON Encoding and Decoding</h2>
+<p>JSON code is tested by checking that known values encode to expected JSON and that known JSON decodes to expected values, in both directions. Encoding tests construct a value, encode it, and compare the resulting data or string with an expected form, or decode it back and check that the round trip preserves the value. Decoding tests take a JSON string, decode it into a value, and check that the value&#x27;s properties match expectations. Both directions matter, because an encoding bug and a decoding bug are different failures, and a round-trip test alone can miss a bug that affects both directions equally, such as a field that is dropped on encode and defaulted on decode. Edge cases for JSON include missing fields, fields with the wrong type, extra unknown fields, and empty objects. A decoder that is too strict will reject valid input with an extra field, while one that is too lenient will silently accept broken input. Tests should pin down the intended behaviour for each of those cases, so that future changes do not accidentally loosen or tighten the decoder. Another useful test checks that a value with special characters, such as quotes or emoji, survives encoding and decoding unchanged, because escaping bugs often hide there. JSON tests are usually fast and easy to write, and they protect one of the most common boundaries in modern programs: the boundary between your code and the outside world, where data arrives as text and must be turned into trustworthy values.</p>
+<pre><code>import XCTest
+import Foundation
+
+struct Note: Codable, Equatable {
+    let title: String
+    let body: String
+}
+
+final class NoteJSONTests: XCTestCase {
+    func testDecodingKnownJSONGivesExpectedNote() throws {
+        let json = &quot;{\&quot;title\&quot;:\&quot;Shopping\&quot;,\&quot;body\&quot;:\&quot;Buy milk\&quot;}&quot;
+        let data = Data(json.utf8)
+        let note = try JSONDecoder().decode(Note.self, from: data)
+        XCTAssertEqual(note, Note(title: &quot;Shopping&quot;, body: &quot;Buy milk&quot;))
+    }
+
+    func testEncodingNoteAndDecodingItGivesSameNote() throws {
+        let original = Note(title: &quot;Ideas&quot;, body: &quot;Build a treehouse&quot;)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Note.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+}</code></pre>
+<p>The note tests check decoding from a known JSON string and a round trip from value to JSON and back. The first test pins down the exact mapping between JSON fields and struct properties, while the second test checks that no information is lost in the round trip. Together they cover the two directions, and either one failing would point at a different kind of bug. You can extend these tests with a missing-field case, expecting a decoding error, and with a special-character case, checking that quotes and emoji survive. Those extensions are cheap to write and they guard the boundary where outside data meets your code, which is exactly where defensive testing pays off most. When you add JSON to a program, add these tests at the same time, before the JSON shapes drift and become hard to pin down.</p>
+<p>JSON tests should also verify how the decoder handles numbers that arrive as strings, and strings that arrive as numbers, because real-world JSON is often messier than the ideal. Pinning down that behaviour in a test prevents silent data loss when the outside world sends an unexpected shape.</p>
+<p>One more JSON habit is to keep a sample of real JSON from the outside world, with names changed if needed, as a test fixture. Real samples catch assumptions that invented examples miss, because the outside world is rarely as tidy as a hand-written example.</p>
+<p class="check"><strong>Check:</strong> Why is a round-trip test alone not enough to verify JSON encoding and decoding?</p>
+<h2>Section 25: Testing the SwiftDay Task Manager</h2>
+<p>The SwiftDay project from this book, a command-line task-and-notes manager, is an excellent subject for testing, because its core logic is pure and its behaviours are easy to state. A task list can be tested by adding tasks, marking them done, listing them, and searching them, with each behaviour checked exactly. A note store can be tested the same way. The file persistence of SwiftDay can be tested with temporary files, as in the file-testing section, by saving tasks, loading them back, and checking that nothing was lost or changed. The command parsing of SwiftDay, which turns user input such as add Buy milk into an action, can be tested by feeding known command strings and checking the resulting actions. That command-parsing test is particularly valuable, because parsing is where user input meets program logic, and small parsing bugs produce confusing behaviour. By testing SwiftDay&#x27;s pieces separately, the task list, the note store, the persistence, and the parser, you build confidence in each piece before they are combined, and when a combined behaviour fails, you can tell which piece is at fault by running its tests. That separation is the practical payoff of testing a real project: it turns a large, intimidating program into a set of small, verified pieces. If you have been following the SwiftDay chapters, try writing tests for its core types now, before reading further, and you will find that the testing skills of this chapter transfer directly to a program you already understand.</p>
+<pre><code>import XCTest
+
+struct DayTask: Equatable {
+    let title: String
+    var isDone = false
+}
+
+struct DayTaskList {
+    private(set) var tasks: [DayTask] = []
+
+    mutating func add(_ task: DayTask) {
+        tasks.append(task)
+    }
+
+    mutating func markDone(at index: Int) {
+        if tasks.indices.contains(index) {
+            tasks[index].isDone = true
+        }
+    }
+
+    func search(_ text: String) -&gt; [DayTask] {
+        return tasks.filter { $0.title.contains(text) }
+    }
+}
+
+final class DayTaskListTests: XCTestCase {
+    func testAddingATaskMakesItSearchable() {
+        var list = DayTaskList()
+        list.add(DayTask(title: &quot;Buy milk&quot;))
+        XCTAssertEqual(list.search(&quot;milk&quot;), [DayTask(title: &quot;Buy milk&quot;)])
+    }
+
+    func testMarkingATaskDoneSetsItsFlag() {
+        var list = DayTaskList()
+        list.add(DayTask(title: &quot;Buy milk&quot;))
+        list.markDone(at: 0)
+        XCTAssertTrue(list.tasks[0].isDone)
+    }
+}</code></pre>
+<p>The SwiftDay tests check adding, searching, and marking done, which are the core behaviours of a task list. Each test is small, each checks an exact result, and together they cover the list&#x27;s main operations. If a later change broke searching, the first test would fail while the second passed, narrowing the fault immediately. That localisation is the benefit of testing pieces separately rather than only testing the whole program end to end. You can extend these tests with edge cases, such as marking an out-of-range index, which should safely do nothing, and searching an empty list, which should return an empty list. Those edge cases are where a task manager&#x27;s bugs usually live, and testing them now prevents user-visible surprises later. Use SwiftDay as your practice project for this chapter, and let its tests grow alongside its features.</p>
+<p>SwiftDay&#x27;s search behaviour deserves its own tests, including searching for a word that appears in several tasks, searching for a word that appears in none, and searching with different capitalisation. Search is a feature users rely on daily, and its edge cases are exactly the ones that cause quiet frustration when they fail.</p>
+<p>Persistence tests for SwiftDay should also check that a task marked done stays done after saving and loading, and that the order of tasks is preserved. Order and completion state are the details users notice first when persistence goes wrong.</p>
+<p class="check"><strong>Check:</strong> Why is it better to test SwiftDay&#x27;s task list, parser, and persistence separately?</p>
+<h2>Section 26: Unit Tests Versus Integration Tests</h2>
+<p>Tests come in different sizes, and two of the most useful sizes are unit tests and integration tests. A unit test checks a single small piece in isolation, such as one function or one struct, with its dependencies replaced by fakes. It is fast, focused, and precise: when it fails, you know exactly which piece broke. An integration test checks several pieces working together, such as a task list plus its file persistence, or a service plus its cache, with real or near-real dependencies. It is slower and less precise, but it catches problems that unit tests cannot, such as pieces that work alone but disagree about how they connect. For example, a task list and a file writer might each pass their unit tests, yet fail together because the writer saves in a format the loader does not understand. Only an integration test that saves and loads together would catch that mismatch. A healthy suite has both kinds: many fast unit tests that pin down individual behaviours, and a smaller number of integration tests that check the important connections between pieces. Too many integration tests make a suite slow and its failures vague, because a failure could be caused by any piece in the chain. Too few leave the connections unverified, which is where real programs often break. The balance is a judgement call, but a useful rule is to unit test everything, and to integration test the connections that matter most, such as persistence, network boundaries, and the main user flows. That combination gives you both precision and confidence, without letting the suite become slow or vague.</p>
+<pre><code>import XCTest
+
+func double(_ number: Int) -&gt; Int {
+    return number * 2
+}
+
+func quadruple(_ number: Int) -&gt; Int {
+    return double(double(number))
+}
+
+final class NumberTests: XCTestCase {
+    func testDoublingThreeGivesSix() {
+        XCTAssertEqual(double(3), 6)
+    }
+
+    func testQuadruplingThreeGivesTwelve() {
+        XCTAssertEqual(quadruple(3), 12)
+    }
+}</code></pre>
+<p>The number tests illustrate the two sizes in miniature. The first test is a unit test for the doubling function alone. The second test is a small integration test, because quadrupling works by calling doubling twice, so it checks the two functions working together. If doubling broke, both tests would fail, which is expected: the integration test depends on the unit it integrates. If quadrupling&#x27;s own logic broke but doubling stayed correct, only the second test would fail, which localises the fault to the combination. That pattern, unit tests for pieces and integration tests for combinations, scales to real programs. Keep the integration tests focused on real connections, such as saving and loading, and let the unit tests carry the detailed behaviour checks. The result is a suite that is fast, precise, and still catches connection bugs.</p>
+<p>Integration tests are also the right place to check performance in a rough sense, such as confirming that saving and loading a thousand tasks completes quickly. A unit test cannot reveal that the combination is slow, because each piece alone may be fast while the interaction between them is not.</p>
+<p class="check"><strong>Check:</strong> What kind of bug can an integration test catch that unit tests might miss?</p>
+<h2>Section 27: Running Tests and Reading Results</h2>
+<p>Running tests is a habit as much as a skill, and the habit is simple: run the tests often, run them after every change, and read their results before moving on. In most Swift environments, tests are run with a single command or a single button, and the results appear as a list of passing and failing tests, with counts and timings. A passing suite is reported quietly, often with just a count, which is as it should be: passing is the normal state, and it should not demand attention. A failing suite demands attention, and the report will name the failing tests and show their failure messages, which you read as described in the earlier section on failing tests. It is useful to run a focused subset of tests while you are working on one feature, for speed, and to run the full suite before you consider a piece of work finished, for confidence. Some developers also run tests automatically on every save or every commit, which catches failures even earlier, but that automation is an enhancement, not a requirement. The essential habit is manual and frequent: change code, run tests, read results, fix failures, repeat. That loop is the heartbeat of test-driven work, and it is surprisingly pleasant once it becomes routine, because it replaces vague worry about whether code works with concrete evidence. A test run that passes after a change is a small, satisfying confirmation, and a test run that fails is an early warning that saves a much larger debugging session later. Make the loop part of your rhythm, and testing will feel like a natural part of writing code, not an extra task bolted on at the end.</p>
+<pre><code>import XCTest
+
+func add(_ a: Int, _ b: Int) -&gt; Int {
+    return a + b
+}
+
+final class AdditionTests: XCTestCase {
+    func testAddingTwoAndThreeGivesFive() {
+        XCTAssertEqual(add(2, 3), 5)
+    }
+
+    func testAddingNegativeNumbers() {
+        XCTAssertEqual(add(-2, -3), -5)
+    }
+}</code></pre>
+<p>The addition tests are the kind of small suite you would run repeatedly while working. Running just this class gives fast feedback on the addition function, while running the full suite later checks that nothing else broke. The habit to build is to run the focused tests after each small change, and the full suite before finishing a task. That two-level rhythm balances speed and confidence: focused runs are quick enough to do constantly, and full runs are thorough enough to trust. If your environment supports running a single test method, use that while debugging a failure, because it isolates the failing case from the rest of the suite. Over time, you will develop a feel for when a focused run is enough and when a full run is warranted, and that feel is part of becoming fluent with testing. The tooling varies, but the habit is universal: run tests often, and read what they say.</p>
+<p>Test results also include timing information, which is worth glancing at occasionally. A test that suddenly becomes much slower may indicate a real problem, such as a test that now waits for a network timeout, or a function that has become inefficient. Slow tests deserve investigation, not just patience.</p>
+<p class="check"><strong>Check:</strong> Why is it useful to run a focused subset of tests while working, and the full suite before finishing?</p>
+<h2>Section 28: Debugging with Tests</h2>
+<p>Tests are not only guards against bugs; they are also debugging tools, because a failing test is a small, repeatable reproduction of a problem. When a program misbehaves in a complex situation, the first step is often to shrink the situation down to a minimal failing test, which isolates the bug from the surrounding complexity. That minimal test is easier to investigate than the full program, because it has fewer moving parts, and it can be run repeatedly while you try fixes. The process is to write a test that captures the failing behaviour, run it to confirm it fails, then simplify the test, removing inputs and setup that are not needed for the failure, until the test is as small as possible while still failing. That minimal test often reveals the bug directly, because the unnecessary details that hid it are gone. Even when it does not reveal the bug immediately, it gives you a fast feedback loop: change a line, run the test, see whether it passes, repeat. That loop is much faster than running a whole program, reproducing a complex scenario by hand, and checking the result manually each time. Tests also help with debugging by narrowing the search: if unit tests pass but an integration test fails, the bug is likely in the connection between pieces, not in the pieces themselves. That narrowing saves a great deal of wandering through code. Treat failing tests as debugging allies, not as annoyances, and invest time in shrinking reproductions before diving into fixes. The shrinking step feels slow, but it usually makes the fix itself quick and obvious.</p>
+<pre><code>import XCTest
+
+func average(of numbers: [Int]) -&gt; Double {
+    if numbers.isEmpty {
+        return 0
+    }
+    let total = numbers.reduce(0, +)
+    return Double(total) / Double(numbers.count)
+}
+
+final class AverageTests: XCTestCase {
+    func testAverageOfEmptyListIsZero() {
+        XCTAssertEqual(average(of: []), 0)
+    }
+
+    func testAverageOfOneTwoThreeIsTwo() {
+        XCTAssertEqual(average(of: [1, 2, 3]), 2)
+    }
+}</code></pre>
+<p>The average tests include an empty-list case, which is a common source of bugs in averaging code, because dividing by zero is undefined. The function shown handles it by returning zero, and the test documents that choice. If the function had crashed on empty input, the minimal test with an empty list would reproduce the crash instantly, without needing a whole program that happened to average an empty list. That is the debugging value of a small test: it turns a mysterious crash in a large program into a tiny, repeatable case that can be studied in isolation. When you meet a bug, resist the urge to fix it by guessing in the large program. Shrink it to a test first, and let the test guide you to the fix. The test will remain afterwards as a guard, so the same bug cannot return unnoticed.</p>
+<p>Another debugging use of tests is bisecting a change: if a suite that passed yesterday fails today, run the tests against yesterday&#x27;s code and today&#x27;s code to confirm the change caused the failure, then narrow the change itself. That disciplined comparison prevents fixing the wrong thing.</p>
+<p class="check"><strong>Check:</strong> How does shrinking a bug down to a minimal failing test help you find and fix it?</p>
+<h2>Section 29: Testing Error Messages and User-Facing Text</h2>
+<p>Error messages and other user-facing text deserve tests, because they are part of the program&#x27;s behaviour, and users experience them directly. A program that handles an error correctly but reports it with a confusing or empty message has still failed the user, because the user cannot understand what went wrong or what to do next. Tests for messages check that the message for a given situation matches an expected string exactly, or at least contains the key information, such as the name of the missing item or the action the user should take. Exact matching is best for messages that should be stable, while contains-checking is better for messages that include variable details, such as a file name or a number, where the test can check the fixed parts and the presence of the variable part separately. Another aspect of message testing is checking that different errors produce different messages, so that users and developers can tell them apart. Two errors that produce the same vague message, such as something went wrong, are hard to diagnose and frustrating to experience. Tests that assert distinct messages for distinct errors push the program towards clearer communication. Message tests are also a form of documentation: they record what the program promises to say in each situation, which helps future maintainers keep messages consistent. As with string tests generally, write the expected message by hand, and include the awkward cases, such as very long names or names with special characters, to make sure the message remains readable. Clear messages are a user-facing quality, and testing them treats that quality as seriously as any other behaviour.</p>
+<pre><code>import XCTest
+
+func messageForMissingFile(named name: String) -&gt; String {
+    return &quot;File not found: \(name). Please check the name and try again.&quot;
+}
+
+final class MessageTests: XCTestCase {
+    func testMissingFileMessageNamesTheFile() {
+        let message = messageForMissingFile(named: &quot;notes.txt&quot;)
+        XCTAssertTrue(message.contains(&quot;notes.txt&quot;))
+        XCTAssertTrue(message.contains(&quot;File not found&quot;))
+    }
+
+    func testMissingFileMessageSuggestsAnAction() {
+        let message = messageForMissingFile(named: &quot;notes.txt&quot;)
+        XCTAssertTrue(message.contains(&quot;try again&quot;))
+    }
+}</code></pre>
+<p>The message tests check that a missing-file message names the file, states the problem, and suggests an action. Those three checks correspond to what a user needs from an error message: what happened, to what, and what to do next. A message that failed any of those checks would still be a message, but it would be a poor one, and the test would catch that poverty. When you write error messages in your own programs, decide what information each message must carry, and write a test that checks for each piece. That discipline improves messages quickly, because vague messages fail their tests until they are made specific. It also prevents regressions, where a later change accidentally drops a useful detail from a message. User-facing text is behaviour, and behaviour deserves tests, even when it is only words.</p>
+<p>Message tests should also check that messages do not leak sensitive information, such as a password or a private path, by asserting that the message does not contain values it should never show. That negative check is a small addition that guards user privacy directly.</p>
+<p class="check"><strong>Check:</strong> What three pieces of information should a good error message carry, and how would you test for each?</p>
+<h2>Section 30: When to Delete or Rewrite a Test</h2>
+<p>Tests are code, and like all code, they can become outdated, misleading, or simply wrong. A test should be deleted or rewritten when the behaviour it checks no longer exists, when its expectation is based on a misunderstanding, or when it has become so brittle that it fails for harmless reasons. Brittle tests are those that depend on incidental details, such as an exact internal ordering that is not part of the contract, or a message that changes with every wording tweak. Such tests fail often without indicating a real problem, and they erode trust in the suite, just as flaky tests do. The remedy is to rewrite the test to check the contract rather than the incidental detail, for example by checking that a result contains the right items rather than that it has an exact internal order, or to delete the test if the contract it checked no longer matters. Deleting a test should not be done casually, because a test is a guard, and removing a guard weakens the suite. Before deleting, check whether the behaviour is covered by another test, and whether the behaviour itself is still required. If the behaviour is gone, the test should go with it. If the behaviour remains but the test is brittle, rewrite the test to be robust. A suite that is regularly pruned, with obsolete tests removed and brittle tests rewritten, stays fast, trustworthy, and pleasant to run. A suite that is never pruned accumulates dead weight, slows down, and eventually gets ignored. Treat test maintenance as part of the work, not as an afterthought, and review your tests whenever you change the behaviour they cover.</p>
+<pre><code>import XCTest
+
+func sortedNames(_ names: [String]) -&gt; [String] {
+    return names.sorted()
+}
+
+final class SortedNameTests: XCTestCase {
+    func testSortingNamesGivesAlphabeticalOrder() {
+        XCTAssertEqual(sortedNames([&quot;Zoe&quot;, &quot;Ada&quot;, &quot;Max&quot;]), [&quot;Ada&quot;, &quot;Max&quot;, &quot;Zoe&quot;])
+    }
+}</code></pre>
+<p>The sorting test checks an exact order, which is appropriate here, because alphabetical order is the contract of a sorting function. It would be brittle only if the contract were merely that the result contains the same names, in which case exact ordering would be an incidental detail. The lesson is to match the test&#x27;s strictness to the contract&#x27;s strictness: check exactly what is promised, and no more. When a contract changes, update the tests to match the new contract promptly, rather than letting them linger with old expectations. Prompt updates keep the suite honest, because a suite whose tests describe yesterday&#x27;s behaviour is worse than no suite at all: it actively misleads. Review tests as part of every behaviour change, and delete or rewrite them in the same change, so that the tests and the program always tell the same story.</p>
+<p>A test that is skipped or disabled deserves the same scrutiny as a test that is deleted. A skipped test is a guard that has been switched off, and it should carry a reason and a plan to switch it back on, or it will be forgotten and the behaviour it guarded will drift unprotected.</p>
+<p class="check"><strong>Check:</strong> When is it right to delete a test, and when should you rewrite it instead?</p>
+<h2>Section 31: Testing Performance in Plain Words</h2>
+<p>Performance tests check that code runs fast enough, not just that it runs correctly, and they are useful when speed is part of the requirement, such as searching a large list, sorting many items, or loading a big file. XCTest provides a way to measure how long a block of code takes, running it several times and reporting the average, so that a single slow run does not mislead you. A performance test sets a baseline, which is the time the code takes when it is known to be acceptable, and fails if later changes make it significantly slower. That baseline needs care, because test machines vary in speed, and a test that passes on a fast machine might fail on a slower one. For that reason, performance tests are best used as warnings rather than as strict gates, or with generous thresholds that only catch large regressions. A performance test should also measure the right thing: the whole operation the user experiences, not just a tiny inner loop, because optimising an inner loop that is rarely the bottleneck wastes effort. Another useful practice is to test performance with realistic data sizes, such as a thousand tasks rather than three, because code that is fast for tiny inputs can be slow for large ones. Performance testing is a supplement to correctness testing, not a replacement for it. A fast program that gives wrong answers is still wrong, and a correct program that is too slow is a different kind of failure. Use performance tests where speed matters, keep their thresholds generous, and treat their failures as invitations to investigate, not as automatic proof of a problem.</p>
+<pre><code>import XCTest
+
+func sumUpTo(_ limit: Int) -&gt; Int {
+    var total = 0
+    for number in 1...limit {
+        total += number
+    }
+    return total
+}
+
+final class PerformanceTests: XCTestCase {
+    func testSummingIsCorrect() {
+        XCTAssertEqual(sumUpTo(100), 5050)
+    }
+
+    func testSummingPerformance() {
+        measure {
+            _ = sumUpTo(10_000)
+        }
+    }
+}</code></pre>
+<p>The performance test above shows both kinds of check side by side: a correctness test that the sum is right, and a measurement block that times the same kind of work at a larger size. The correctness test is the strict gate, while the measurement is a warning system that reports timing. In a real project, you would run the measurement, note its baseline, and investigate if it grows dramatically after a change. You would not panic over a small variation, because timing varies with machine load and other factors. That calm, investigative attitude is the right one for performance work in general. Measure first, with realistic data, and only then decide whether optimisation is needed. Premature optimisation, meaning making code faster before knowing it is slow, often makes code more complicated without helping the user. Performance tests, used wisely, tell you when optimisation is actually warranted.</p>
+<p>A performance test should also be run more than once before drawing conclusions, because a single measurement can be distorted by background activity on the machine. Averaging several runs gives a steadier picture, and a large, consistent slowdown is far more meaningful than one slow reading.</p>
+<p class="check"><strong>Check:</strong> Why should performance test thresholds be generous rather than strict?</p>
+<h2>Section 32: Testing with Random and Property-Based Ideas</h2>
+<p>Most tests use specific examples, but another approach, called property-based testing, checks general properties that should hold for many inputs, using randomly generated values. For example, instead of testing that sorting one specific list gives one specific result, a property test might check that sorting any list gives a list with the same elements, in non-decreasing order. That property holds for every input, so testing it with many random inputs gives broader coverage than a handful of examples. Swift does not include a property-based framework by default, but the idea is still useful, and you can approximate it by writing a test that loops over many inputs, including edge cases, and checks a property each time. The value of this approach is that it can reveal bugs that example tests miss, because random inputs explore corners you would not think to try. Its limitation is that a failing property test does not always tell you which input caused the failure, so a good property test reports the failing input when it finds one, allowing you to turn it into a specific example test afterwards. Property thinking also improves example tests, because asking what property should always hold forces you to state the general rule, not just one instance of it. For instance, a function that reverses a string should satisfy the property that reversing twice returns the original, and that property is worth testing with several strings. You do not need a special framework to benefit from this thinking; a loop over varied inputs and a clear property check is enough to start. Use properties alongside examples, not instead of them, because examples document specific behaviours while properties guard general rules.</p>
+<pre><code>import XCTest
+
+func reversed(_ text: String) -&gt; String {
+    return String(text.reversed())
+}
+
+final class ReversalTests: XCTestCase {
+    func testReversingTwiceReturnsOriginal() {
+        let samples = [&quot;&quot;, &quot;a&quot;, &quot;hello&quot;, &quot;Swift!&quot;, &quot;A man&quot;]
+        for sample in samples {
+            XCTAssertEqual(reversed(reversed(sample)), sample)
+        }
+    }
+
+    func testReversingKeepsTheSameLength() {
+        let samples = [&quot;&quot;, &quot;hello&quot;, &quot;Swift programming&quot;]
+        for sample in samples {
+            XCTAssertEqual(reversed(sample).count, sample.count)
+        }
+    }
+}</code></pre>
+<p>The reversal tests check properties rather than single examples: reversing twice returns the original, and reversing keeps the length, for several samples including an empty string and strings with punctuation. Those properties would hold for any correct reversal function, and they would fail for many incorrect ones, such as a function that drops characters or changes case. The samples include edge cases, which is important, because a property test with only normal samples is barely better than an example test. When you write property-style tests, choose samples that cover the edges, and state the property clearly in the test&#x27;s name. If a property test fails, add the failing input as a specific example test, so that the failure is documented precisely. Property thinking is a powerful complement to example testing, and it is worth practising even without a dedicated framework.</p>
+<p>Property tests also pair well with example tests when a bug is found: the property test finds the failing region, and a specific example test pins down the exact failing case. Together they give both breadth and precision, which is a strong combination for tricky functions.</p>
+<p class="check"><strong>Check:</strong> What is a property of a function, and how is testing a property different from testing one example?</p>
+<h2>Section 33: Testing Concurrency Without Flakiness</h2>
+<p>Testing concurrent code is harder than testing sequential code, because timing affects the outcome, and a test that depends on timing will be flaky. The key to testing concurrency reliably is to test deterministic properties rather than timing. Instead of asserting that one task finishes before another, which depends on scheduling, assert that the final state is correct no matter the order, such as a counter reaching the expected total, or a set containing exactly the expected items. Those final-state properties are deterministic even when the order is not. Another technique is to make concurrency deterministic in tests by controlling the schedule, for example by using a fake that returns immediately, or by running tasks in a fixed sequence for one test and concurrently for another, comparing the results. If the sequential and concurrent results agree, that is strong evidence the concurrent version is correct. Actor tests from an earlier section follow this pattern: many tasks, a task group to wait for completion, and a final-state assertion. Avoid tests that sleep for a fixed time and then assert, because a slow machine might not have finished in that time, and the test will fail randomly. Instead, wait for a real completion signal, such as a task group finishing, a callback firing, or a state reaching an expected value through polling with a generous timeout. Polling with a timeout is still timing-dependent, but it is far more robust than a fixed sleep, because it waits as long as needed up to a limit. The goal is always the same: a test whose result depends on the code&#x27;s logic, not on the machine&#x27;s speed.</p>
+<pre><code>import XCTest
+
+actor Basket {
+    private var items: [String] = []
+
+    func add(_ item: String) {
+        items.append(item)
+    }
+
+    func count() -&gt; Int {
+        return items.count
+    }
+}
+
+final class BasketConcurrencyTests: XCTestCase {
+    func testConcurrentAddsGiveCorrectCount() async {
+        let basket = Basket()
+        await withTaskGroup(of: Void.self) { group in
+            for number in 1...50 {
+                group.addTask {
+                    await basket.add(&quot;Item \(number)&quot;)
+                }
+            }
+        }
+        let total = await basket.count()
+        XCTAssertEqual(total, 50)
+    }
+}</code></pre>
+<p>The basket concurrency test asserts a final-state property, the count after fifty concurrent adds, rather than anything about the order or timing of the adds. That property is deterministic: with a correct actor, it will always be fifty, on any machine, at any speed. A test that asserted the order of items would be flaky, because concurrent tasks finish in an unpredictable order, and order is not part of the contract. Choosing the right property to assert is the central skill in concurrency testing. Ask yourself what must be true no matter how tasks are scheduled, and test that. Final counts, final sets of items, and the absence of duplicates are good candidates. Order, timing, and interleaving are usually not, unless the program explicitly promises them. Test the promises, not the accidents of scheduling, and your concurrent tests will be trustworthy.</p>
+<p>Another concurrency testing habit is to run the same test with different numbers of tasks, from one to many, and confirm the result is the same each time. A result that changes with the number of tasks is a warning that the code depends on scheduling in a way it should not.</p>
+<p class="check"><strong>Check:</strong> Why should a concurrency test assert a final-state property rather than an ordering or timing property?</p>
+<h2>Section 34: Continuous Integration in Plain Words</h2>
+<p>Continuous integration, often shortened to CI, is the practice of automatically running your tests whenever code is changed, usually when it is shared with a team or saved to a shared repository. A CI system checks out the latest code, builds it, runs the full test suite, and reports whether everything passed, all without a human having to remember to run the tests. The benefit is that failures are caught immediately, while the change that caused them is still fresh, and before the broken code spreads to other people&#x27;s work. CI also runs tests in a clean, consistent environment, which catches problems that only appear on a fresh machine, such as a test that depends on a file that exists on your computer but not on anyone else&#x27;s. For a solo developer, CI is still valuable, because it provides a second, independent check that the program builds and passes from a clean state, not just from the state of your own machine. Setting up CI is usually a matter of adding a small configuration file that tells the system how to build and test your project, and the details vary by service, so you do not need to master them now. What matters is the habit and the idea: every change is tested automatically, in a clean environment, and the result is visible to everyone involved. CI turns testing from a personal habit into a team safety net, and it is one of the practices that separates hobby projects from professional ones. Even a simple CI setup, running tests on every change, is a large step towards reliability, and it is worth adopting as soon as a project matters to anyone besides yourself.</p>
+<pre><code>import XCTest
+
+func multiply(_ a: Int, _ b: Int) -&gt; Int {
+    return a * b
+}
+
+final class MultiplyTests: XCTestCase {
+    func testMultiplyingThreeAndFourGivesTwelve() {
+        XCTAssertEqual(multiply(3, 4), 12)
+    }
+}</code></pre>
+<p>The multiplication test is the kind of test CI would run automatically on every change. On your machine, you might run it by hand and see it pass. On CI, it runs in a clean environment, where it would fail if the code depended on something only present on your machine, or if a change broke multiplication without you noticing. That independent check is CI&#x27;s value. You do not need to set up CI today to benefit from this chapter, but you should understand what it does, so that when you join a team or publish a project, the CI step feels familiar rather than mysterious. The core idea is simple: tests run automatically, on every change, in a clean place, and the results are reported plainly. Everything else is configuration detail, and configuration details can be learned when you need them.</p>
+<p>CI configuration usually lives in a small file in the project, and it typically states which command builds the project and which command runs the tests. Reading an example configuration for your platform is the quickest way to learn the format, because the files are short and mostly declarative.</p>
+<p class="check"><strong>Check:</strong> What does continuous integration add beyond running tests by hand on your own machine?</p>
+<h2>Section 35: Testing User Interface Logic Without a Screen</h2>
+<p>User interface code is often thought of as untestable, because it involves screens, taps, and visual layout, but the logic behind an interface is usually testable, and testing it is valuable. The trick is to separate the logic from the presentation: put decisions, such as what message to show, whether a button should be enabled, or which items to display, into plain functions or view models that can be tested without a screen. The screen itself then becomes a thin layer that displays whatever the logic decides, and that layer needs far less testing, because it contains little logic of its own. For example, a function that decides whether a form is valid, based on whether its fields are filled, can be tested with many combinations of filled and empty fields, without ever showing a form. A function that formats a price for display can be tested with exact strings, without rendering anything. A view model that holds the state of a screen, such as the current message and whether loading is in progress, can be tested by calling its methods and checking its state, just like any other type. This separation is good design in general, not just for testing, because it keeps the interface layer simple and the logic layer reusable. When you build an app, look for the decisions hidden inside your interface code, extract them into testable functions, and test those functions thoroughly. The screen will still need manual checking, because visual layout cannot be fully captured by unit tests, but the logic behind it will be guarded, and logic bugs are the ones that cause the most confusing user experiences.</p>
+<pre><code>import XCTest
+
+struct FormState {
+    var name = &quot;&quot;
+    var email = &quot;&quot;
+
+    var isValid: Bool {
+        return !name.isEmpty &amp;&amp; email.contains(&quot;@&quot;)
+    }
+}
+
+final class FormStateTests: XCTestCase {
+    func testEmptyFormIsNotValid() {
+        XCTAssertFalse(FormState().isValid)
+    }
+
+    func testFormWithNameAndEmailIsValid() {
+        XCTAssertTrue(FormState(name: &quot;Ada&quot;, email: &quot;ada@example.com&quot;).isValid)
+    }
+
+    func testFormWithNameButNoEmailIsNotValid() {
+        XCTAssertFalse(FormState(name: &quot;Ada&quot;, email: &quot;&quot;).isValid)
+    }
+}</code></pre>
+<p>The form state tests check validation logic without any screen, by creating form states with different combinations of fields and checking whether each is valid. Those combinations cover the important cases: empty, complete, and partially complete. A bug in the validation logic, such as forgetting to check the email, would fail one of these tests immediately. The screen that displays the form would use this same logic to enable or disable its submit button, so testing the logic is effectively testing the behaviour the user experiences, without the complexity of driving a real interface. That is the pattern to copy: extract decisions into plain types, test those types, and keep the screen thin. It makes interface logic as testable as any other logic, which is a large part of making an app reliable.</p>
+<p>Interface logic tests should also check the initial state of a screen, before any user action, because a screen that starts in a confusing state creates a poor first impression. Testing the initial state is easy, since it requires no interaction, and it catches defaults that were never deliberately chosen.</p>
+<p class="check"><strong>Check:</strong> How can you test the logic behind a screen without actually showing the screen?</p>
+<h2>Section 36: Testing with Preconditions and Guard Clauses</h2>
+<p>Many functions begin with preconditions or guard clauses that reject invalid input early, and those guards deserve their own tests, because they define the function&#x27;s contract about what it will and will not accept. A guard that rejects a negative age, an empty name, or an out-of-range index is a behaviour, and like any behaviour, it should be tested with inputs on both sides of the boundary. Test an input just inside the valid range, an input just outside it, and the boundary value itself, because boundary values are where off-by-one errors hide. For example, if a function accepts ages from zero to one hundred and twenty, test minus one, zero, one hundred and twenty, and one hundred and twenty-one. That set of four tests pins down the boundary far better than a single test with a normal age. Guard tests also document the contract for future readers: they show, in code, which inputs are accepted and which are rejected, and what happens in each case. When a guard throws an error, test the specific error, as discussed earlier. When a guard returns a default or an optional, test that result. The habit of testing guards is part of a larger habit: testing boundaries wherever they appear, whether they are numeric ranges, string lengths, collection sizes, or date ranges. Boundaries are where programs most often go wrong, because the normal case is easy and the boundary case is easy to forget. A test suite that systematically checks boundaries is a suite that catches the bugs other suites miss, and it does not take much extra effort, because boundary tests are usually short and follow a clear pattern.</p>
+<pre><code>import XCTest
+
+enum AgeError: Error, Equatable {
+    case outOfRange
+}
+
+func checkAge(_ age: Int) throws {
+    if age &lt; 0 || age &gt; 120 {
+        throw AgeError.outOfRange
+    }
+}
+
+final class AgeTests: XCTestCase {
+    func testAgeZeroIsAccepted() throws {
+        try checkAge(0)
+    }
+
+    func testAgeOneHundredTwentyIsAccepted() throws {
+        try checkAge(120)
+    }
+
+    func testAgeMinusOneIsRejected() {
+        XCTAssertThrowsError(try checkAge(-1)) { error in
+            XCTAssertEqual(error as? AgeError, .outOfRange)
+        }
+    }
+
+    func testAgeOneHundredTwentyOneIsRejected() {
+        XCTAssertThrowsError(try checkAge(121)) { error in
+            XCTAssertEqual(error as? AgeError, .outOfRange)
+        }
+    }
+}</code></pre>
+<p>The age tests check both boundaries and both sides of each boundary, which is the thorough pattern for guard testing. Zero and one hundred and twenty are accepted, while minus one and one hundred and twenty-one are rejected with a specific error. If the guard had an off-by-one error, such as rejecting one hundred and twenty itself, one of these tests would fail immediately. That precision is the value of boundary testing. When you write functions with guards, list their boundaries before writing tests, and write a test for each boundary value and its neighbours. That list becomes a checklist, and working through it systematically is far more reliable than trying to remember edge cases while writing tests. Boundary tests are short, but they are among the most effective tests you can write.</p>
+<p>Guard tests should also cover the case where several guards could fail at once, to check that the function reports the first or most important failure, rather than an arbitrary one. The order of guard checks is part of the contract when multiple inputs are invalid, and it deserves a test.</p>
+<p class="check"><strong>Check:</strong> For a function accepting ages 0 to 120, which four test values best pin down its boundaries, and why?</p>
+<h2>Section 37: Snapshot Testing in Plain Words</h2>
+<p>Snapshot testing is a technique for checking outputs that are large or complex, such as a formatted document, a long string, or a data structure, by comparing the output against a saved snapshot of the expected output. The first time the test runs, it saves the output as the snapshot. On later runs, it compares the new output against the saved snapshot, and fails if they differ. That comparison catches unintended changes, such as a formatting tweak that alters a whole document, without you having to write detailed assertions for every part of the output. Snapshot tests are particularly useful for generated text, such as reports, exports, or rendered views, where the output is long but the important property is that it does not change unexpectedly. The technique has a risk: if you accept a new snapshot without checking it carefully, you may be blessing a bug, because the snapshot becomes whatever the code currently produces, right or wrong. The remedy is to review every snapshot change as carefully as you would review a code change, checking that the new output is actually correct, not just different. Snapshot tests are a supplement to precise assertions, not a replacement for them. Use precise assertions for the important details, and snapshots for the overall shape, and review snapshot updates with care. When used that way, snapshot testing is a powerful tool for catching regressions in complex outputs that would be tedious to assert piece by piece, and it is worth knowing about even if you do not use it in every project.</p>
+<pre><code>import XCTest
+
+func report(for name: String, score: Int) -&gt; String {
+    return &quot;Report for \(name)\nScore: \(score)\nStatus: \(score &gt;= 50 ? &quot;Pass&quot; : &quot;Fail&quot;)&quot;
+}
+
+final class ReportTests: XCTestCase {
+    func testReportForPassingScore() {
+        let expected = &quot;Report for Ada\nScore: 80\nStatus: Pass&quot;
+        XCTAssertEqual(report(for: &quot;Ada&quot;, score: 80), expected)
+    }
+
+    func testReportForFailingScore() {
+        let expected = &quot;Report for Ben\nScore: 30\nStatus: Fail&quot;
+        XCTAssertEqual(report(for: &quot;Ben&quot;, score: 30), expected)
+    }
+}</code></pre>
+<p>The report tests show a simple form of snapshot thinking: the expected output is written out in full, as a literal, and compared exactly. That literal is effectively a snapshot, saved in the test itself rather than in a separate file. For small outputs, an inline literal is clearer than a separate snapshot file, because the expected output is visible right next to the test. For large outputs, a separate snapshot file is more practical, because the literal would overwhelm the test. Either way, the principle is the same: compare the whole output exactly, and review any change to the expected output carefully. When a snapshot test fails, the first question should be whether the new output is correct or whether the code broke. Answering that question thoughtfully is what makes snapshot testing safe. If the new output is correct, update the snapshot deliberately. If it is wrong, fix the code. Never update a snapshot blindly, because a blindly updated snapshot is a test that has stopped testing.</p>
+<p>Snapshot tests are also useful for checking generated files, such as exported reports or configuration files, where the whole file is the output. A snapshot of a known-good export catches accidental changes to the export format that precise assertions on single fields might miss.</p>
+<p class="check"><strong>Check:</strong> What is the main risk of snapshot testing, and how do you guard against it?</p>
+<h2>Section 38: Testing Accessibility and Plain Language</h2>
+<p>Accessibility testing checks that a program can be used by people with different abilities, and while much of it involves manual checking with assistive tools, some aspects can be tested in code, and the habit of thinking about them improves every program. For example, a function that produces a message for display can be tested to make sure the message is clear and does not rely solely on colour, such as saying error in words rather than only showing red text. A function that formats a number or a date can be tested to make sure its output is understandable when read aloud, without relying on visual layout. A validation function can be tested to make sure its error messages explain what is wrong and how to fix it, rather than merely stating that something failed. These are not traditional unit tests, but they are tests of qualities that matter to real users, and writing them forces you to consider users whose experience differs from your own. Plain language is part of accessibility: messages written in short, clear sentences are easier for everyone to understand, including people reading in a second language or under stress. Tests that check message wording, even loosely, help keep language plain, because they make wording changes visible and reviewable. Accessibility is a large topic, and code tests cover only a small part of it, but that small part is worth covering, because it builds the habit of designing for all users from the start, rather than treating accessibility as an afterthought. A program that is tested for clarity is a program that is clearer for everyone.</p>
+<pre><code>import XCTest
+
+func errorMessage(for missing: String) -&gt; String {
+    return &quot;Missing \(missing). Please add it and try again.&quot;
+}
+
+final class AccessibilityMessageTests: XCTestCase {
+    func testErrorMessageStatesWhatIsMissing() {
+        let message = errorMessage(for: &quot;email address&quot;)
+        XCTAssertTrue(message.contains(&quot;email address&quot;))
+    }
+
+    func testErrorMessageSuggestsWhatToDo() {
+        let message = errorMessage(for: &quot;email address&quot;)
+        XCTAssertTrue(message.contains(&quot;Please add it&quot;))
+    }
+
+    func testErrorMessageIsNotEmpty() {
+        XCTAssertFalse(errorMessage(for: &quot;email address&quot;).isEmpty)
+    }
+}</code></pre>
+<p>The message tests check that an error message states what is missing, suggests an action, and is not empty. Those checks are simple, but they enforce a standard of clarity that benefits every user, including those using screen readers, where a vague message is even harder to interpret than on screen. When you write messages in your programs, test them for the information they must carry, and keep the wording short and direct. That discipline, applied to every message, produces a program that communicates well, which is a form of accessibility in itself. Full accessibility testing involves tools and manual checks beyond unit tests, but starting with message clarity in code is a concrete, achievable step that any developer can take, and it sets the tone for the rest of the work.</p>
+<p>Accessibility in code also includes checking that important information is not conveyed by colour alone, and that text has enough contrast in principle, though contrast itself is usually checked with design tools. Code tests can check that a status is expressed in words as well as in any visual signal.</p>
+<p class="check"><strong>Check:</strong> How can a simple unit test help make a program more accessible?</p>
+<h2>Section 39: Keeping Tests Fast</h2>
+<p>A fast test suite is a suite that gets run, and a slow suite is a suite that gets skipped, so keeping tests fast is a practical priority, not just a nicety. The main causes of slow tests are real network calls, real file system access on large data, long sleeps, and tests that do far more work than they need to, such as setting up a whole program to test one function. The remedies are familiar from earlier sections: replace network calls with fakes, use small temporary files instead of large real ones, avoid sleeps in favour of completion signals, and test small pieces in isolation rather than through the whole program. Another cause of slowness is duplication: many tests repeating the same expensive setup, when a shared setup or a smaller setup would do. Reviewing setup code for unnecessary work often yields large speedups. It is also worth separating slow tests from fast ones, so that developers can run the fast suite constantly and the slow suite less often, such as before finishing a task or on CI. That separation keeps the daily feedback loop quick while still providing thorough coverage periodically. Measure your suite&#x27;s total time occasionally, and investigate if it grows sharply, because slow growth is often a sign that a few tests have become expensive, and fixing those few restores the suite&#x27;s speed. A suite that runs in seconds is a joy to use, and developers will run it without thinking. A suite that runs in minutes becomes a chore, and chores get skipped. Speed is therefore a feature of the test suite itself, and it deserves the same attention as the tests&#x27; correctness.</p>
+<pre><code>import XCTest
+
+func add(_ a: Int, _ b: Int) -&gt; Int {
+    return a + b
+}
+
+final class FastTests: XCTestCase {
+    func testAddingSmallNumbers() {
+        XCTAssertEqual(add(2, 3), 5)
+    }
+
+    func testAddingLargeNumbers() {
+        XCTAssertEqual(add(1_000_000, 2_000_000), 3_000_000)
+    }
+}</code></pre>
+<p>The fast tests above are pure function tests with no network, no files, and no waiting, so they run in a fraction of a second. A suite made mostly of tests like these stays fast even as it grows into the hundreds, because each test is cheap. When a test needs something slower, such as a file or a fake network, keep that test&#x27;s scope small, and consider whether the slow part is truly needed for what the test checks. Often it is not, and a pure-function version of the test is both faster and clearer. That preference for pure, fast tests, with slower tests reserved for the boundaries where they are genuinely needed, is the key to a suite that remains pleasant to run. Fast suites get run, and run suites catch bugs, so speed and safety reinforce each other.</p>
+<p>Test speed can also be improved by running tests in parallel where the framework supports it, provided the tests are independent. Parallel running multiplies the benefit of fast tests, but it exposes any hidden sharing between tests, so it is also a useful check for test isolation.</p>
+<p class="check"><strong>Check:</strong> Name three things that make tests slow, and give a remedy for each.</p>
+<h2>Section 40: Testing as Documentation</h2>
+<p>Tests document a program&#x27;s intended behaviour in a way that stays accurate, because unlike written documentation, tests are checked every time they run. When documentation says a function does one thing and the code does another, nobody notices until a user complains. When a test says a function does one thing and the code does another, the test fails immediately, and the disagreement is visible. That self-checking property makes tests a uniquely reliable form of documentation. A new developer joining a project can read its tests to learn what the program promises, with confidence that those promises are current, because any outdated test would be failing. Test names, in particular, form a readable specification: a list of test names describes the behaviours the program guarantees, in plain language, without implementation details. That list is often the best starting point for understanding a codebase, better than reading the implementation itself, because it states what matters rather than how it is achieved. To make tests serve as documentation, write them clearly, name them well, and keep them focused on behaviour rather than implementation. Avoid tests that merely mirror the code&#x27;s structure, because those document how the code works, not what it promises, and they break whenever the implementation changes, even when the behaviour stays the same. Behaviour-focused tests survive refactoring, which is exactly what documentation should do: it should describe the promise, not the current method of keeping it. When you write tests with documentation in mind, you produce two valuable things at once: a safety net and a specification, both maintained automatically by the act of running the suite.</p>
+<pre><code>import XCTest
+
+func isAdult(age: Int) -&gt; Bool {
+    return age &gt;= 18
+}
+
+final class AdultTests: XCTestCase {
+    func testAgeEighteenIsAdult() {
+        XCTAssertTrue(isAdult(age: 18))
+    }
+
+    func testAgeSeventeenIsNotAdult() {
+        XCTAssertTrue(!isAdult(age: 17))
+    }
+}</code></pre>
+<p>The adult tests document a rule, adulthood starts at eighteen, more clearly than any comment could, because they show the boundary with two concrete cases. A reader who sees these tests understands the rule immediately, and a future change to the rule would require changing the tests, which makes the change visible and deliberate. That visibility is the documentation value: rules that are tested are rules that cannot change silently. When you write tests, imagine a new developer reading them to learn the program, and ask whether they would understand the program&#x27;s promises from the tests alone. If the answer is yes, your tests are doing double duty as documentation, and your codebase is easier to join, easier to maintain, and easier to trust. That is a high return on the effort of writing clear tests.</p>
+<p>Documentation through tests also helps when a program is handed to a new maintainer, because the tests answer the question of what the program is supposed to do, without requiring the new maintainer to guess from the code. That transfer of intent is one of the most valuable things a test suite provides.</p>
+<p class="check"><strong>Check:</strong> Why are tests more reliable as documentation than written comments or documents?</p>
+<h2>Section 41: Testing Networking Code with Fakes</h2>
+<p>Networking code is tested with fakes because real network calls are slow, unpredictable, and dependent on outside services that a test cannot control. The pattern is to define a protocol for the network operation, such as fetching data for a key, and to provide two implementations: a real one that talks to the network, and a fake one that returns pre-arranged data immediately. The code under test depends on the protocol, so a test can inject the fake and check the code&#x27;s behaviour without any network at all. Fake network tests should cover the success case, where the fake returns data and the code processes it correctly, and the failure case, where the fake throws or returns an error and the code handles it gracefully. They should also cover the empty case, where the fake returns no data, and the malformed case, where the fake returns data in an unexpected shape, if the code is supposed to handle those. A fake can also record how it was called, acting as a mock, so that a test can check that the code requested the right resource, or that it did not make a request when it should have used a cache. That recording check is valuable for caching logic, because a cache bug often shows up as an unnecessary request, not as a wrong result. Networking fakes should be simple and deterministic: they return the same data every time, they never sleep, and they never reach the real network. That determinism is what makes the tests fast and trustworthy. When you design networking code, define its protocol early, write the fake alongside it, and test the code that uses it before the real implementation is even finished. That order, fake first, is a practical form of test-driven development for networked programs.</p>
+<pre><code>import XCTest
+
+protocol Fetching {
+    func fetch(for key: String) async throws -&gt; String
+}
+
+struct FakeFetcher: Fetching {
+    var data: [String: String] = [:]
+    var requestedKeys: [String] = []
+
+    func fetch(for key: String) async throws -&gt; String {
+        return data[key] ?? &quot;&quot;
+    }
+}
+
+final class FetcherTests: XCTestCase {
+    func testFakeFetcherReturnsStoredData() async throws {
+        var fake = FakeFetcher()
+        fake.data = [&quot;news&quot;: &quot;Headlines&quot;]
+        let result = try await fake.fetch(for: &quot;news&quot;)
+        XCTAssertEqual(result, &quot;Headlines&quot;)
+    }
+}</code></pre>
+<p>The fake fetcher above returns stored data for a key, or an empty string when the key is missing, which is enough to test code that uses it. A more complete fake would record each requested key, allowing a test to check which keys were requested, but the basic shape is the same: a simple, predictable stand-in for a real service. The test checks that the fake itself behaves as expected, which is a sensible first step before using the fake to test other code. In a real project, the fake would grow a few features, such as the ability to throw on demand, so that failure paths can be tested too. Keep the fake&#x27;s features minimal and explicit, adding each one only when a test needs it. That restraint keeps the fake trustworthy, which is essential, because a test is only as good as the doubles it relies on. Networking fakes are one of the highest-value testing techniques, because they turn the most unpredictable part of a program into a predictable one.</p>
+<p class="check"><strong>Check:</strong> Why should networking tests use a fake instead of calling a real service?</p>
+<h2>Section 42: Testing Persistence and Round Trips</h2>
+<p>Persistence, meaning saving data so that it survives after a program ends, is tested with round trips: save a known value, load it back, and check that the loaded value equals the original. That round-trip check is the core persistence test, and it should be performed for every type of data the program saves, including tasks, notes, settings, and any other stored state. Round-trip tests should use temporary storage, as with file tests, so that they do not touch real user data, and they should cover edge cases, such as empty collections, values with special characters, and the largest values the program is expected to handle. They should also check what happens when the stored data is missing, corrupted, or in an old format, because those are the situations that occur in real use, when a user upgrades, deletes a file, or experiences a crash during saving. A persistence layer that crashes on corrupted data is worse than one that reports an error or starts fresh, and tests should pin down which behaviour is intended. Another useful persistence test checks that saving twice, or saving after a change, produces the latest state, not a mixture of old and new. That test catches bugs where a save appends instead of replacing, or where a cache and a file disagree. Persistence tests are integration tests in miniature, because they check a type plus its storage working together, and they are worth writing early, because data loss is one of the most serious failures a program can have. A program that loses user data loses user trust, and trust is hard to regain.</p>
+<pre><code>import XCTest
+import Foundation
+
+struct SavedNote: Codable, Equatable {
+    let title: String
+    let body: String
+}
+
+final class PersistenceTests: XCTestCase {
+    func testSavingAndLoadingANotePreservesIt() throws {
+        let note = SavedNote(title: &quot;Ideas&quot;, body: &quot;Build a treehouse&quot;)
+        let data = try JSONEncoder().encode(note)
+        let loaded = try JSONDecoder().decode(SavedNote.self, from: data)
+        XCTAssertEqual(loaded, note)
+    }
+
+    func testLoadingEmptyDataFailsGracefully() {
+        let data = Data()
+        XCTAssertThrowsError(try JSONDecoder().decode(SavedNote.self, from: data))
+    }
+}</code></pre>
+<p>The persistence tests check a round trip for a note and the graceful failure of loading empty data. The round trip uses JSON encoding, which is a common persistence format, but the pattern is the same for any format: save, load, compare. The empty-data test checks that corrupted or missing data produces an error rather than a crash or a silently wrong value, which is the behaviour a careful program should have. You can extend these tests with a temporary file, so that the round trip goes through the real file system, and with special-character content, to check that escaping works. Those extensions turn a simple encoding test into a genuine persistence test, covering the path data actually takes in the program. Write persistence tests before users trust your program with their data, not after, because the cost of a persistence bug is measured in lost work, not just in failed tests.</p>
+<p>A persistence test should also verify that loading data saved by an older version of the program either works or fails with a clear error, rather than crashing. Version changes are inevitable, and a program that handles old data gracefully is far kinder to its users than one that breaks on upgrade.</p>
+<p class="check"><strong>Check:</strong> What does a round-trip test check, and why is it the core persistence test?</p>
+<h2>Section 43: Testing with Multiple Assertions</h2>
+<p>A test can contain several assertions, and knowing when to use several versus one is a matter of judgement. Several assertions are appropriate when they all check different aspects of a single behaviour, such as checking that a created object has the right name, the right count, and the right status. In that case, one test with three assertions is clearer than three tests that repeat the same setup, because the setup is shared and the behaviour is one thing. However, several assertions have a drawback: XCTest stops at the first failing assertion in a test, or reports all failures depending on configuration, and a test that fails early may hide later failures. That hiding is not a serious problem if you fix failures one at a time, but it means a multi-assertion test can take several runs to reveal all its problems. A stricter guideline says one assertion per test, or one logical assertion per test, meaning several assertions that together check one behaviour count as one logical check. That guideline produces many small tests, each with a precise failure message, but it also produces repetition, because each test repeats its setup. The balance most experienced testers strike is to group assertions that check one behaviour in one test, and to split assertions that check different behaviours into different tests, even if that means some repeated setup. Shared setup through setUp reduces the cost of that repetition. When you are unsure, prefer splitting, because a failing test that points at one behaviour is easier to fix than a failing test that points at several. Clarity of failure is worth a little repetition.</p>
+<pre><code>import XCTest
+
+struct Profile {
+    let name: String
+    let age: Int
+    var isAdult: Bool {
+        return age &gt;= 18
+    }
+}
+
+final class ProfileTests: XCTestCase {
+    func testAdultProfileHasExpectedProperties() {
+        let profile = Profile(name: &quot;Ada&quot;, age: 30)
+        XCTAssertEqual(profile.name, &quot;Ada&quot;)
+        XCTAssertEqual(profile.age, 30)
+        XCTAssertTrue(profile.isAdult)
+    }
+}</code></pre>
+<p>The profile test uses three assertions to check one behaviour: that an adult profile is created correctly with the right name, age, and adult status. Those three checks belong together, because they describe a single object in a single state, and splitting them into three tests would repeat the setup three times for little benefit. If the name were wrong, the first assertion would fail and point at the name, which is precise enough. Contrast this with a test that checks a profile, a basket, and a greeting all at once: that test would mix behaviours, and a failure would not say which behaviour broke. The distinction is between aspects of one behaviour and separate behaviours, and learning to feel that distinction is part of writing good tests. Group aspects, split behaviours, and let failure messages guide you: if a failing test does not tell you what broke, it is probably checking too much.</p>
+<p>Multiple assertions are also acceptable when they check the same object after a single action that changes several of its properties at once. In that case, splitting would repeat the action, which is wasteful, and the assertions together describe one resulting state, which is a single logical check.</p>
+<p class="check"><strong>Check:</strong> When is it reasonable for a test to contain several assertions, and when should it be split?</p>
+<h2>Section 44: Avoiding Tests That Mirror Implementation</h2>
+<p>A test that mirrors the implementation, meaning it repeats the code&#x27;s logic step by step, is a weak test, because it will share the code&#x27;s bugs and pass even when the code is wrong. For example, if a function computes a total by adding two numbers, a test that computes the expected total by adding the same two numbers in the same way is not an independent check; it is the same logic written twice. If the logic is wrong, both copies are wrong together, and the test passes while the program fails. The remedy is to work out expected results independently, by hand, from the requirement, or from a known example, rather than by re-running the logic. For a total, that means writing the expected number as a literal, not as an expression that recomputes it. For a transformation, it means writing the expected output as a literal, not by calling the transformation again. Mirroring is tempting because it feels thorough, and it is easy to write, but it defeats the purpose of testing, which is independent verification. A related form of mirroring is testing private implementation details, such as internal helper methods or internal state, rather than public behaviour. Those tests break whenever the implementation is refactored, even when the behaviour stays the same, which makes refactoring painful and discourages improvement. Test public behaviour, with independently worked-out expectations, and your tests will be both strong and resilient. They will catch real bugs, and they will survive the refactoring that good development requires.</p>
+<pre><code>import XCTest
+
+func totalPrice(unitPrice: Int, quantity: Int) -&gt; Int {
+    return unitPrice * quantity
+}
+
+final class PriceTests: XCTestCase {
+    func testTotalPriceForThreeAtFourIsTwelve() {
+        XCTAssertEqual(totalPrice(unitPrice: 4, quantity: 3), 12)
+    }
+}</code></pre>
+<p>The price test checks the total against the literal twelve, worked out by hand, rather than by recomputing four times three in the test. That literal is an independent expectation, and if the function mistakenly added instead of multiplying, the test would fail, because four plus three is seven, not twelve. A mirroring test that wrote the expectation as four times three would pass even if the function were wrong in a subtle way, because it would share the function&#x27;s logic. The difference is small in this example, but it grows with complexity: for a function with several steps, a mirroring test can share several bugs at once, while a literal expectation catches them all. When you write tests, pause before writing the expected value and ask whether you worked it out independently or merely copied the code&#x27;s reasoning. Independent expectations are the heart of testing, and they are worth the extra thought.</p>
+<p>Mirroring can also creep in through test helpers that share code with production code. If a helper and the production code both implement the same rule, a bug in the rule appears in both places and the test passes wrongly. Keep test helpers independent, or keep them trivially simple.</p>
+<p class="check"><strong>Check:</strong> Why does a test that recomputes the expected result using the same logic as the code fail to catch bugs?</p>
+<h2>Section 45: Test Maintenance and Refactoring Tests</h2>
+<p>Tests need maintenance just as production code does, because as a program changes, its tests must change with it, or they become outdated and misleading. Refactoring tests means improving their structure without changing what they check, just as refactoring production code improves structure without changing behaviour. Common test refactorings include extracting repeated setup into setUp or helper methods, renaming tests to match changed behaviour, splitting a large test into smaller ones, and removing duplication between tests. These refactorings keep the suite readable and fast, which encourages developers to keep running it. A test suite that is never refactored becomes harder to understand, slower to run, and more brittle, because old helpers linger, names drift from behaviour, and duplication spreads. The best time to refactor tests is in the same change that changes the behaviour they cover, so that the tests and the code evolve together and never drift apart. A change that updates production code but leaves its tests describing the old behaviour is an incomplete change, and it should not be considered finished until the tests match. Refactoring tests is not glamorous work, but it is what keeps a suite useful over months and years, rather than useful only in the week it was written. Treat test code with the same care as production code: give it clear names, remove duplication, and keep it simple. A well-maintained suite is a pleasure to work with, and a neglected suite is a burden that eventually gets abandoned, taking its safety net with it.</p>
+<pre><code>import XCTest
+
+func isPositive(_ number: Int) -&gt; Bool {
+    return number &gt; 0
+}
+
+final class PositiveTests: XCTestCase {
+    func testPositiveNumberIsPositive() {
+        XCTAssertTrue(isPositive(5))
+    }
+
+    func testZeroIsNotPositive() {
+        XCTAssertFalse(isPositive(0))
+    }
+
+    func testNegativeNumberIsNotPositive() {
+        XCTAssertFalse(isPositive(-5))
+    }
+}</code></pre>
+<p>The positive tests are small, clear, and focused, which makes them easy to maintain. If the definition of positive changed, only these tests would need updating, and their names would make the change obvious. If a new boundary case appeared, a new test could be added in the same style without disturbing the others. That maintainability is the result of keeping tests simple and behaviour-focused, rather than clever or tightly coupled to implementation. When you refactor tests, aim for that simplicity: short tests, clear names, one behaviour each, and shared setup only where it genuinely helps. A suite built that way can grow for years without becoming a burden, because each test is easy to understand, easy to change, and easy to trust. Maintenance is not a separate phase; it is part of every change, done in small steps, continuously.</p>
+<p>Test refactoring also includes updating test data when the program&#x27;s sample data changes. Stale sample data makes tests confusing, because a reader cannot tell whether the data is old or deliberately odd. Fresh, realistic sample data keeps tests readable and trustworthy.</p>
+<p>A practical tip is to rename a test as soon as its behaviour changes, rather than leaving an old name that describes something the test no longer checks. Stale names mislead future readers more than stale code, because names are trusted at a glance.</p>
+<p class="check"><strong>Check:</strong> Why should tests be refactored in the same change that changes the behaviour they cover?</p>
+<h2>Section 46: Testing Swift Packages</h2>
+<p>Swift packages are reusable bundles of code, and testing them follows the same principles as testing an app, with a few packaging details. A package&#x27;s tests live in a tests folder, organised by target, and they can import the package&#x27;s modules to check their public behaviour. The important distinction is between public and internal behaviour: package tests should primarily check the public interface, meaning the functions and types that users of the package will actually use, because that interface is the package&#x27;s promise. Testing internal helpers is sometimes useful, but the public tests are the ones that guard the package&#x27;s contract, and they are the ones that must keep passing when the package is updated. A package test suite should also be runnable on its own, without the rest of an app, so that package authors and users can verify the package in isolation. That isolation is one of the benefits of packaging: a well-tested package can be trusted as a building block, without needing to test the whole app that uses it. When you publish a package, its tests are part of its quality signal: a package with clear, passing tests is more trustworthy than one with no tests, because users can see that its behaviour is verified. Package testing therefore matters beyond your own development; it is a statement to future users that the code does what it claims. The mechanics of setting up package tests vary by tooling, but the principles, clear names, independent expectations, and behaviour-focused checks, are exactly the ones you have learned in this chapter, applied to a reusable unit of code.</p>
+<pre><code>import XCTest
+
+func shout(_ text: String) -&gt; String {
+    return text.uppercased() + &quot;!&quot;
+}
+
+final class ShoutTests: XCTestCase {
+    func testShoutingHelloGivesHelloWithExclamation() {
+        XCTAssertEqual(shout(&quot;hello&quot;), &quot;HELLO!&quot;)
+    }
+
+    func testShoutingEmptyTextGivesExclamation() {
+        XCTAssertEqual(shout(&quot;&quot;), &quot;!&quot;)
+    }
+}</code></pre>
+<p>The shout tests could belong to a tiny package that provides a shouting function, and they check its public behaviour with exact expectations, including the empty case. A user of that package could run these tests and gain confidence that the function behaves as documented, without reading its implementation. That confidence is the product of package testing: it turns a claim about a package into a verified fact. When you build a package, write its tests as if strangers will read them, because they will, and they will judge the package partly by them. Clear tests, covering normal and edge cases, are a form of documentation and a form of quality assurance at once. They cost little to write for a small package, and they pay off every time the package is reused.</p>
+<p>Package tests should also run on every platform the package claims to support, because a package that passes on one platform may fail on another due to file paths, line endings, or locale differences. Platform coverage is part of a package&#x27;s promise, and its tests should verify it.</p>
+<p>Finally, a package&#x27;s tests should be easy for a stranger to run with a single command, without special setup. If running the tests requires hidden steps, document those steps plainly, or the tests will not be run by the very people they are meant to reassure.</p>
+<p class="check"><strong>Check:</strong> Why should package tests focus on the public interface rather than internal helpers?</p>
+<h2>Section 47: Common Testing Mistakes</h2>
+<p>Several testing mistakes appear again and again, and recognising them will help you avoid them. The first is testing too little, such as writing one test for a function with many behaviours, which leaves most behaviours unverified. The second is testing the wrong thing, such as checking that code runs without crashing, rather than checking that it produces the right result. A test that only checks for no crash is weak, because wrong results do not crash. The third is writing tests that depend on each other, so that a failure in one test causes failures in others, making the real fault hard to find. Independent tests, each with fresh setup, avoid that cascade. The fourth is writing tests that are too clever, with complex logic of their own, because a clever test can contain bugs just as production code can, and a buggy test is worse than no test, because it misleads. Keep tests simple, almost boring, with straightforward setup, one action, and clear assertions. The fifth is ignoring failing tests, by skipping them or by assuming they are flaky, which erodes the suite&#x27;s authority. A failing test should be investigated promptly, and either the code or the test should be fixed, so that the suite returns to fully passing. A suite that is allowed to have known failures teaches developers to ignore failures, and ignored failures hide real bugs. Avoiding these five mistakes, testing enough, testing results, keeping tests independent, keeping them simple, and never ignoring failures, will put your suite ahead of most, because most suites fail in one of these ways.</p>
+<pre><code>import XCTest
+
+func double(_ number: Int) -&gt; Int {
+    return number * 2
+}
+
+final class DoubleTests: XCTestCase {
+    func testDoublingGivesCorrectResult() {
+        XCTAssertEqual(double(3), 6)
+        XCTAssertEqual(double(0), 0)
+    }
+}</code></pre>
+<p>The doubling test above is simple and checks results, not just that the code runs, which is the right instinct. It could be improved by splitting it into two tests, one per case, so that a failure points at a specific case, but as a starting point it avoids the worst mistakes: it checks real results, it is independent, and it is simple. Compare it with a test that merely called double and asserted true, which would pass no matter what the function returned. That weak test is an example of testing the wrong thing, and it is surprisingly common, because it is easy to write a test that runs code without checking it. Always ask, after writing a test, whether it would fail if the code were wrong. If the answer is no, the test is decorative, and it should be strengthened until it would fail. That question, would this test catch a bug, is the single most useful check on any test you write.</p>
+<p>A sixth common mistake is writing tests that are too slow to run often, which leads developers to skip them. Speed is a design constraint for tests, not a luxury, because a suite that is not run provides no protection at all, no matter how thorough its tests are on paper.</p>
+<p class="check"><strong>Check:</strong> Name three common testing mistakes, and explain why each one weakens a test suite.</p>
+<h2>Section 48: Building a Testing Habit</h2>
+<p>A testing habit is built the same way as any habit: by starting small, repeating often, and attaching the new behaviour to an existing routine. Start by writing tests for the next small function you create, not by trying to test a whole existing program at once, which is overwhelming and likely to be abandoned. Attach testing to your coding routine: write the function, write a test for it, run the test, and only then move on to the next function. That small loop, repeated many times, becomes automatic, and soon you will feel uncomfortable writing code without a test, in the same way you would feel uncomfortable writing code without saving it. Another habit-building trick is to write a test whenever you fix a bug, as discussed earlier, because bug fixes are frequent, concrete, and naturally produce tests that guard real behaviour. Over weeks, those bug-fix tests accumulate into a meaningful suite, even if you never set out to test everything at once. It also helps to keep the test suite fast and the test running easy, because a habit that is painful to perform will not survive. If running tests takes many steps, simplify the steps until running them is one action. Finally, review your tests occasionally, as you would review your code, and prune or improve them as needed. A habit is not a one-time effort; it is a practice maintained over time. Testing habits compound: each test you write makes the next change safer, which makes you more willing to improve code, which produces better code that is easier to test. That virtuous cycle is why experienced developers test habitually, not because they enjoy writing tests for their own sake, but because testing makes all their other work easier and calmer.</p>
+<pre><code>import XCTest
+
+func add(_ a: Int, _ b: Int) -&gt; Int {
+    return a + b
+}
+
+final class AdditionTests: XCTestCase {
+    func testAddingTwoAndThreeGivesFive() {
+        XCTAssertEqual(add(2, 3), 5)
+    }
+}</code></pre>
+<p>The addition test is the smallest possible habit-building step: one function, one test, one assertion. Starting with tests this small removes the intimidation of testing, because there is nothing complex to get wrong. From there, the habit grows naturally: a second test for another case, a test for another function, a test class for another type. Each step is small, but the accumulation is large. Do not wait until you feel ready to test everything; start with one test today, for the next function you write, and let the habit build from there. In a month, you will have a suite, and more importantly, you will have a way of working that includes verification as a natural step, not as an extra chore. That way of working is the real goal of this chapter, more than any single technique it contains.</p>
+<p>Building a habit also benefits from sharing it: when a team agrees to write tests for new features, the social expectation reinforces the individual habit. Even for a solo developer, telling a peer or writing the habit into a checklist creates accountability that helps it stick.</p>
+<p class="check"><strong>Check:</strong> What small, repeatable routine can help a beginner build a lasting testing habit?</p>
+<h2>Section 49: Testing Checklist for a New Feature</h2>
+<p>When you finish a new feature, a short testing checklist helps you confirm that it is properly verified before you consider it done. First, does every new public behaviour have at least one test, with a clear name? Second, are the edge cases tested, including empty inputs, boundary values, and the largest inputs expected? Third, are the failure paths tested, including invalid inputs and missing data, with specific errors checked where they matter? Fourth, are the tests independent, with fresh setup, so that they pass in any order and on any machine? Fifth, are the tests fast, without real network calls or long waits, so that they will actually be run? Sixth, do the tests check results, not just that code runs, with independently worked-out expectations? Seventh, if the feature involves concurrency, is there a concurrent test that checks a final-state property with many tasks? Eighth, if the feature persists data, is there a round-trip test? Ninth, have you run the full suite, not just the new tests, to check for regressions? Tenth, have you removed or updated any old tests that the feature made obsolete? Working through that checklist takes only a few minutes, but it catches the most common gaps, and it turns testing from a vague intention into a concrete review. Keep the checklist somewhere visible while you work, and use it for every feature, until its questions become automatic. A checklist is a humble tool, but it is one of the most effective ways to prevent omissions, because it externalises memory: you do not have to remember every testing concern, you just have to work through the list. Pilots, surgeons, and engineers use checklists for the same reason, and programmers can benefit from them too.</p>
+<pre><code>import XCTest
+
+func isValidUsername(_ name: String) -&gt; Bool {
+    return !name.isEmpty &amp;&amp; name.count &lt;= 20
+}
+
+final class UsernameTests: XCTestCase {
+    func testEmptyUsernameIsInvalid() {
+        XCTAssertFalse(isValidUsername(&quot;&quot;))
+    }
+
+    func testTwentyCharacterUsernameIsValid() {
+        XCTAssertTrue(isValidUsername(&quot;abcdefghijklmnopqrst&quot;))
+    }
+
+    func testTwentyOneCharacterUsernameIsInvalid() {
+        XCTAssertFalse(isValidUsername(&quot;abcdefghijklmnopqrstu&quot;))
+    }
+}</code></pre>
+<p>The username tests illustrate the checklist in action: they cover the empty case, the boundary at twenty characters, and just beyond the boundary at twenty-one, which are the edge cases for a length rule. They check results, not just execution, and they are independent and fast. A feature that passed this checklist would be considered well tested for its validation logic, though a complete feature might also need tests for its other behaviours. Use the checklist as a review tool, not as a bureaucratic hurdle: its purpose is to catch gaps while they are cheap to fill, not to slow you down. Over time, you will internalise its questions, and you will find yourself writing tests that already satisfy them, without needing to consult the list. That internalisation is the sign that the checklist has done its job.</p>
+<p>The checklist should also include a question about whether the feature&#x27;s tests would fail if the feature were broken. That meta-question, applied to each test, catches decorative tests before they enter the suite, and it is the single most valuable review a test can receive.</p>
+<p class="check"><strong>Check:</strong> Which three checklist items are most often missed by beginners, and why do they matter?</p>
+<h2>Section 50: Testing Well, and What Comes Next</h2>
+<p>Testing well is less about mastering every technique in this chapter and more about adopting a consistent attitude: write down what your code should do, check it automatically, and keep those checks running as the code changes. The techniques you have learned, assertions, Arrange Act Assert, test doubles, async and actor tests, boundary and edge case testing, and the habits of fixing bugs with tests first, are tools that serve that attitude. You do not need to use every technique in every program; you need to choose the ones that fit the code in front of you, and to apply them consistently. A small program with a handful of thoughtful tests is better tested than a large program with hundreds of weak ones, because thoughtful tests check real behaviour and catch real bugs. As you continue through this book, carry testing with you into every chapter: when you learn a new feature, ask how you would test it, and write a test for the code you build with it. That question will deepen your understanding of the feature itself, because testing forces you to state its behaviour precisely. The next chapter turns to debugging, logging, and diagnostics, which are the companions of testing: tests catch bugs early, and debugging tools help you understand the bugs that tests reveal. Together they form a complete approach to reliable programs: prevent what you can with tests, diagnose what remains with debugging, and keep both practices as part of your daily work. Testing is not a destination you reach and then leave behind; it is a way of working that improves every program you write from now on, and the sooner it becomes habitual, the more it will repay you.</p>
+<pre><code>import XCTest
+
+func greet(_ name: String) -&gt; String {
+    return &quot;Hello, \(name)!&quot;
+}
+
+final class GreetTests: XCTestCase {
+    func testGreetingIncludesTheName() {
+        XCTAssertEqual(greet(&quot;Ada&quot;), &quot;Hello, Ada!&quot;)
+    }
+}</code></pre>
+<p>The greeting test is a fitting final example, because it is simple, clear, and complete: one behaviour, one expectation, one test. It embodies the attitude this chapter has tried to teach, that verification should be written down, automated, and kept. As you move on to debugging, remember that a failing test is the starting point for diagnosis, not the end of the story. Tests tell you that something is wrong and where to look; debugging tells you why it is wrong and how to fix it. Those two skills, used together, are the foundation of reliable programming. Practise them on every program you write, starting with the next one, and let them become as natural as writing the code itself. That is the real lesson of testing: not a set of tools, but a habit of checking your work, honestly and automatically, every time.</p>
+<p>One final thought: testing is also a form of respect for the people who will use and maintain your program. It says that you cared enough to verify your work, and that you left behind a way for others to verify it too. That respect, expressed in code, is what makes a program trustworthy.</p>
+<p class="check"><strong>Check:</strong> What single attitude towards testing matters more than mastering every technique?</p>
+<h2>Practical Task</h2>
+<p>Pick a small piece of Swift code you have written, such as a function, a struct, or a SwiftDay task list, and write a test suite for it with at least ten tests. Include a normal case, an empty case, a boundary case, a failure case with a specific error where relevant, and a test that checks an exact result rather than just a count. Run the tests, fix any failures by changing the code or correcting a wrong expectation after checking the requirement, and write a short note explaining which test caught the most interesting problem and why.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What is the Arrange, Act, Assert pattern, and why does it make tests easier to read and to debug when they fail?</li>
+<li>Explain test doubles: what is a stub, a fake, and a mock, and when would you use each one?</li>
+<li>Why are flaky tests harmful to a test suite, and what are three ways to make a test deterministic?</li>
+<li>Describe test-driven development: what happens in the red, green, and refactor steps, and why is the red step important?</li>
+<li>How would you test an actor that is used by many tasks at once, and why is checking a final-state property better than checking timing or order?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-31.html">← Chapter 31</a> <a href="index.html">All chapters</a> <a href="chapter-33.html">Chapter 33 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/swift-developer/chapter-32.html'; this.page.identifier = 'book-swift-developer-chapter-32'; this.page.title = 'Chapter 32: Testing in Swift in Plain Words'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 37 — Migrations and Changing Schemas Safely — Back-End Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 37 of the Back-End Developer teaching book: Migrations and Changing Schemas Safely.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Back-End Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 37: Migrations and Changing Schemas Safely</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-37.svg" alt="Design for Chapter 37" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What a Migration Really Is</h2>
+<p>Learning what a migration really is is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like what a migration really is because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, what a migration really is usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of what a migration really is using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with what a migration really is is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with what a migration really is, and how would you avoid it?</p>
+<h2>Section 2: Why Changing a Live Table Is Risky</h2>
+<p>This section is about why changing a live table is risky. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain why changing a live table is risky to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason why changing a live table is risky matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands why changing a live table is risky can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through why changing a live table is risky is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where why changing a live table is risky changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows why changing a live table is risky in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with why changing a live table is risky, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and why changing a live table is risky will feel far less mysterious.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of why changing a live table is risky failed, and how would you notice?</p>
+<h2>Section 3: Adding a Column Safely</h2>
+<p>In this section you will meet adding a column safely, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does adding a column safely solve, and what would go wrong without it?</p>
+<p>Think of adding a column safely as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply adding a column safely, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of adding a column safely using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with adding a column safely is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> Why does adding a column safely matter for a back-end system that real people depend on?</p>
+<h2>Section 4: Removing a Column in Two Steps</h2>
+<p>Learning removing a column in two steps is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like removing a column in two steps because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, removing a column in two steps usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows removing a column in two steps in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with removing a column in two steps is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of removing a column in two steps you could build yourself, and what would you add next?</p>
+<h2>Section 5: Renaming a Column Without Breaking Clients</h2>
+<p>This section is about renaming a column without breaking clients. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain renaming a column without breaking clients to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason renaming a column without breaking clients matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands renaming a column without breaking clients can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through renaming a column without breaking clients is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where renaming a column without breaking clients changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of renaming a column without breaking clients using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with renaming a column without breaking clients, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and renaming a column without breaking clients will feel far less mysterious. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is renaming a column without breaking clients, and when would you use it?</p>
+<h2>Section 6: Changing a Column Type Carefully</h2>
+<p>In this section you will meet changing a column type carefully, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does changing a column type carefully solve, and what would go wrong without it?</p>
+<p>Think of changing a column type carefully as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply changing a column type carefully, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows changing a column type carefully in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with changing a column type carefully is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain changing a column type carefully to a friend who has never built a back end before?</p>
+<h2>Section 7: Adding an Index Without Locking Everyone Out</h2>
+<p>Learning adding an index without locking everyone out is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like adding an index without locking everyone out because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, adding an index without locking everyone out usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of adding an index without locking everyone out using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with adding an index without locking everyone out is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with adding an index without locking everyone out, and how would you avoid it?</p>
+<h2>Section 8: Backfilling Data in Small Batches</h2>
+<p>This section is about backfilling data in small batches. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain backfilling data in small batches to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason backfilling data in small batches matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands backfilling data in small batches can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through backfilling data in small batches is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where backfilling data in small batches changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows backfilling data in small batches in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with backfilling data in small batches, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and backfilling data in small batches will feel far less mysterious. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of backfilling data in small batches failed, and how would you notice?</p>
+<h2>Section 9: Default Values and Existing Rows</h2>
+<p>In this section you will meet default values and existing rows, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does default values and existing rows solve, and what would go wrong without it?</p>
+<p>Think of default values and existing rows as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply default values and existing rows, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of default values and existing rows using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with default values and existing rows is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does default values and existing rows matter for a back-end system that real people depend on?</p>
+<h2>Section 10: Making a Column Required Step by Step</h2>
+<p>Learning making a column required step by step is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like making a column required step by step because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, making a column required step by step usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows making a column required step by step in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with making a column required step by step is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of making a column required step by step you could build yourself, and what would you add next?</p>
+<h2>Section 11: Splitting One Table into Two</h2>
+<p>This section is about splitting one table into two. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain splitting one table into two to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason splitting one table into two matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands splitting one table into two can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through splitting one table into two is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where splitting one table into two changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of splitting one table into two using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with splitting one table into two, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and splitting one table into two will feel far less mysterious. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is splitting one table into two, and when would you use it?</p>
+<h2>Section 12: Merging Two Tables into One</h2>
+<p>In this section you will meet merging two tables into one, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does merging two tables into one solve, and what would go wrong without it?</p>
+<p>Think of merging two tables into one as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply merging two tables into one, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows merging two tables into one in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with merging two tables into one is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain merging two tables into one to a friend who has never built a back end before?</p>
+<h2>Section 13: Foreign Keys and Migration Order</h2>
+<p>Learning foreign keys and migration order is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like foreign keys and migration order because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, foreign keys and migration order usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of foreign keys and migration order using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with foreign keys and migration order is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with foreign keys and migration order, and how would you avoid it?</p>
+<h2>Section 14: Reversible Migrations and Rollback Plans</h2>
+<p>This section is about reversible migrations and rollback plans. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain reversible migrations and rollback plans to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason reversible migrations and rollback plans matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands reversible migrations and rollback plans can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through reversible migrations and rollback plans is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where reversible migrations and rollback plans changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows reversible migrations and rollback plans in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with reversible migrations and rollback plans, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and reversible migrations and rollback plans will feel far less mysterious. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of reversible migrations and rollback plans failed, and how would you notice?</p>
+<h2>Section 15: Testing a Migration on a Copy First</h2>
+<p>In this section you will meet testing a migration on a copy first, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does testing a migration on a copy first solve, and what would go wrong without it?</p>
+<p>Think of testing a migration on a copy first as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply testing a migration on a copy first, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of testing a migration on a copy first using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with testing a migration on a copy first is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> Why does testing a migration on a copy first matter for a back-end system that real people depend on?</p>
+<h2>Section 16: Migration Files and Version Numbers</h2>
+<p>Learning migration files and version numbers is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like migration files and version numbers because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, migration files and version numbers usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows migration files and version numbers in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with migration files and version numbers is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of migration files and version numbers you could build yourself, and what would you add next?</p>
+<h2>Section 17: Applying Migrations in Order</h2>
+<p>This section is about applying migrations in order. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain applying migrations in order to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason applying migrations in order matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands applying migrations in order can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through applying migrations in order is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where applying migrations in order changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of applying migrations in order using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with applying migrations in order, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and applying migrations in order will feel far less mysterious. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is applying migrations in order, and when would you use it?</p>
+<h2>Section 18: One Migration at a Time</h2>
+<p>In this section you will meet one migration at a time, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does one migration at a time solve, and what would go wrong without it?</p>
+<p>Think of one migration at a time as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply one migration at a time, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows one migration at a time in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with one migration at a time is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain one migration at a time to a friend who has never built a back end before?</p>
+<h2>Section 19: Migrations in Team Work</h2>
+<p>Learning migrations in team work is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like migrations in team work because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, migrations in team work usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of migrations in team work using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with migrations in team work is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with migrations in team work, and how would you avoid it?</p>
+<h2>Section 20: Resolving Conflicting Migrations</h2>
+<p>This section is about resolving conflicting migrations. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain resolving conflicting migrations to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason resolving conflicting migrations matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands resolving conflicting migrations can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through resolving conflicting migrations is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where resolving conflicting migrations changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows resolving conflicting migrations in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with resolving conflicting migrations, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and resolving conflicting migrations will feel far less mysterious. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of resolving conflicting migrations failed, and how would you notice?</p>
+<h2>Section 21: Data Migrations Versus Schema Migrations</h2>
+<p>In this section you will meet data migrations versus schema migrations, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does data migrations versus schema migrations solve, and what would go wrong without it?</p>
+<p>Think of data migrations versus schema migrations as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply data migrations versus schema migrations, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of data migrations versus schema migrations using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with data migrations versus schema migrations is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> Why does data migrations versus schema migrations matter for a back-end system that real people depend on?</p>
+<h2>Section 22: Keeping Migrations Small and Reviewable</h2>
+<p>Learning keeping migrations small and reviewable is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like keeping migrations small and reviewable because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, keeping migrations small and reviewable usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows keeping migrations small and reviewable in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with keeping migrations small and reviewable is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of keeping migrations small and reviewable you could build yourself, and what would you add next?</p>
+<h2>Section 23: Describing Migrations in Plain Words</h2>
+<p>This section is about describing migrations in plain words. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain describing migrations in plain words to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason describing migrations in plain words matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands describing migrations in plain words can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through describing migrations in plain words is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where describing migrations in plain words changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of describing migrations in plain words using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with describing migrations in plain words, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and describing migrations in plain words will feel far less mysterious. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is describing migrations in plain words, and when would you use it?</p>
+<h2>Section 24: Rolling Back a Bad Migration</h2>
+<p>In this section you will meet rolling back a bad migration, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does rolling back a bad migration solve, and what would go wrong without it?</p>
+<p>Think of rolling back a bad migration as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply rolling back a bad migration, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows rolling back a bad migration in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with rolling back a bad migration is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain rolling back a bad migration to a friend who has never built a back end before?</p>
+<h2>Section 25: When Rollback Is Not Possible</h2>
+<p>Learning when rollback is not possible is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like when rollback is not possible because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, when rollback is not possible usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of when rollback is not possible using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with when rollback is not possible is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with when rollback is not possible, and how would you avoid it?</p>
+<h2>Section 26: Expanding Before Contracting</h2>
+<p>This section is about expanding before contracting. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain expanding before contracting to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason expanding before contracting matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands expanding before contracting can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through expanding before contracting is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where expanding before contracting changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows expanding before contracting in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with expanding before contracting, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and expanding before contracting will feel far less mysterious. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of expanding before contracting failed, and how would you notice?</p>
+<h2>Section 27: The Expand and Contract Pattern</h2>
+<p>In this section you will meet the expand and contract pattern, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does the expand and contract pattern solve, and what would go wrong without it?</p>
+<p>Think of the expand and contract pattern as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply the expand and contract pattern, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of the expand and contract pattern using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with the expand and contract pattern is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does the expand and contract pattern matter for a back-end system that real people depend on?</p>
+<h2>Section 28: Deploying Code and Migrations Together</h2>
+<p>Learning deploying code and migrations together is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like deploying code and migrations together because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, deploying code and migrations together usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows deploying code and migrations together in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with deploying code and migrations together is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of deploying code and migrations together you could build yourself, and what would you add next?</p>
+<h2>Section 29: Deploying Code and Migrations Separately</h2>
+<p>This section is about deploying code and migrations separately. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain deploying code and migrations separately to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason deploying code and migrations separately matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands deploying code and migrations separately can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through deploying code and migrations separately is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where deploying code and migrations separately changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of deploying code and migrations separately using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with deploying code and migrations separately, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and deploying code and migrations separately will feel far less mysterious. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is deploying code and migrations separately, and when would you use it?</p>
+<h2>Section 30: Feature Flags and Schema Changes</h2>
+<p>In this section you will meet feature flags and schema changes, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does feature flags and schema changes solve, and what would go wrong without it?</p>
+<p>Think of feature flags and schema changes as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply feature flags and schema changes, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows feature flags and schema changes in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with feature flags and schema changes is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain feature flags and schema changes to a friend who has never built a back end before?</p>
+<h2>Section 31: Zero-Downtime Migrations in Plain Words</h2>
+<p>Learning zero-downtime migrations in plain words is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like zero-downtime migrations in plain words because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, zero-downtime migrations in plain words usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of zero-downtime migrations in plain words using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with zero-downtime migrations in plain words is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with zero-downtime migrations in plain words, and how would you avoid it?</p>
+<h2>Section 32: Locking, Waiting and Long Migrations</h2>
+<p>This section is about locking, waiting and long migrations. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain locking, waiting and long migrations to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason locking, waiting and long migrations matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands locking, waiting and long migrations can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through locking, waiting and long migrations is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where locking, waiting and long migrations changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows locking, waiting and long migrations in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with locking, waiting and long migrations, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and locking, waiting and long migrations will feel far less mysterious. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of locking, waiting and long migrations failed, and how would you notice?</p>
+<h2>Section 33: Running Migrations Outside Peak Hours</h2>
+<p>In this section you will meet running migrations outside peak hours, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does running migrations outside peak hours solve, and what would go wrong without it?</p>
+<p>Think of running migrations outside peak hours as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply running migrations outside peak hours, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of running migrations outside peak hours using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with running migrations outside peak hours is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> Why does running migrations outside peak hours matter for a back-end system that real people depend on?</p>
+<h2>Section 34: Monitoring a Migration While It Runs</h2>
+<p>Learning monitoring a migration while it runs is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like monitoring a migration while it runs because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, monitoring a migration while it runs usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows monitoring a migration while it runs in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with monitoring a migration while it runs is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of monitoring a migration while it runs you could build yourself, and what would you add next?</p>
+<h2>Section 35: Stopping a Migration That Goes Wrong</h2>
+<p>This section is about stopping a migration that goes wrong. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain stopping a migration that goes wrong to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason stopping a migration that goes wrong matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands stopping a migration that goes wrong can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through stopping a migration that goes wrong is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where stopping a migration that goes wrong changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of stopping a migration that goes wrong using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with stopping a migration that goes wrong, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and stopping a migration that goes wrong will feel far less mysterious. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is stopping a migration that goes wrong, and when would you use it?</p>
+<h2>Section 36: Seed Data and Migrations</h2>
+<p>In this section you will meet seed data and migrations, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does seed data and migrations solve, and what would go wrong without it?</p>
+<p>Think of seed data and migrations as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply seed data and migrations, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows seed data and migrations in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with seed data and migrations is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. When you try the example, run it more than once, and watch what stays the same and what changes between runs. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain seed data and migrations to a friend who has never built a back end before?</p>
+<h2>Section 37: Handling Empty Tables and Missing Data</h2>
+<p>Learning handling empty tables and missing data is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like handling empty tables and missing data because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, handling empty tables and missing data usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of handling empty tables and missing data using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with handling empty tables and missing data is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with handling empty tables and missing data, and how would you avoid it?</p>
+<h2>Section 38: Unique Constraints on Existing Data</h2>
+<p>This section is about unique constraints on existing data. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain unique constraints on existing data to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason unique constraints on existing data matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands unique constraints on existing data can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through unique constraints on existing data is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where unique constraints on existing data changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows unique constraints on existing data in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with unique constraints on existing data, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and unique constraints on existing data will feel far less mysterious. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of unique constraints on existing data failed, and how would you notice?</p>
+<h2>Section 39: Cleaning Duplicates Before a Constraint</h2>
+<p>In this section you will meet cleaning duplicates before a constraint, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does cleaning duplicates before a constraint solve, and what would go wrong without it?</p>
+<p>Think of cleaning duplicates before a constraint as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply cleaning duplicates before a constraint, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of cleaning duplicates before a constraint using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with cleaning duplicates before a constraint is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> Why does cleaning duplicates before a constraint matter for a back-end system that real people depend on?</p>
+<h2>Section 40: Moving Data Between Columns</h2>
+<p>Learning moving data between columns is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like moving data between columns because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, moving data between columns usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows moving data between columns in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with moving data between columns is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of moving data between columns you could build yourself, and what would you add next?</p>
+<h2>Section 41: Moving Data Between Tables</h2>
+<p>This section is about moving data between tables. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain moving data between tables to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason moving data between tables matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands moving data between tables can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through moving data between tables is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where moving data between tables changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of moving data between tables using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with moving data between tables, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and moving data between tables will feel far less mysterious. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is moving data between tables, and when would you use it?</p>
+<h2>Section 42: Renaming Tables Safely</h2>
+<p>In this section you will meet renaming tables safely, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does renaming tables safely solve, and what would go wrong without it?</p>
+<p>Think of renaming tables safely as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply renaming tables safely, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows renaming tables safely in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with renaming tables safely is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain renaming tables safely to a friend who has never built a back end before?</p>
+<h2>Section 43: Dropping a Table for Good</h2>
+<p>Learning dropping a table for good is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like dropping a table for good because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, dropping a table for good usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of dropping a table for good using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with dropping a table for good is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. Notice how this idea connects to earlier chapters, because back-end skills build on each other instead of standing alone. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with dropping a table for good, and how would you avoid it?</p>
+<h2>Section 44: Migration Checklists Before Production</h2>
+<p>This section is about migration checklists before production. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain migration checklists before production to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason migration checklists before production matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands migration checklists before production can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through migration checklists before production is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where migration checklists before production changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows migration checklists before production in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with migration checklists before production, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and migration checklists before production will feel far less mysterious. When you try the example, run it more than once, and watch what stays the same and what changes between runs.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of migration checklists before production failed, and how would you notice?</p>
+<h2>Section 45: Recording What Changed and Why</h2>
+<p>In this section you will meet recording what changed and why, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does recording what changed and why solve, and what would go wrong without it?</p>
+<p>Think of recording what changed and why as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply recording what changed and why, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>Here is a small, runnable example of recording what changed and why using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>A good check before you finish with recording what changed and why is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Good back-end work is often invisible to users, and that is a compliment: the system simply does what they expected, without drama. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> Why does recording what changed and why matter for a back-end system that real people depend on?</p>
+<h2>Section 46: Automating Migrations in Deployment</h2>
+<p>Learning automating migrations in deployment is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like automating migrations in deployment because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, automating migrations in deployment usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>The short Python example below shows automating migrations in deployment in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>One trap with automating migrations in deployment is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If you were explaining this section to a teammate tomorrow, the example you tried yourself would be the part you remember best. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+MIGRATIONS = [
+    (1, &quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT)&quot;),
+    (2, &quot;ALTER TABLE tasks ADD COLUMN done INTEGER NOT NULL DEFAULT 0&quot;),
+]
+
+
+def apply_migrations(path=&quot;app.db&quot;):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)&quot;)
+    done = {row[0] for row in db.execute(&quot;SELECT version FROM schema_version&quot;)}
+    for version, sql in MIGRATIONS:
+        if version not in done:
+            db.execute(sql)
+            db.execute(&quot;INSERT INTO schema_version (version) VALUES (?)&quot;, (version,))
+            print(&quot;applied migration&quot;, version)
+    db.commit()
+    db.close()
+
+
+apply_migrations(&quot;:memory:&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> What is the simplest version of automating migrations in deployment you could build yourself, and what would you add next?</p>
+<h2>Section 47: Migrations and Multiple Environments</h2>
+<p>This section is about migrations and multiple environments. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain migrations and multiple environments to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason migrations and multiple environments matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands migrations and multiple environments can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through migrations and multiple environments is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where migrations and multiple environments changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>Here is a small, runnable example of migrations and multiple environments using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>Beginners often make a few predictable mistakes with migrations and multiple environments, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and migrations and multiple environments will feel far less mysterious. Take care with names in your code, because a clear name is a small kindness to the next person who reads it, who may be you.</p>
+<pre><code>import sqlite3
+
+
+def columns_of(db, table):
+    return [row[1] for row in db.execute(f&quot;PRAGMA table_info({table})&quot;)]
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)&quot;)
+db.execute(&quot;ALTER TABLE users ADD COLUMN nickname TEXT&quot;)
+print(&quot;columns now:&quot;, columns_of(db, &quot;users&quot;))
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is migrations and multiple environments, and when would you use it?</p>
+<h2>Section 48: Migrations and Multiple Servers</h2>
+<p>In this section you will meet migrations and multiple servers, one small piece of the larger back-end picture. It helps to learn it on its own first, before worrying about how it connects to everything else, because a clear picture of one piece makes the whole system less mysterious. We will start with the plain-words meaning, then look at a realistic situation where it matters, and finish with a short example you can read slowly. Keep asking yourself one question as you read: what problem does migrations and multiple servers solve, and what would go wrong without it?</p>
+<p>Think of migrations and multiple servers as a tool with a specific job, not a solution for every problem. Used in the right place, it makes a system simpler to reason about, easier to test, and safer to change. Used in the wrong place, it adds moving parts that nobody needed. Part of becoming a back-end developer is learning that judgement: knowing not just how something works, but when it earns its place. This section therefore spends as much time on the trade-offs as on the mechanics, so you can make that call with confidence.</p>
+<p>When you apply migrations and multiple servers, begin with the simplest version that could possibly work, and resist the urge to build the most general version first. A simple version teaches you what the real difficulties are, and it gives you something working that you can improve. Add complexity only when a real need appears, such as a user complaint, a failed test, or a measurement that shows a problem. This habit keeps systems understandable, and it means that when something breaks, there are fewer places to look. Simple first, then deliberate, is a good rule for almost all back-end work.</p>
+<p>The short Python example below shows migrations and multiple servers in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>A good check before you finish with migrations and multiple servers is to explain it aloud, in your own words, as if teaching a friend. If you get stuck, that stuck point is exactly where to reread. Also check that your example handles at least one thing going wrong, because real systems always meet bad input, slow networks, and unexpected failures. Finally, make sure you could find your work again later: clear names, short comments where they help, and a note about why you chose this approach are worth more than clever code that nobody can follow. Before you move on, try to summarise the main idea of this section in one sentence, because a short summary shows what you truly understood. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead.</p>
+<pre><code>import sqlite3
+
+
+def backfill_in_batches(path=&quot;:memory:&quot;, batch=2):
+    db = sqlite3.connect(path)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT, display TEXT)&quot;)
+    for i in range(5):
+        db.execute(&quot;INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)&quot;, (i, &quot;user &quot; + str(i)))
+    db.commit()
+    while True:
+        rows = db.execute(&quot;SELECT id, name FROM people WHERE display IS NULL LIMIT ?&quot;, (batch,)).fetchall()
+        if not rows:
+            break
+        for row_id, name in rows:
+            db.execute(&quot;UPDATE people SET display = ? WHERE id = ?&quot;, (name.strip().title(), row_id))
+        db.commit()
+        print(&quot;backfilled batch of&quot;, len(rows))
+    db.close()
+
+
+backfill_in_batches()</code></pre>
+<p class="check"><strong>Check:</strong> How would you explain migrations and multiple servers to a friend who has never built a back end before?</p>
+<h2>Section 49: What to Do When a Migration Fails Live</h2>
+<p>Learning what to do when a migration fails live is worth doing slowly, because it shows up again and again in real back-end work. This section explains it from the beginning, assuming no earlier knowledge beyond what you have already met in this book, and it uses everyday comparisons before it uses technical terms. You will see what the idea looks like in practice, how a developer decides when to use it, and what a sensible first attempt looks like. There is no trick here, only a steady idea that becomes natural once you have used it a few times.</p>
+<p>Many beginners skip ideas like what to do when a migration fails live because they seem advanced, and then meet them suddenly in a real project where there is no time to learn calmly. Learning them now, in a small example, means you will recognise the shape of the problem later and remember the outline of the solution. You do not need to memorise every detail. You need the mental model: what goes in, what comes out, what can go wrong, and how you would check whether it worked. The details can always be looked up again.</p>
+<p>In practice, what to do when a migration fails live usually appears as a small number of deliberate steps rather than one large leap. First, you decide what you want to happen and write it down in plain words. Then you choose the smallest change that moves you toward it, and you try that change in a safe place, such as your own computer or a test environment. Next, you check the result carefully, including the cases where something goes wrong. Finally, you write down what you did, so the next person can follow the same path. That rhythm, plan, small step, check, record, is the same whether the task is tiny or large.</p>
+<p>Here is a small, runnable example of what to do when a migration fails live using only Python&#x27;s standard library, so you can try it without installing anything. Trace through it as if you were the computer, following each step in order, and notice how the plain-words idea from this section appears in the code.</p>
+<p>One trap with what to do when a migration fails live is copying a solution from elsewhere without understanding what each part does. A copied solution feels fast, but it leaves gaps that appear later, usually at the worst moment. Instead, build the smallest version yourself, even if it is rough, and compare it with other approaches once yours works. You will learn far more from one working version you understand than from ten you merely pasted, and you will be able to fix it when it breaks, which is the skill that actually matters. If any sentence in this section felt unclear, reread it slowly and picture the example happening step by step, rather than skipping ahead. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+import hashlib
+
+
+def record_migration(db, version, sql):
+    digest = hashlib.sha256(sql.encode()).hexdigest()[:12]
+    db.execute(&quot;INSERT INTO schema_version (version, digest) VALUES (?, ?)&quot;, (version, digest))
+
+
+db = sqlite3.connect(&quot;:memory:&quot;)
+db.execute(&quot;CREATE TABLE schema_version (version INTEGER PRIMARY KEY, digest TEXT)&quot;)
+record_migration(db, 1, &quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY)&quot;)
+print(&quot;migration recorded with digest&quot;)
+db.close()</code></pre>
+<p class="check"><strong>Check:</strong> What is one mistake beginners often make with what to do when a migration fails live, and how would you avoid it?</p>
+<h2>Section 50: Review: Changing Schemas Without Fear</h2>
+<p>This section is about review: changing schemas without fear. At first the idea may sound technical, but underneath it is a simple everyday pattern, and once you can describe that pattern in plain words, the technical details become much easier to follow. You will look at what the idea means, why developers reach for it, and where it fits into a back-end system you might build yourself. By the end of the section you should be able to explain review: changing schemas without fear to another beginner without reaching for jargon, and to recognise it when you meet it in real code, documentation, or a conversation with another developer.</p>
+<p>The reason review: changing schemas without fear matters is that back-end systems are used by real people, and real people notice when something is slow, confusing, or broken. A developer who understands review: changing schemas without fear can prevent a whole class of problems instead of fixing them after users complain. It also makes your code easier to explain to teammates, because you can say what you are doing and why, rather than copying a pattern you do not understand. That clarity saves time twice: once while you build, and again months later when someone, often you, has to change the code.</p>
+<p>A useful way to work through review: changing schemas without fear is to start from a concrete example instead of an abstract definition. Imagine a small application with a handful of users and a simple task to complete. Walk through what happens step by step, and notice the exact moment where review: changing schemas without fear changes the outcome. Then imagine the same situation with ten times as many users, or with a failure halfway through, and ask what would break first. That second picture is where the design decisions live, and it is the picture experienced developers keep in mind even when they are writing the simplest code.</p>
+<p>The short Python example below shows review: changing schemas without fear in a form you can run with only the standard library. Read it slowly, line by line, and predict what each line does before you move to the next. Then try changing one small thing, such as a value or a name, and predict the new result before you run it again.</p>
+<p>Beginners often make a few predictable mistakes with review: changing schemas without fear, and knowing them in advance will save you time. One common mistake is rushing to write code before the idea is clear in plain words. Another is changing several things at once when something goes wrong, which makes it impossible to tell which change helped. A third is testing only the happy path, where everything works, and never trying the failure cases. Work slowly, change one thing at a time, and test the awkward cases early, and review: changing schemas without fear will feel far less mysterious. A useful habit is to keep a small notebook of ideas like this one, with one plain-words example beside each, so you can find them again later.</p>
+<pre><code>import sqlite3
+
+
+def expand_then_contract():
+    db = sqlite3.connect(&quot;:memory:&quot;)
+    db.execute(&quot;CREATE TABLE articles (id INTEGER PRIMARY KEY, headline TEXT)&quot;)
+    db.execute(&quot;ALTER TABLE articles ADD COLUMN title TEXT&quot;)
+    db.execute(&quot;INSERT INTO articles (headline, title) VALUES (?, ?)&quot;, (&quot;Old headline&quot;, &quot;Old headline&quot;))
+    db.execute(&quot;UPDATE articles SET title = headline&quot;)
+    print(&quot;expand step done: new column filled from old column&quot;)
+    db.close()
+
+
+expand_then_contract()</code></pre>
+<p class="check"><strong>Check:</strong> What would change in the example if one part of review: changing schemas without fear failed, and how would you notice?</p>
+<h2>Practical Task</h2>
+<p>Practise a safe migration from start to finish: write two migration files, one that adds a new column with a default and one that backfills it in small batches, plus a version table that records which migrations have run. Run them against a copy of a test database, not the original, then write a rollback note for each migration explaining how you would undo it or why it cannot be undone. Finish by listing the checks you would run before applying the same migrations to a live database.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What is a migration, and why is changing a live table riskier than changing a table on your own computer?</li>
+<li>How does the expand and contract pattern let you rename or remove a column without breaking running code?</li>
+<li>Why should migrations run in order, one at a time, and be recorded in a version table?</li>
+<li>What is the difference between a schema migration and a data migration, and why does the difference matter for rollback?</li>
+<li>What checks would you run before applying a migration to a production database, and what would you do if it failed halfway?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-36.html">← Chapter 36</a> <a href="index.html">All chapters</a> <a href="chapter-38.html">Chapter 38 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/back-end-developer/chapter-37.html'; this.page.identifier = 'book-back-end-developer-chapter-37'; this.page.title = 'Chapter 37: Migrations and Changing Schemas Safely'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 27 — Databases with SQLite — Python Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 27 of the Python Developer teaching book: Databases with SQLite.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:860px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:860px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.25;font-size:2rem}
+h2{color:#22d3ee;margin-top:2.2em;line-height:1.35}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+ul.chapter-list{list-style:none;padding:0}
+ul.chapter-list li{margin:.55em 0}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:700;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Front-End Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 27 — Databases with SQLite</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-27.svg" alt="Design for Chapter 27" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: Why Use a Database</h2>
+<p>Programs often need to store data that lasts beyond a single run. A text file can do that for small, simple data, and JSON or CSV files, as taught earlier, work well for many learning projects. A database becomes valuable when data grows larger, when it has relationships between different kinds of records, when many queries are needed, such as finding, filtering, sorting, and counting, and when data integrity matters, such as preventing duplicates or invalid values. A database provides tools for all of those tasks, built in, rather than requiring you to write them yourself, for every file, in every program, which would be repetitive, error-prone, and hard to maintain, as data grows and queries become more complex. A database organises data into tables, which are like spreadsheets, with rows for records and columns for fields. That structure makes data easy to query, because you can ask for exactly the records you need, with conditions, sorting, and limits, without loading the whole dataset into memory, and without writing filtering code, for every query, as you would with a file, where you must load, parse, and filter, manually, each time. Databases also enforce rules, such as uniqueness, or required fields, at the storage layer, so that invalid data cannot be stored, even if application code has a bug, a safety net that file storage, on its own, does not provide, because files accept whatever is written to them, without checking, a lack of checking that, for important data, is a risk, where invalid data, once stored, can cause failures, later, when it is read, and used, in calculations, or displays, that assume validity, an assumption that database constraints, by preventing invalid storage, make safe, by ensuring stored data, meets its rules, from the start, for every record, not just for records, that application code, happened to validate, correctly, at the time of writing, a correctness that, database enforcement, guarantees, more reliably, than application validation alone, which, though it should also be done, for user experience, can be bypassed, or buggy, in ways that database constraints, catch, as a second layer, of protection, for data integrity, generally, where layered validation, as discussed for APIs, applies equally, to databases, with application validation, for immediacy, and database constraints, for authority, a layering that, together, keeps data, valid, and trustworthy, over time, as programs, grow, and as, data, accumulates, through, many writes, from, many parts, of a program, all of which, must meet, the same rules, a sameness that, database constraints, enforce, centrally, rather than, requiring each writer, to, implement the same rules, correctly, independently, a independence that, though it, may seem, like flexibility, actually, risks inconsistency, where, different writers, implement rules, slightly differently, leading to, data, that, meets some rules, in some places, but not, others, an inconsistency that, central enforcement, prevents, by, defining rules, once, in the database, and, enforcing them, for all writers, equally, a equality that, makes data, reliable, regardless of, which part, of a program, wrote it, a reliability.</p>
+<p class="check"><strong>Check:</strong> Why does a database enforce data rules more reliably than file storage alone?</p>
+<h2>Section 2: What SQLite Is</h2>
+<p>SQLite is a database system that lives entirely inside your program. Unlike a server database, it does not run as a separate process waiting for network connections. That design is what makes SQLite feel so approachable: if you understand files, you already understand where the data lives, how to copy it, and how to move it to another machine.</p>
+<p>A server database works differently. A program such as a large web service often needs many users, or many separate programs, to share the same data at the same time, from different machines. In that case a dedicated server process manages the database, handles concurrent connections, enforces permissions, and coordinates writes so that many clients do not corrupt each other&#x27;s work. Someone must install the server, configure it, keep it running, back it up, and secure it. For a small desktop tool, a personal organiser, a learning project, or a single-user application, that cost is often unnecessary. SQLite removes it by letting one program own its database file directly.</p>
+<p>This simplicity is an advantage whenever one program, or a small number of programs on the same machine, is the main user of the data. Deployment becomes trivial: you ship the program and its database file together. Testing becomes easy too, because you can create a fresh database file for each test, run the test, and delete the file afterwards, without touching a shared server. Copying the file, while the program is not writing to it, gives you a complete backup, and restoring is just copying the file back. That is a powerful property for beginners and for experienced developers alike, because it makes the whole lifecycle of the data visible and easy to reason about.</p>
+<p>SQLite is also a good learning tool precisely because it hides so little. You create a file, you create tables inside it, and you query those tables with the same SQL used on larger systems. The skills transfer. So learning SQLite is not a dead end. It is a gentle introduction to relational databases that still teaches the central ideas: tables, keys, constraints, transactions, and queries. Many professional programs also stay with SQLite long after the learning stage, because their data and concurrency needs never outgrow it.</p>
+<p>That said, simplicity has limits, and part of good judgement is knowing them. SQLite is designed for low-concurrency use. It allows many readers, but writes are serialised, so a program with many simultaneous writers, or writers on different machines, will need a server database instead. Recognising that boundary is as important as knowing how to use SQLite itself. Choose the tool that matches the program: a single-file database for a single-program task, and a server database when shared, high-concurrency access is genuinely required.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;notes.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, title TEXT)&quot;)
+connection.commit()
+connection.close()</code></pre>
+<p>In that short example, no server was started and no network was used. The file notes.db either appeared or was opened, a table was created inside it, and the program closed the connection when it was done. That is the whole deployment story for SQLite, and it explains why it remains popular for embedded programs, mobile applications, testing, and personal tools.</p>
+<p class="check"><strong>Check:</strong> How does SQLite differ from a server database, and when is its simplicity an advantage?</p>
+<h2>Section 3: Tables, Rows and Columns</h2>
+<p>A table is the basic container for one kind of record in a database. If you are building a tasks program, you might have a tasks table. If you are building a notes program, you might have a notes table. A tasks table, for example, might have columns for a title, a status, and a date created. A users table might have columns for a name and an email address. Thinking in tables therefore starts with a simple question: what kinds of things does this program store, and what facts about each kind matter?</p>
+<p>A row in a table is a single record. Each row holds one task, one user, or one note, with a value in each column. A column is a single field shared by all rows in the table. The difference is that a database table is stricter and more useful than a spreadsheet grid. Columns have declared types and rules, rows can be linked to rows in other tables, and the database can query the grid efficiently without loading every row into your program.</p>
+<p>Columns carry more information than just a name. Each column has a type, such as text for titles, integer for counts and identifiers, or real for decimal numbers. Types guide both the program and the reader. Declaring types, and then validating data in your program before it is stored, keeps the table honest. SQLite is forgiving about types compared with some other databases, so this discipline matters even more: your program should enforce the contract that the column declares, rather than relying on the database to reject every wrong value.</p>
+<p>Planning a table before you store data in it saves far more time than it costs. Before creating a table, list the records it will hold, the columns each record needs, which columns must always have a value, which values must be unique, and how the program will query the data later. Will you often filter by status? Those questions shape which columns you need and which indexes may help later. A table designed around real queries is easy to use. A table assembled casually, with columns added whenever a new need appears, tends to collect redundant fields, inconsistent naming, and missing values that are hard to clean up afterwards.</p>
+<p>Redesign is sometimes unavoidable as a program grows, and later sections explain how to change a schema safely. But frequent redesign is a sign that the first design was rushed. When someone opens the schema, they should be able to see what each table means, what each column means, and what rules the data must obey, without guessing from scattered code. Good tables are therefore both a storage choice and a communication choice.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created TEXT NOT NULL
+    )
+&#x27;&#x27;&#x27;)
+connection.commit()
+connection.close()</code></pre>
+<p>Here, each row is one task, each column is one fact about a task, and the table definition states those facts clearly. That clarity is the foundation for everything else in this chapter: inserting, querying, updating, and relating data all depend on tables that were designed with care.</p>
+<p class="check"><strong>Check:</strong> What do tables, rows, and columns represent, and why should table structure be planned before storing data?</p>
+<h2>Section 4: Creating a Database and Table</h2>
+<p>Creating a SQLite database in Python begins with opening a connection to a database file. Python includes sqlite3 in its standard library, so no extra installation is needed. You import sqlite3, call its connect function with a file name, and you receive a connection object. That behaviour can feel surprising at first, because nothing visibly happens when you connect to a new file. The file may appear empty, or may not even appear on disk until the first table is created or the first change is committed. What matters is that after connect returns, you have a working handle to a database, ready for use.</p>
+<p>A connection is not the same as a table. The connection is your program&#x27;s link to the database file. To do work, you ask the connection for a cursor, and you use that cursor to execute SQL statements. Creating a table a second time would cause an error, which is why examples often use IF NOT EXISTS. That clause makes the statement safe to run again: if the table already exists, nothing changes, and your program can start cleanly whether it is the first run or the hundredth.</p>
+<p>Understanding connection creation as file creation clarifies several practical points. Your data lives in that one file, in the directory your program names. Backing up the database means copying the file when it is not being written to. Deleting the file deletes the whole database, tables and rows together, so you should never delete a database file casually. This file-based thinking is reassuring for learners, because files are already familiar, and it is accurate: SQLite really does store everything in that single file, including the table definitions themselves.</p>
+<p>A good pattern for small programs is to keep database setup in one place. A function that opens the connection, creates any missing tables, commits, and returns the connection gives the rest of the program a reliable starting point. An unclosed connection can leave changes uncommitted, or leave the file locked, so later runs or other programs cannot open it cleanly. Using a context manager, or a try and finally block, makes closing reliable even when an error occurs, a habit worth forming from the very first database program you write.</p>
+<p>Begin with a tiny example and grow from it. Create one database file, one table, and a few rows, then close and reopen the file to confirm the data survived. From there, later sections add inserting, querying, updating, and deleting, each building on the same connection and cursor pattern. The pattern stays the same throughout the chapter, so learning it well now makes every later section easier.</p>
+<pre><code>import sqlite3
+
+def get_connection(path=&quot;app.db&quot;):
+    connection = sqlite3.connect(path)
+    cursor = connection.cursor()
+    cursor.execute(&#x27;&#x27;&#x27;
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            status TEXT NOT NULL
+        )
+    &#x27;&#x27;&#x27;)
+    connection.commit()
+    return connection
+
+connection = get_connection()
+connection.close()</code></pre>
+<p>Notice how little code is required. Import, connect, create the table if needed, commit, and close. There is no server to start, no configuration file to write, and no separate setup step for the user. That is SQLite&#x27;s promise, and it is why a first database program in Python can be both short and genuinely useful.</p>
+<p class="check"><strong>Check:</strong> What happens when you open a connection to a SQLite database file that does not yet exist?</p>
+<h2>Section 5: Inserting Data</h2>
+<p>Inserting data means adding a new row to a table. Each row holds values for the table&#x27;s columns, or for a subset of columns when other columns have defaults or are allowed to be empty. The new row receives its own identity, usually from an automatically assigned primary key, so it can be found, updated, and deleted later without confusion with other rows that may look similar.</p>
+<p>Good inserts name their columns explicitly. Instead of relying on the order in which columns were defined, you list the columns you are supplying, in the same order as the values you provide. This makes the statement self-explanatory: a reader can see exactly which value goes into which column, without opening the table definition to check the column order. An insert that relies on position alone can silently put values into the wrong columns after such a change, producing data that looks stored but is actually wrong. Explicit naming trades a few extra words for clarity and safety, a trade professional developers make willingly.</p>
+<p>The second habit that matters for every insert is using parameterised values. In Python&#x27;s sqlite3 module, you write placeholders in the SQL statement, usually question marks, and you pass the actual values separately as a tuple. That older approach is dangerous, because input containing quote characters or SQL keywords can change the meaning of the statement, and it is also error-prone, because values containing quotes, newlines, or other special characters can break the statement in ordinary use. Parameterised values avoid both problems: values are treated strictly as data, never as part of the command.</p>
+<p>Consider a task title typed by a user. It might contain an apostrophe, such as &quot;Call Sam&#x27;s office&quot;. If that title is pasted into SQL text, the apostrophe can end the quoted value early and corrupt the statement. The same protection applies to every kind of input, including text from files, from network responses, and from other programs. Parameterisation is therefore not only a security measure against deliberate attack, discussed in detail later, but also a correctness measure for everyday data. It should be used from the very first insert you write, not added later when a problem appears.</p>
+<p>After executing an insert, you must commit the transaction for the change to become permanent. Until commit, the new row is visible only to the current connection and can be lost if the program closes without committing. A reliable pattern is to execute the insert, commit, and then, if you need the new row&#x27;s identifier, read it from the cursor. That identifier lets you confirm the insert, link related rows, or show the new record to the user.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL
+    )
+&#x27;&#x27;&#x27;)
+cursor.execute(
+    &quot;INSERT INTO tasks (title, status) VALUES (?, ?)&quot;,
+    (&quot;Buy milk&quot;, &quot;pending&quot;),
+)
+connection.commit()
+print(&quot;New task id:&quot;, cursor.lastrowid)
+connection.close()</code></pre>
+<p>That example shows both habits together: columns named explicitly, values supplied as parameters, and a commit to make the row permanent. Adopt those habits now, and every insert you write later will be clear, safe, and resilient to change.</p>
+<p class="check"><strong>Check:</strong> Why should inserts name columns explicitly and use parameterised values?</p>
+<h2>Section 6: Reading Data with SELECT</h2>
+<p>Reading data from a table uses a SELECT statement. At its simplest, SELECT names the columns you want and the table you want them from, and the database returns matching rows. You might ask for the title and status of every task, or for every column of every note. That loop is the heart of most database programs: the program asks a precise question, the database answers with exactly the rows requested, and the program works with that answer. Learning to phrase those questions well is therefore one of the most valuable skills in this chapter.</p>
+<p>A good SELECT names only the columns actually needed. It is tempting to ask for everything, every time, because that feels simpler and avoids thinking about which columns matter. But asking for everything has costs. Naming only the needed columns makes the query faster, leaner, and clearer. If a later reader sees that a query asks only for title and status, they immediately know the task uses only those two facts. If the query asks for everything, they must search the code to discover which columns are actually used, a search that wastes time and invites mistakes when columns change.</p>
+<p>Precision in SELECT also helps performance as tables grow. A small learning table with a few dozen rows will return quickly no matter how broad the query is. A real table with thousands or millions of rows behaves differently. The database is optimised to retrieve exactly what is asked for, and it can often do so efficiently using indexes and its internal storage layout. Your program, by contrast, would have to filter and discard the excess itself, slowly and wastefully. Letting the database do the precise retrieval is both faster and simpler to reason about.</p>
+<p>SELECT becomes more powerful when combined with filtering, sorting, and limiting, which later sections cover in detail. Even on its own, though, it teaches an important shift in thinking: from procedural to declarative. Instead of writing loops that open a file, read every record, and keep the ones you want, you declare what you want and let the database find it. If the requirement changes from all tasks to pending tasks only, you change the query, not a tangle of loops and conditions. That clarity is why databases are preferred for query-heavy programs, even when a file could technically hold the same data.</p>
+<p>In Python, a SELECT is executed with a cursor, just like a table creation or an insert. You execute the statement, then fetch the results. Both approaches start from the same SELECT, and choosing between them is a question of result size and program design, not of query correctness. The query itself should already be as precise as possible before fetching begins.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;SELECT title, status FROM tasks&quot;)
+for title, status in cursor:
+    print(f&quot;{title} [{status}]&quot;)
+connection.close()</code></pre>
+<p>This example asks only for title and status, because those are the facts being printed. Nothing else is retrieved, nothing else is held in memory, and the intent of the code is obvious. Carry that discipline into every query you write: ask for what you need, no more, and let the database supply exactly that answer.</p>
+<p class="check"><strong>Check:</strong> Why should SELECT queries name only the columns actually needed?</p>
+<h2>Section 7: Filtering with WHERE</h2>
+<p>Filtering with WHERE turns a broad list operation into a precise question. Without WHERE, a SELECT returns every row in a table. You might test for equality, compare numbers or dates, combine conditions with AND and OR, or test whether a value is present or missing. Each of those forms expresses an intent that a reader can understand directly from the query, without tracing through program logic.</p>
+<p>Filtering in the database is far better than downloading all rows and filtering in your program. The difference is invisible on a tiny table, but decisive on a large one. If a table holds ten thousand rows and only ten match your condition, downloading all ten thousand wastes time, memory, and, in a networked setting, bandwidth, just to discard almost all of it. Your program then works with a small, relevant result, and stays responsive even as the table grows. That scaling behaviour is one of the main reasons to use a database at all.</p>
+<p>WHERE conditions also make code clearer. A query that says, in effect, give me pending tasks, states its purpose in one place. The equivalent local filtering requires a loop, a condition inside the loop, and a list to collect matches, spread across several lines and mixed with other program logic. When the local version changes, the loop, the condition, and the collection must all be checked. Declarative filtering therefore reduces both the code you write and the chance of introducing a bug when requirements shift. It also makes testing easier, because you can test the query on its own, with known data, and confirm it returns exactly the expected rows.</p>
+<p>Conditions must still be written with care. Values supplied by users or by other parts of the program should be passed as parameters, not pasted into the query text, for the same security and correctness reasons that apply to inserts. A parameterised WHERE condition keeps values as data, so a search term containing a quote or a special character cannot break the query or change its meaning. A search box that breaks on an apostrophe is a visible failure, and a filter that can be manipulated into returning rows it should not is a serious one. Parameterisation prevents both.</p>
+<p>A useful discipline is to make every filtered query as specific as the task allows. If the task needs pending tasks for one user, filter by both status and user, not by status alone with further filtering afterwards. Each condition you add in the query reduces the work your program must do and sharpens the meaning of the code. Over time, this habit produces programs that stay fast and readable as data grows, rather than programs that slow down and become harder to follow with every new feature.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(
+    &quot;SELECT title FROM tasks WHERE status = ?&quot;,
+    (&quot;pending&quot;,),
+)
+for (title,) in cursor:
+    print(title)
+connection.close()</code></pre>
+<p>Here the database does the filtering, the value is passed safely as a parameter, and the program receives only pending tasks. That is the pattern to use whenever a query must return a subset of rows: state the condition in WHERE, parameterise its values, and work with the precise result.</p>
+<p class="check"><strong>Check:</strong> Why should filtering be done with WHERE in the database rather than by downloading all rows and filtering locally?</p>
+<h2>Section 8: Updating Data</h2>
+<p>Updating data means changing values in rows that already exist, without deleting and recreating them. You might mark a task as done, correct a title, or change a user&#x27;s status. An UPDATE statement names the table, lists the columns to change and their new values, and, crucially, states which rows should change. Without it, the update applies to every row in the table. That is occasionally intended, for example when resetting all statuses at the start of a new period, but it is usually a mistake when the intent was to change one record or a small group.</p>
+<p>A missing WHERE clause is dangerous because its effect is immediate and broad. A program meant to mark one task as done could mark every task as done. A correction meant for one user&#x27;s record could overwrite every user&#x27;s record with the same value. The cost is therefore not just the time to fix the data, but the risk that the original data cannot be fully reconstructed at all. That risk is why experienced developers treat every UPDATE as a statement that must justify its scope: which rows, and why those rows and no others.</p>
+<p>The safest habit is to update individual records by their primary key. A primary key identifies exactly one row, so a WHERE clause on that key cannot accidentally match other rows. When you know the identifier of the record to change, use it. During development, a useful check is to run the same condition as a SELECT first, and inspect the rows it returns. If the SELECT returns the rows you expect, and no others, the UPDATE with the same condition should be safe. That small preview step catches many errors before they change data.</p>
+<p>Update values, like insert values, must be parameterised. Values often come from users or from external sources, and pasting them into SQL text invites the same injection and special-character problems as unparameterised inserts. Passing values as parameters guarantees that behaviour. It also keeps the statement readable, because the structure of the update is separate from the data it carries, making it easier to review which columns are changing and under which condition.</p>
+<p>After an UPDATE, committing makes the change permanent, and checking how many rows were affected can confirm the update did what you intended. If you expected one row to change and the count is zero, the identifier may be wrong or the row may not exist. If the count is unexpectedly large, the condition was too broad. Either signal is valuable, and both are easier to act on before the program proceeds as if the update succeeded. Treating row counts as a sanity check, especially for single-record updates, turns a silent failure into a visible one.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(
+    &quot;UPDATE tasks SET status = ? WHERE id = ?&quot;,
+    (&quot;done&quot;, 3),
+)
+print(&quot;Rows updated:&quot;, cursor.rowcount)
+connection.commit()
+connection.close()</code></pre>
+<p>This example updates one task, identified by its key, with a parameterised value, and reports how many rows changed. Follow that shape for every update: a precise WHERE clause, parameterised values, a commit, and, where it matters, a check that the affected count matches your expectation.</p>
+<p class="check"><strong>Check:</strong> Why is a missing WHERE clause dangerous in an UPDATE, and why should update values be parameterised?</p>
+<h2>Section 9: Deleting Data</h2>
+<p>Deleting data means removing rows from a table. Unlike an update, which changes values, a deletion removes the record itself. That removal is permanent unless a backup exists from which the rows can be restored. Real data is different. User input, historical records, and accumulated work often exist only in the database. Once deleted without a backup, they cannot be recreated from anywhere else, and the loss may only become apparent later, when a user or a report needs a record that is no longer there.</p>
+<p>For that reason, deletion deserves more caution than most operations. Before deleting, be sure the rows are truly unwanted, and be sure a backup exists for anything important. In programs where users can delete records through an interface, confirmation is standard practice. That extra step is welcomed for important data, because the cost of an accidental deletion far outweighs the cost of one confirmation click. Deletion through a database tool deserves the same caution: an easy interface does not make the action less permanent.</p>
+<p>The technical safeguard that matters most is the WHERE clause. A DELETE without WHERE removes every row in the table. That is occasionally intended, for example when clearing a test table before a new test run, but it is usually a serious mistake when the intent was to remove one record. A primary key identifies exactly one row, so a DELETE with a primary-key condition cannot accidentally remove neighbours that happen to share a title or a status. Titles and statuses are not unique, and using them as the sole condition risks deleting several rows when only one was meant.</p>
+<p>A helpful preview step, as with updates, is to run the condition as a SELECT before deleting. If the SELECT returns exactly the rows you intend to remove, the DELETE with the same condition is likely safe. If it returns extra rows, the condition is too broad and must be narrowed before any deletion occurs. This check takes a moment, but it is far cheaper than restoring from a backup, or discovering that restoration is impossible. In automated programs, the same idea appears as a check on the affected row count after deletion: if a single-record deletion reports zero or several rows affected, something is wrong and should be investigated rather than ignored.</p>
+<p>Some programs avoid hard deletion altogether for important records, using soft deletes instead, a topic covered later. In a soft delete, a record is marked as deleted but kept in the table, so it can be restored or audited. That choice is not always appropriate, especially where privacy rules require real removal, but it illustrates the underlying principle: deletion should be deliberate, reversible where possible, and always scoped precisely. Even when hard deletion is correct, it should be treated as a significant action, not a casual one.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;SELECT title FROM tasks WHERE id = ?&quot;, (3,))
+print(&quot;About to delete:&quot;, cursor.fetchone())
+cursor.execute(&quot;DELETE FROM tasks WHERE id = ?&quot;, (3,))
+print(&quot;Rows deleted:&quot;, cursor.rowcount)
+connection.commit()
+connection.close()</code></pre>
+<p>This example previews the row, deletes by primary key, and reports the count. That sequence, preview, precise condition, parameterised value, commit, and verification, is the safe shape for every deletion you write.</p>
+<p class="check"><strong>Check:</strong> Why must DELETE statements normally include a WHERE clause on a unique identifier?</p>
+<h2>Section 10: Primary Keys</h2>
+<p>A primary key is a column, or a combination of columns, whose value uniquely identifies each row in a table. Every row has a different primary key value, and no row may have a missing primary key. Without a unique identifier, those operations would have to rely on other columns, such as titles or names, which may be shared by several rows and therefore cannot pinpoint one record with certainty.</p>
+<p>Primary keys should be stable as well as unique. A stable key does not change during the row&#x27;s lifetime. If a key changes, every reference to it must change too, and any reference that is missed will point to the wrong row or to nothing at all. That is a fragile situation, and it is why keys should be chosen for stability first, and for human meaning only when the meaning itself is stable.</p>
+<p>That reasoning leads to a widely used design pattern: use a meaningless, automatically assigned identifier as the primary key. In SQLite, an INTEGER PRIMARY KEY column is commonly filled automatically with a new number for each row. That number has no business meaning. Its only job is identification, and because it has no meaning, it never needs to change for business reasons. A task can be renamed, a user can change their email address, and a note can be rewritten, all without touching the primary key. References to the row stay valid through all of those changes, which is exactly what stability requires.</p>
+<p>Meaningful values make poor primary keys when they can change. A title can be edited, an email address can be replaced, and a code can be corrected. Using any of those as a key means that an ordinary edit becomes a key change, with all the reference problems that follow. Meaningless keys avoid that entire class of problems by separating two roles that are often confused. Identification is the key&#x27;s job. Display and business meaning belong in other columns, such as title, name, or email, which can be shown to users and changed freely without affecting identity.</p>
+<p>There are exceptions, such as country codes or other standard values that genuinely never change, where a meaningful key can work. Those cases are rare, and they should be chosen deliberately, after confirming that the value really is stable and unique by rule, not just in current data. It is simple to create, easy to use in queries, and robust against the everyday changes that real data undergoes. When you design a new table, start by giving it such a key, then add the meaningful columns alongside it.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL
+    )
+&#x27;&#x27;&#x27;)
+cursor.execute(
+    &quot;INSERT INTO tasks (title, status) VALUES (?, ?)&quot;,
+    (&quot;Write report&quot;, &quot;pending&quot;),
+)
+connection.commit()
+print(&quot;Task id:&quot;, cursor.lastrowid)
+connection.close()</code></pre>
+<p>Here the id column identifies each task, while title and status carry the meaning. Renaming the task later changes only the title, never the id, and every reference to that task remains correct. That separation is the core lesson of primary key design.</p>
+<p class="check"><strong>Check:</strong> Why are stable, meaningless identifiers better primary keys than titles or email addresses that may change?</p>
+<h2>Section 11: Data Types in SQLite</h2>
+<p>SQLite uses a flexible type system. Each column has a declared type, such as text, integer, real, or blob. Text holds strings, like names and titles. Integer holds whole numbers, like counts and identifiers. Real holds decimal numbers, like prices and measurements. Blob holds binary data, like images, though storing large binary data in a database is often a poor choice, as discussed later.</p>
+<p>Flexibility means SQLite is forgiving about types. It will often store a value even if its type does not exactly match the column&#x27;s declared type, converting where it can. That forgiveness is convenient during learning, because it rarely blocks an insert for a type reason. It also carries a risk, because mistyped data can be stored silently, and only cause problems later, when it is used in calculations or comparisons. Application code should therefore validate types before inserting, rather than relying on the database to reject wrong types, because SQLite may accept them.</p>
+<p>A useful habit is to treat column types as a contract, even when the database is forgiving. Decide, for each column, what type it should hold, and enforce that in your program&#x27;s validation, before data reaches the database. That enforcement keeps stored data consistent, so that later queries, sorts, and calculations behave predictably. Sorting, for example, behaves differently for text and numbers: text sorting puts &quot;10&quot; before &quot;2&quot;, because it compares characters, while numeric sorting puts 2 before 10, as expected. Storing numbers as text, even accidentally, can therefore produce wrong sort orders and wrong comparisons, a subtle bug that type discipline prevents.</p>
+<p>Finally, choose types that match the data&#x27;s nature, not just its appearance. Dates can be stored as text in a standard format, as numbers, or in other forms, and each choice affects how easily they can be sorted and compared. A standard, sortable text format for dates, such as year-month-day, sorts correctly as text, which is why it is commonly used. Similarly, money should be handled carefully, because decimal rounding can cause small errors, and many programs store money as integer cents, to avoid those errors, converting only for display. Those choices, made per column, with thought about sorting, comparison, and arithmetic, are part of good table design, and they repay the thought, through data that behaves correctly, in every query, over the program&#x27;s life.</p>
+<p>A final tip is to test type behaviour with realistic sample data before relying on it. Insert values of the kinds your program will actually receive, including edge cases like empty strings, zero, and large numbers, and check how they are stored and retrieved. That testing reveals surprises early, when they are cheap to fix, rather than later, when mistyped data has already spread through your program. It also builds your understanding of SQLite&#x27;s flexibility, so you can use it deliberately, rather than being surprised by it.</p>
+<p class="check"><strong>Check:</strong> Why should your program validate types before inserting, even though SQLite is flexible about types?</p>
+<h2>Section 12: Constraints: NOT NULL and UNIQUE</h2>
+<p>Constraints are rules enforced by the database, on data in a table. Two common constraints are NOT NULL and UNIQUE. NOT NULL means a column must always have a value; a row cannot be stored with that column empty. That rule suits fields that are essential, such as a task&#x27;s title, without which the record is meaningless. UNIQUE means no two rows can have the same value in that column, such as an email address that should belong to only one user, or a code that should identify only one item. Together, those constraints protect data integrity, at the storage layer, as discussed earlier, by preventing invalid or duplicate data, even if application code has a bug, or is bypassed. Choosing constraints requires judgement. Making every column NOT NULL would be too strict, because some fields are genuinely optional, such as a note, or a due date that has not been set yet. Forcing a value for optional fields leads to placeholder values, like empty strings or fake dates, which are worse than a clear missing value, because they look like real data, while being meaningless. A better rule is: require values only for fields that are truly essential, and allow missing values, clearly marked as missing, for fields that are optional. That distinction keeps data honest, because missing means missing, not a fake value pretending to be real, and it lets queries distinguish, correctly, between records that have a value, and those that do not, a distinction that placeholder values blur, causing wrong counts, wrong filters, and wrong displays, all of which honest missing values avoid, by being explicit, about absence, rather than disguised, as presence. UNIQUE also needs judgement. It should be applied where uniqueness is a real business rule, such as one account per email address, or one code per product. It should not be applied where duplicates are legitimate, such as two tasks with the same title, which is perfectly normal, and which a UNIQUE constraint on title would wrongly forbid, blocking legitimate data, and frustrating users, who cannot understand why a second task with a familiar title is rejected, when it is, in fact, a different task, with the same title, a common occurrence, for everyday titles, like &quot;Buy milk&quot;, which many tasks may share, legitimately, without being duplicates, in any meaningful sense, a legitimacy that UNIQUE on title would deny, by treating sameness of title, as sameness of record, which it is not, because records are distinguished, by their identifiers, not by their titles, a distinction that primary keys, as discussed, provide, and that UNIQUE constraints, should respect, by applying, only where, uniqueness, is, truly required, for, the column&#x27;s, meaning, not, merely, where, duplicates, seem, unlikely, at first glance, a seeming that, though it, may hold, for, small datasets, fails, as, datasets grow, and, as, legitimate duplicates, appear, in, columns, that, were, wrongly constrained, as, unique, a failing that, careful constraint choice, prevents, by, asking, for each column, whether, duplicates, are, ever legitimate, and,.</p>
+<p class="check"><strong>Check:</strong> When should a column be NOT NULL, and when should it allow missing values?</p>
+<h2>Section 13: Transactions</h2>
+<p>A transaction is a group of database operations treated as a single unit. Either all of the operations succeed, or all of them fail together. There is no in-between state in which some changes are saved and others are lost. That all-or-nothing property, often called atomicity, matters whenever a task requires several changes that must stay consistent with each other. If only the insert succeeds, the record exists twice. If only the delete succeeds, it exists nowhere. Neither outcome is valid. A transaction prevents both, by ensuring that a failure anywhere rolls back everything.</p>
+<p>Rollback is the mechanism that makes this guarantee real. If any operation in the transaction fails, because of a constraint violation, an error, or an interruption, the database discards all the changes made within the transaction and restores the data to its state before the transaction began. That clean restoration is far more reliable than trying to undo changes manually in application code, where each undo step could itself fail and leave the data in an even messier state. Databases provide atomicity as a built-in feature, and programs should use it for every multi-step change that must stay consistent.</p>
+<p>Transactions also provide isolation. Changes made inside a transaction are not visible to other readers until the transaction commits successfully. That rule prevents other parts of your program, or other programs, from seeing half-finished data during a multi-step change and acting on it as if it were complete. Isolation hides that intermediate state, so readers see only complete, consistent states of the data. Together, atomicity and isolation give transactions their power: multi-step changes appear to happen instantly and completely, or not at all.</p>
+<p>The cost of using transactions is small. In Python, you begin work, execute several statements, and then commit if everything succeeded, or roll back if anything failed. That few extra lines buys a strong guarantee for every multi-step operation, from moving records, to updating related tables together, to importing a batch of rows that must all be valid or none stored. The habit should apply regardless of how simple the steps seem, because simple steps can still fail partway, through a constraint, a missing related record, or a program interruption.</p>
+<p>File-based storage, on its own, does not provide this guarantee easily. To make a multi-file change atomic, a program would need manual backup and restore logic, carefully handling every failure mode, and even then it would struggle to hide intermediate states from other readers. When you recognise that a task involves several changes that belong together, that recognition is itself the signal to use a transaction. Group the changes, commit on success, roll back on failure, and let the database keep the data consistent.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+try:
+    cursor.execute(&quot;UPDATE accounts SET balance = balance - 10 WHERE id = ?&quot;, (1,))
+    cursor.execute(&quot;UPDATE accounts SET balance = balance + 10 WHERE id = ?&quot;, (2,))
+    connection.commit()
+except sqlite3.Error:
+    connection.rollback()
+    raise
+finally:
+    connection.close()</code></pre>
+<p>In this example, both balance updates succeed together or neither is kept. That is the essence of a transaction: a group of changes that the database treats as one indivisible unit.</p>
+<p class="check"><strong>Check:</strong> Why should a multi-step database change be wrapped in a transaction?</p>
+<h2>Section 14: Commit and Rollback</h2>
+<p>Commit and rollback are the two ways a transaction ends, and every transaction must end with one or the other. Commit means making all the changes in the transaction permanent. Rollback means discarding all the changes in the transaction, restoring the data to its state before the transaction began, as if the changes had never been made. Understanding the difference, and ending every transaction explicitly, is essential to avoiding lost or half-saved data.</p>
+<p>A transaction that is neither committed nor rolled back leaves its changes in limbo. Depending on how the program ends, those changes may be discarded automatically, or they may remain visible only to the current connection and invisible to everyone else. In production, the confusion is worse, because changes that were thought to be saved turn out to be lost when the program closes without committing. Explicit commit prevents that failure by making saving a deliberate, visible step in the code, rather than an implicit behaviour that a reader must guess at.</p>
+<p>Explicit endings also make code easier to review and debug. When a transaction ends with commit on success and rollback on failure, a reader can see exactly when permanence occurs and what happens when something goes wrong. If changes do not appear as expected, the first question is whether commit was reached, and that question is easy to answer when commit is written out in the code. Clarity about permanence is therefore not a cosmetic preference. It is a practical aid to correctness, especially in code that other people will maintain.</p>
+<p>Rollback should be used not only when a database error occurs, but also when a business rule fails during a transaction. Suppose a program discovers midway through a multi-step change that a destination is full, a related record is missing, or a quantity is insufficient. No database error has occurred, but the transaction&#x27;s purpose cannot be achieved completely. Rolling back restores a clean, consistent state, lets the program report the problem clearly to the user, and leaves the data ready for a fresh attempt later, with corrected input or a different approach. That clean slate is one of rollback&#x27;s most valuable properties.</p>
+<p>In Python, the usual pattern is a try block for the work, commit at the end of the try block if all steps succeeded, and rollback in the error path. A finally block, or a context manager, then closes the connection reliably. That structure covers both technical errors and business-rule failures, provided the program calls rollback, or raises an error that leads to rollback, whenever the transaction should not commit. Forming this pattern as a habit, for every transaction, prevents the two most common transaction mistakes: forgetting to commit successful work, and committing partial work after a failure.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+try:
+    cursor.execute(&quot;INSERT INTO tasks (title, status) VALUES (?, ?)&quot;, (&quot;New task&quot;, &quot;pending&quot;))
+    if False:  # a business rule check that failed
+        raise ValueError(&quot;Task cannot be saved&quot;)
+    connection.commit()
+except Exception:
+    connection.rollback()
+    raise
+finally:
+    connection.close()</code></pre>
+<p>Here, success commits the insert, while any failure, technical or business, rolls it back. That explicit ending is what makes transaction code trustworthy.</p>
+<p class="check"><strong>Check:</strong> What is the difference between committing and rolling back a transaction?</p>
+<h2>Section 15: Indexes</h2>
+<p>An index is a data structure that helps the database find rows quickly, without scanning every row in a table. You can think of it like the index at the back of a book: instead of reading every page to find a topic, you look up the topic in the index and jump straight to the right pages. When a query filters or sorts by an indexed column, the database can use that reference to locate matching rows directly, rather than examining the whole table. For large tables, that difference can turn a slow query into a fast one.</p>
+<p>The trade-off is that indexes speed up reads but slow down writes. Every time a row is inserted, updated, or deleted, the database must also update every index on that table, to keep the index consistent with the data. An insert into a table with many indexes therefore does more work than an insert into a table with none, because each index must gain a new entry. For a table that is read far more often than it is written, that cost is worthwhile, because the many fast reads outweigh the slower writes. For a table that is written constantly and rarely queried by a particular column, an index on that column may cost more than it saves.</p>
+<p>Index choice should therefore be guided by how the table is actually used. Ask which columns appear frequently in WHERE conditions, in sorting, or in joins, and how often those queries run compared with writes. A column that is rarely filtered on, or that holds values with little variety, such as a true-or-false flag split evenly across rows, is a weaker candidate, because the index will not narrow the search much. Adding indexes for every column, just in case, is a mistake: it slows every write for little or no read benefit, and it increases the size of the database file.</p>
+<p>Indexes are also not a substitute for good query design. A query that returns far more data than needed will still be slow, even with an index, because the database must still deliver all that data. When a query is slow, the right response is to measure it with realistic data, examine which conditions it uses, and consider whether an index on those conditions would help, rather than guessing or adding indexes indiscriminately. SQLite provides tools to inspect how a query will be executed, and learning to use them is part of mature database work.</p>
+<p>Finally, indexes should be revisited as a program grows. A table that starts small may not need an index at all, because scanning a few hundred rows is already fast. Conversely, an index that helped an early query pattern may become a burden if the pattern changes. Treating indexes as a deliberate, measured choice, reviewed when usage changes, keeps the balance between read speed and write cost in the right place.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status)&quot;)
+connection.commit()
+connection.close()</code></pre>
+<p>This statement creates an index on the status column, so queries filtering by status can find matching tasks faster. The index is a tool to apply thoughtfully, not a default to apply everywhere.</p>
+<p class="check"><strong>Check:</strong> Why do indexes speed up reads but slow down writes, and how should that trade-off guide index choice?</p>
+<h2>Section 16: Joins in Concept</h2>
+<p>A join is a query operation that combines rows from two or more tables based on a relationship between them. In a well-designed database, related facts live in separate tables: tasks in one table, users in another, notes in a third. The database matches rows using a shared value, usually a foreign key in one table that holds the primary key of a row in the other table. The result is a combined view, assembled for that query, from data that remains stored once, in its proper place.</p>
+<p>Joins are better than fetching tables separately and combining them in application code, for several reasons. The first is efficiency. If you fetch all tasks and all users into your program and then match them with loops, you have downloaded far more data than the answer requires, and you have done the matching work slowly, in Python, instead of letting the database do it with its optimised structures and indexes. The database can use indexes on the key columns to match rows quickly, filter the result in the same query, and return a small, ready-to-use answer. As tables grow, the difference between database-side joining and program-side looping grows with them.</p>
+<p>The second reason is clarity. A join states the relationship in the query itself: tasks joined to users on the owner key. A reader can see which tables are involved and how they relate, without tracing through nested loops, dictionaries, and matching conditions in program code. When program-side combining changes, the fetching code, the matching code, and the handling of unmatched rows must all be checked. Joins also handle edge cases more cleanly. A task with no owner, or a user with no tasks, can be included or excluded deliberately by choosing the right kind of join, whereas hand-written combining code must handle those cases explicitly, and often handles them inconsistently.</p>
+<p>A third reason is correctness. Matching in application code is easy to get subtly wrong, especially when keys are missing, duplicated, or of the wrong type. Delegating the combination to the database therefore reduces the surface for bugs in your own code. It also keeps the single-source-of-truth principle intact: each fact is stored once, in one table, and joins assemble views from that stored truth on demand, rather than duplicating facts into other tables or into program memory where they can drift out of sync.</p>
+<p>Learning joins in concept, before memorising every syntax variant, is worthwhile. The core idea is simple: two tables, a shared key, and a combined result. Start with the simple case of matched rows, practise it on small tables where you can check the result by hand, and then expand to the other cases as your programs need them.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    SELECT tasks.title, users.name
+    FROM tasks
+    JOIN users ON tasks.owner_id = users.id
+&#x27;&#x27;&#x27;)
+for title, name in cursor:
+    print(f&quot;{title} — {name}&quot;)
+connection.close()</code></pre>
+<p>This query returns each task with its owner&#x27;s name, combined by the database from two tables. No separate fetching, no manual matching, and no duplicated names are needed to produce that answer.</p>
+<p class="check"><strong>Check:</strong> Why is a database join better than fetching tables separately and combining them in application code?</p>
+<h2>Section 17: One-to-Many Relationships</h2>
+<p>A one-to-many relationship is one of the most common patterns in database design. It describes a situation where one record in one table relates to many records in another table, but each record in the second table relates to only one record in the first. A single category can contain many items, but each item belongs to one category. Recognising this pattern is the first step to modelling it correctly, because the pattern determines where the link between the tables should live.</p>
+<p>In a one-to-many relationship, the foreign key is stored on the many side. The tasks table holds an owner identifier for each task, pointing to the user who owns it. The structure stays fixed while the data grows.</p>
+<p>This placement also makes the common queries natural. To find all tasks for a user, you filter the tasks table by that user&#x27;s identifier. To find the owner of a task, you follow its owner identifier to the users table, or join the two tables on that key. If the key were stored on the one side instead, neither query would be simple: finding a user&#x27;s tasks would require searching a list stored in one column, and finding a task&#x27;s owner would require searching every user&#x27;s list. The many-side placement is therefore not an arbitrary convention. It is the placement that makes both directions of the relationship easy to query.</p>
+<p>Foreign keys also support integrity. When the database enforces the foreign key, it can prevent a task from pointing to a user who does not exist, and it can define what happens when a user is deleted: whether their tasks should be deleted too, kept with no owner, or block the deletion until the tasks are handled. But the foundation is the placement itself: one foreign key column, on the many side, holding the primary key of the related row on the one side. That single column is the link that joins, filters, and integrity rules all build upon.</p>
+<p>A helpful way to check a design is to phrase it in a sentence. Say, for example, one user has many tasks, and each task belongs to one user. The table named second in the many phrase, tasks, is the many side, and it stores the key. If the sentence is unclear, the relationship itself may need more thought before any table is created. That short verbal check prevents many modelling errors, because it forces you to decide which side is one and which is many, rather than guessing at the table structure.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL
+    )
+&#x27;&#x27;&#x27;)
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        owner_id INTEGER NOT NULL,
+        FOREIGN KEY (owner_id) REFERENCES users (id)
+    )
+&#x27;&#x27;&#x27;)
+connection.commit()
+connection.close()</code></pre>
+<p>Here, many tasks can point to one user through owner_id, while each task points to exactly one user. That is the one-to-many pattern, modelled in the only placement that scales cleanly.</p>
+<p class="check"><strong>Check:</strong> In a one-to-many relationship, which side stores the foreign key, and why?</p>
+<h2>Section 18: Many-to-Many Relationships</h2>
+<p>A many-to-many relationship describes a situation where records on both sides can relate to many records on the other side. A student can enrol in many courses, and each course can have many students. Neither side can hold the link on its own, because a single column in one table cannot cleanly hold a variable list of identifiers from the other table, and adding a column per related record would require changing the table structure every time a new link is added. That is why many-to-many relationships need a third table.</p>
+<p>The third table is called a linking table, or junction table. It exists solely to record links between the two main tables. Each row in the linking table holds a pair of identifiers: one from each side of the relationship. To record that a student takes three courses, you add three rows to the linking table, one per course. To record that a course has twenty students, you add twenty rows. The main tables never change their structure, no matter how many links are added, because all the variability lives in the linking table, where each row represents exactly one link.</p>
+<p>This design keeps each fact stored once, which is the essence of good database modelling. Student details live only in the students table, course details only in the courses table, and the linking table stores only the fact that a particular student and a particular course are connected. If a student&#x27;s name changes, it changes in one place. Queries also stay natural: to find a student&#x27;s courses, you join through the linking table; to find a course&#x27;s students, you join through it in the other direction. Both directions use the same linking rows, viewed from opposite sides.</p>
+<p>The linking table can also carry facts about the link itself, when such facts exist. An enrolment might have a date, or a grade. A task-tag link might have been added on a certain day. If it describes a student in general, it belongs in the students table. Keeping that distinction clear prevents the linking table from becoming a dumping ground for unrelated data.</p>
+<p>A common mistake is to try to avoid the linking table by storing a list of identifiers in a single column, such as a comma-separated list of course identifiers in a student row. That approach breaks querying, filtering, and integrity: the database cannot easily find all students in a course, cannot enforce that each identifier refers to a real course, and cannot index the list efficiently. It may feel like extra work at first, but it is the design that scales, queries cleanly, and stays consistent as links are added and removed.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS task_tags (
+        task_id INTEGER NOT NULL,
+        tag_id INTEGER NOT NULL,
+        PRIMARY KEY (task_id, tag_id),
+        FOREIGN KEY (task_id) REFERENCES tasks (id),
+        FOREIGN KEY (tag_id) REFERENCES tags (id)
+    )
+&#x27;&#x27;&#x27;)
+connection.commit()
+connection.close()</code></pre>
+<p>Each row here is one task-tag link, identified by the pair of keys. That simple structure is what makes many-to-many relationships workable in a relational database.</p>
+<p class="check"><strong>Check:</strong> Why does a many-to-many relationship need a linking table instead of a foreign key on either side?</p>
+<h2>Section 19: Sorting and Limiting Results</h2>
+<p>Sorting and limiting results are operations that shape the order and size of a query&#x27;s answer. Sorting, with ORDER BY, arranges rows by one or more columns, such as by date created, by title, or by priority. Together, they let a program ask for exactly the slice of data a user needs to see, in the order that makes sense for the task, rather than receiving an unordered, unbounded list and trying to make sense of it afterwards.</p>
+<p>Doing sorting and limiting in the database query is far better than doing them locally after retrieval. The difference is, once again, a matter of scale and clarity. If a table holds thousands of rows and the user needs to see the ten most recent, retrieving all thousands and sorting them in Python wastes time and memory, just to discard almost all of the result. Your program then works with a small, already ordered result, and stays responsive as the table grows. Local sorting and limiting, by contrast, gets slower with every row added, even though the visible result stays the same size.</p>
+<p>Database-side sorting also gives a reliable, explicit order. A query without ORDER BY returns rows in no guaranteed order, even if it often appears to return them in insertion order. Relying on that apparent order is fragile, because it can change after deletions, updates, or internal storage changes. If two rows tie on the first sorting column, adding a second column, such as the primary key, breaks the tie deterministically, so repeated runs of the same query return rows in the same order. That determinism matters for pagination, where a user moving from page to page must not see the same row twice or miss a row entirely because the order shifted between pages.</p>
+<p>Limiting pairs naturally with sorting, especially for pagination. A program that shows twenty tasks per page asks for the first twenty, ordered by a chosen column, then the next twenty, and so on, using LIMIT together with an offset. Without LIMIT, every page request would retrieve the whole table, even though only twenty rows are displayed. That waste is invisible on small tables and crippling on large ones, which is why the habit of limiting in the query should be formed early, while tables are still small and the cost of learning it is low.</p>
+<p>Sorting and limiting should be chosen to match the user&#x27;s task. Recent first suits a news or notes list, alphabetical order suits a directory, and priority order suits a task list. The database does not know which order is meaningful for your program, so you must state it. A reader can see that intent directly, without searching through sorting code in the program. That clarity, combined with the performance benefit, makes database-side sorting and limiting a standard practice for every list a program displays.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    SELECT title FROM tasks
+    ORDER BY created DESC
+    LIMIT 10
+&#x27;&#x27;&#x27;)
+for (title,) in cursor:
+    print(title)
+connection.close()</code></pre>
+<p>This query returns the ten most recent task titles, already in order. The program does no sorting and no trimming, because the database has already done both, precisely and efficiently.</p>
+<p class="check"><strong>Check:</strong> Why should sorting and limiting be done in the database query rather than locally after retrieval?</p>
+<h2>Section 20: Aggregates: COUNT, SUM and AVERAGE</h2>
+<p>Aggregates are functions that summarise many rows into a single value. COUNT returns how many rows match a query. SUM adds up a numeric column across those rows. These functions answer questions that programs ask constantly: how many tasks are pending, what is the total of a set of amounts, what is the average score across a group. Without aggregates, answering those questions would require retrieving every relevant row and calculating the summary in program code. With aggregates, the database calculates the summary and returns just the answer.</p>
+<p>Calculating summaries in the database is better than calculating them locally, for the same reasons that filtering and sorting belong in the database. If a table holds thousands of rows, retrieving all of them to count them wastes time, memory, and bandwidth, when a single number is all that is needed. Your program then works with that result directly, without holding a large dataset it will immediately discard. As data grows, the local approach gets slower, while the database approach stays fast, because the amount of data returned stays constant: one number, no matter how many rows were summarised.</p>
+<p>Aggregates also combine naturally with filtering. COUNT with a WHERE condition counts only the rows that meet the condition, such as pending tasks, or tasks created this week. SUM with a condition totals only the matching rows. The query states the whole intent: count the rows that match this condition, total this column for those rows. A reader can see that intent at once, and the database can optimise the whole operation as one unit, rather than as separate retrieval and calculation steps.</p>
+<p>Care is needed with missing values and with what is being counted. COUNT with a column name counts only rows where that column has a value, while COUNT with an asterisk counts all rows, including those with missing values in other columns. SUM and AVG ignore missing values, which is usually the desired behaviour, but it means an average over a column with many missing values is an average over the present values only, not over all rows. Understanding those rules prevents subtle reporting errors, where a count or average looks correct but actually reflects a different set of rows than intended. Testing aggregates on small, known datasets, where you can calculate the expected answer by hand, is the best way to confirm you understand them before relying on them for real reports.</p>
+<p>Aggregates are the foundation for grouping, covered in the next sections, where summaries are calculated per group rather than for the whole result. Even on their own, though, they change how a program handles summaries: from retrieving and calculating, to asking and receiving. That shift keeps programs fast, code short, and intent clear, and it is why summary questions should almost always be answered by the database.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;SELECT COUNT(*) FROM tasks WHERE status = ?&quot;, (&quot;pending&quot;,))
+print(&quot;Pending tasks:&quot;, cursor.fetchone()[0])
+cursor.execute(&quot;SELECT AVG(score) FROM results&quot;)
+print(&quot;Average score:&quot;, cursor.fetchone()[0])
+connection.close()</code></pre>
+<p>Each query here returns a single summarised value. No rows are downloaded, no loop calculates a total, and the program receives exactly the answer it asked for.</p>
+<p class="check"><strong>Check:</strong> Why should summaries like counts and averages be calculated by the database rather than locally?</p>
+<h2>Section 21: Grouping with GROUP BY</h2>
+<p>Grouping with GROUP BY extends aggregates from a single summary to one summary per group. Without grouping, COUNT returns one total for all matching rows, and AVG returns one average for the whole set. With GROUP BY, the database first divides the matching rows into groups based on a column, such as status, category, or owner, and then calculates the aggregate separately for each group. A tasks program might count tasks per status, showing how many are pending, in progress, and done, in a single query. A sales program might total amounts per category. That per-group view is often exactly what a report or dashboard needs.</p>
+<p>Doing grouping in the database is better than grouping locally, for familiar reasons of efficiency and clarity. To group locally, a program must retrieve every relevant row, sort or bucket them by the grouping column, and calculate each group&#x27;s summary in code. That work grows with the number of rows, even though the final answer has only as many rows as there are groups. If a table holds ten thousand tasks across three statuses, the grouped query returns three rows, while the local approach processes ten thousand. The database result is also easier to use: it is already in the grouped form the program needs to display, without further transformation.</p>
+<p>GROUP BY also makes the intent of a summary explicit. A query that groups by status and counts rows says, in one statement, that the program wants a count for each status. When the grouping changes, for example from status to owner, the query changes in one place, while the local code must be reworked and retested. Declarative grouping therefore reduces both code and error surface, and it makes the summary logic testable on its own, with known data, where the expected per-group counts can be checked directly.</p>
+<p>A few rules make GROUP BY reliable. Every column in the result that is not aggregated should normally be a grouping column, so that each result row describes exactly one group. Filtering before grouping, with WHERE, restricts which rows are grouped at all, while filtering after grouping, with HAVING, restricts which groups appear in the result, based on their summaries. Confusing those two stages is a common mistake, but the distinction is logical once stated: WHERE filters rows, HAVING filters groups. Keeping that distinction clear prevents summaries that look plausible but actually describe the wrong set of rows or groups.</p>
+<p>Grouping is also the bridge to more advanced reporting. Once per-group counts and totals are natural, a program can answer richer questions: average scores per subject, totals per month, or counts per user, each in a single query. Learning GROUP BY early therefore pays off across many programs, because summarised, grouped views are among the most common outputs a database program produces.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    SELECT status, COUNT(*) FROM tasks
+    GROUP BY status
+    ORDER BY status
+&#x27;&#x27;&#x27;)
+for status, count in cursor:
+    print(f&quot;{status}: {count}&quot;)
+connection.close()</code></pre>
+<p>This query returns one row per status, with its task count. The database does the grouping and counting, and the program simply displays the ready-made summary.</p>
+<p class="check"><strong>Check:</strong> What does GROUP BY add to an aggregate query, and why do it in the database?</p>
+<h2>Section 22: Searching with LIKE</h2>
+<p>Searching with LIKE lets a query find rows whose text matches a pattern, rather than an exact value. An exact match requires the search term to equal the whole column value. LIKE relaxes that requirement: a pattern can match part of a value, using wildcard symbols. So a pattern that starts with a percent sign and ends with a search term finds values ending with that term, a pattern with percent signs on both sides finds values containing the term anywhere, and a pattern ending with a percent sign finds values beginning with the term. That flexibility makes LIKE suitable for search boxes, where users type part of a title or name and expect matching rows.</p>
+<p>LIKE is sufficient for many small and medium search needs. A personal notes program, a task list, or a small catalogue can search titles and descriptions with LIKE and return useful results quickly, especially when the tables are modest in size. For a program where search is a secondary feature, and where users search mainly by a fragment of a known title, LIKE is often the right tool, and adding a more complex search system would be unnecessary work. Its simplicity is a genuine advantage, not a limitation to apologise for.</p>
+<p>LIKE has limits that matter as data and expectations grow. It matches patterns character by character, without understanding words, relevance, or spelling. It cannot easily rank results by how well they match, handle misspellings, ignore common words, or search across many columns with sensible weighting. A search that feels instant on a few hundred rows can become slow on hundreds of thousands, especially if the search term is short and matches many rows. Those are the signs that a more advanced search tool should be considered.</p>
+<p>More advanced tools, such as full-text search, address those limits by building a specialised index of words, supporting ranked results, and handling larger collections efficiently. SQLite itself offers a full-text search extension for this purpose, and server databases and dedicated search services offer their own versions. Moving to such a tool is a deliberate step, justified when search becomes a central feature, when tables are large, when users expect ranked and tolerant results, or when LIKE performance has been measured and found wanting. The decision should be based on that measurement and on user needs, not on assuming that simple search is always inadequate, or that advanced search is always better.</p>
+<p>A practical approach is to start with LIKE, measure its behaviour with realistic data, and upgrade only when a clear limit is hit. That approach keeps early development simple, while leaving a clear path forward. It also respects the principle that runs through this chapter: choose the tool that matches the program&#x27;s actual needs, and revisit the choice when those needs change.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;notes.db&quot;)
+cursor = connection.cursor()
+cursor.execute(
+    &quot;SELECT title FROM notes WHERE title LIKE ?&quot;,
+    (&quot;%python%&quot;,),
+)
+for (title,) in cursor:
+    print(title)
+connection.close()</code></pre>
+<p>This query finds every note whose title contains the word python, using a parameter for the pattern. For a small notes collection, that simple search is entirely sufficient.</p>
+<p class="check"><strong>Check:</strong> When is LIKE search sufficient, and when should you consider a more advanced search tool?</p>
+<h2>Section 23: Handling NULL and Missing Values</h2>
+<p>NULL represents a missing value in a database. It does not mean zero, it does not mean empty text, and it does not mean false. A user who has not provided a phone number has a NULL phone number, not a phone number of zero. That distinction matters, because queries, counts, and comparisons treat NULL differently from any concrete value, and confusing the two produces wrong results that can be hard to spot.</p>
+<p>The difference shows up in comparisons. A comparison with NULL does not return true or false in the usual way; it returns an unknown result, which filters treat as not matching. A program that needs to find tasks without a due date must test explicitly for NULL, not for an empty string or zero. Learning that rule early prevents a whole class of bugs where missing rows silently disappear from results, or where counts understate how many records lack a value.</p>
+<p>Missing values should also not be disguised with placeholders. Using zero for a missing score, an empty string for a missing name, or a fake date such as the start of an epoch for a missing date makes the data look complete when it is not. Counts, averages, and filters will then treat placeholders as real values, producing wrong totals and misleading displays. A count of tasks with a due date that includes fake dates overstates how many tasks are actually scheduled. NULL avoids that deception by stating honestly that the value is missing, allowing queries to distinguish, correctly, between rows that have a value and rows that do not.</p>
+<p>Allowing NULL is appropriate for genuinely optional fields, as discussed for NOT NULL constraints. A note is optional, a due date may not yet be set, and a middle name may not exist. For those fields, NULL is the honest representation. The choice between allowing NULL and requiring a value should therefore be made per column, based on whether missing is a legitimate state for that field. That per-column judgement keeps the data honest: required means required, and optional means clearly missing when absent, not faked.</p>
+<p>In Python, NULL values arrive as None when rows are fetched, which gives a natural way to handle them: check for None before using the value, display a sensible fallback such as not set, and avoid arithmetic on None. That check should be part of any code that reads optional columns, because assuming a value is always present will cause errors or wrong output when a NULL row is encountered. Handling None explicitly, like testing for NULL in SQL, keeps the program robust in the presence of incomplete data, which is the normal state of real programs, not an exception.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;SELECT title FROM tasks WHERE due IS NULL&quot;)
+print(&quot;Tasks without a due date:&quot;)
+for (title,) in cursor:
+    print(title)
+connection.close()</code></pre>
+<p>This query finds only tasks whose due date is genuinely missing. It would not find tasks with an empty string or zero in that column, which is exactly why NULL, rather than a placeholder, is the right way to represent missing data.</p>
+<p class="check"><strong>Check:</strong> Why is NULL different from zero or empty text, and why should missing values not use placeholders?</p>
+<h2>Section 24: Python and SQLite Together</h2>
+<p>Python and SQLite work together through the sqlite3 module, which is part of Python&#x27;s standard library. That means no extra package is needed to start using a database: you import sqlite3, connect to a file, and use a cursor to execute SQL. NULL becomes None, integers become Python integers, and text becomes Python strings. That straightforward mapping keeps database code feeling like ordinary Python, with SQL statements as the bridge to the stored data.</p>
+<p>A connection represents your program&#x27;s link to the database file. A cursor is the object through which you send statements and receive results. The usual pattern is short: connect, create a cursor, execute statements, fetch results where needed, commit changes, and close the connection. Each step has a purpose. Connecting opens the file. Fetching retrieves results. Committing makes changes permanent. Closing releases the file and any locks. Skipping the last two steps is where most beginner problems arise, because uncommitted changes can be lost and unclosed connections can leave files locked for later runs.</p>
+<p>Connections must be closed reliably, even when an error occurs. If a program raises an exception halfway through database work and never reaches its close call, the connection may remain open, the file may stay locked, and uncommitted changes may be left in an uncertain state. The next run of the program, or another program trying to open the same file, may then fail or behave strangely. That guarantee is not optional polish. It is part of correct resource handling, in the same way that closing files reliably is part of correct file handling.</p>
+<p>The same reliability applies to transactions. If an error occurs during a multi-step change, the transaction should be rolled back, not left open. A context manager for the connection, combined with explicit commit on success and rollback on failure, gives a robust structure: work is attempted, success is committed, failure is rolled back, and the connection is closed in all cases. Writing that structure from the start, even for tiny programs, builds a habit that scales to larger programs, where errors are more frequent and their consequences more serious. Small programs are the right place to learn the pattern, because the stakes are low and the pattern itself is short.</p>
+<p>Finally, keep database code organised. A small program can keep its connection handling in a few functions: one to open and set up the database, and others to add, list, update, and delete records. Larger programs often place that code in a dedicated module, so that the rest of the program works with clear functions rather than raw SQL scattered everywhere. That organisation, combined with reliable closing, parameterised queries, and explicit commits, is what makes Python and SQLite together a solid foundation, rather than a collection of fragile scripts that happen to touch a database file.</p>
+<pre><code>import sqlite3
+
+try:
+    connection = sqlite3.connect(&quot;tasks.db&quot;)
+    cursor = connection.cursor()
+    cursor.execute(&quot;SELECT COUNT(*) FROM tasks&quot;)
+    print(&quot;Tasks:&quot;, cursor.fetchone()[0])
+    connection.commit()
+finally:
+    try:
+        connection.close()
+    except NameError:
+        pass</code></pre>
+<p>A cleaner form uses with sqlite3.connect as the connection, which closes automatically. Either way, the principle is the same: the connection must be closed on every path, not only on the successful one.</p>
+<p class="check"><strong>Check:</strong> Why should database connections be closed reliably, even when an error occurs?</p>
+<h2>Section 25: Parameterised Queries and Injection Defence</h2>
+<p>A parameterised query is a SQL statement in which values are supplied separately from the statement text, through placeholders. In Python&#x27;s sqlite3 module, the placeholder is usually a question mark, and the values are passed as a tuple alongside the statement. That separation is the defence against SQL injection, one of the most common and serious vulnerabilities in programs that use databases. Understanding it is essential, because injection can compromise an entire database through a single unprotected input field.</p>
+<p>SQL injection happens when user input is pasted into SQL text, and that input contains characters that change the statement&#x27;s meaning. A classic example is a search or login value containing a quote followed by SQL keywords. When that text is joined into the statement, the database parses the combined text as a new statement, which may return rows it should not, bypass a check, modify data, or even delete tables, depending on what the injected text says. It requires only an input field whose contents are trusted as code, rather than treated as data. Any program that builds SQL by string formatting, with user input or with data from external sources, is vulnerable in principle, even if no attack has yet occurred.</p>
+<p>Parameterised queries prevent injection by never letting values become part of the parsed statement. The statement, with its placeholders, is parsed first, with its structure fixed. The values are then supplied separately, and the database inserts them as data values, with quoting and escaping handled by the database itself. That is why parameterisation is a structural defence, not a matter of filtering out dangerous characters. Filtering is fragile, because attackers find characters and encodings the filter missed. Separation of code and data is robust, because it removes the attack&#x27;s mechanism entirely.</p>
+<p>Parameterisation should be used even for trusted data, and even when the data comes from your own program rather than a user. Trusted data can still contain characters that break a manually built statement, such as an apostrophe in a name or a title, and data that is trusted today may come from a less trusted source tomorrow, after a feature is added or a data source changes. The rule becomes simple and universal: values are always parameters, never text. That simplicity is itself a security benefit, because it leaves no case where a developer must remember to be careful, and therefore no case where forgetting causes a vulnerability.</p>
+<p>The same rule applies to every kind of statement: inserts, updates, deletes, and filtered selects. Any statement that includes a value, from any source, should use a placeholder for that value. Keeping that distinction clear, values as parameters, structure as fixed code, gives a program a clean defence against injection, without complex validation logic or fragile filtering.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+user_input = &quot;O&#x27;Brien&quot;
+cursor.execute(
+    &quot;SELECT * FROM users WHERE name = ?&quot;,
+    (user_input,),
+)
+print(cursor.fetchall())
+connection.close()</code></pre>
+<p>Here, even a name containing an apostrophe is handled safely, because it is passed as a parameter, not pasted into the SQL text. That safety holds for every value, trusted or not, and it is why parameterisation is non-negotiable in database code.</p>
+<p class="check"><strong>Check:</strong> How do parameterised queries prevent SQL injection, and why should they be used even for trusted data?</p>
+<h2>Section 26: Designing a Schema for a Small App</h2>
+<p>Designing a schema for a small application begins not with tables, but with a clear list of the kinds of records the application must store, and why each kind is needed now. A schema is the set of tables, columns, types, and rules that define how data is stored. Each record kind should be justified by a current requirement, not by a guess about the future.</p>
+<p>Listing record kinds starts with the application&#x27;s purpose, stated plainly. A tasks-and-notes manager needs tasks and notes, because those are the things users create and manage. It may need users, if more than one person uses it, or tags, if tasks can be grouped by label. Adding them later, when they are genuinely needed, is easier than maintaining speculative tables that no code uses, and that confuse every reader of the schema. A minimal schema, justified by current needs, is therefore not a sign of limited ambition. It is a sign of disciplined design.</p>
+<p>For each record kind, the next step is to list its columns, again justified by need. A task needs a title, because users identify tasks by title. It needs a status, because tasks progress from pending to done. Each column should answer the question: which feature uses this fact, and what goes wrong if it is missing. A column that no feature uses is clutter, and clutter has costs: it must be filled, validated, displayed or ignored, and migrated whenever the schema changes. A column that a feature needs, but that was omitted, is also costly, but it is cheaper to add a genuinely needed column later than to carry speculative columns indefinitely.</p>
+<p>Relationships between record kinds should be modelled with the patterns from earlier sections: foreign keys on the many side for one-to-many relationships, and linking tables for many-to-many relationships. Constraints should be chosen with the same restraint. Those choices, made for a small schema, are easy to state, easy to test, and easy to explain to another developer. They also make the schema a useful document: reading the table definitions should reveal what the application stores, what it requires, and how its records relate, without needing to read all of the application code.</p>
+<p>Finally, test the schema with realistic examples before building much code on it. Write down a few sample records, walk through the application&#x27;s main tasks, and check that each task can be done with the schema as designed. Can a task be created, listed by status, updated by its identifier, and linked to its owner? If any main task is awkward or impossible, the schema needs adjustment now, while it is still cheap to change. That short exercise, repeated as requirements grow, keeps schema design grounded in what the application actually does, rather than in what it might one day do.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;manager.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL,
+        due TEXT
+    )
+&#x27;&#x27;&#x27;)
+connection.commit()
+connection.close()</code></pre>
+<p>This minimal tasks table reflects only current needs: a title and status are required, a due date is optional. That restraint is the heart of good schema design for a small application.</p>
+<p class="check"><strong>Check:</strong> Why should schema design start with listing record kinds justified by current requirements?</p>
+<h2>Section 27: Changing a Schema Safely</h2>
+<p>Changing a schema safely means altering the structure of tables that already hold data, without losing or corrupting that data. Schema changes are inevitable as a program grows: a new column is needed, a column type must change, or a table must be split or merged. A safe change process therefore treats the live database as precious, and treats every change as something to be prepared, backed up, and tested before it touches real data.</p>
+<p>The first step is always a backup. Before changing the schema, copy the database file to a safe location, separate from the original, and confirm the copy is complete. For SQLite, that copy is a file copy, made while the program is not writing to the database. A change made without a backup is a gamble, because even a well-planned change can fail through a mistake, a misunderstanding of the existing data, or an unexpected value that the new structure cannot hold. The backup turns a potential disaster into a recoverable mistake.</p>
+<p>The second step is to test the change on a copy, not on the live database. Apply the proposed change to a copy of the database, using realistic data, and then run the program&#x27;s main operations against the changed copy. Testing on a copy reveals problems while they are still cheap to fix, because the live data has not been touched and the program has not been disrupted. Only when the test copy passes should the change be applied to the live database, following the same steps that were tested.</p>
+<p>SQLite has limited support for altering tables directly. Some changes, such as adding a column, are straightforward. Others, such as removing a column, changing a type, or adding a strict constraint to existing data, require a more involved process: creating a new table with the desired structure, copying data from the old table into the new one, with any needed conversions, dropping the old table, and renaming the new table. That process must be done inside a transaction, so that a failure partway does not leave the database half-migrated. Each step should be scripted and tested, rather than performed by hand in an ad-hoc way, because a script can be reviewed, tested on a copy, and repeated exactly on the live database.</p>
+<p>Finally, record what changed and why. A short note, or a migration script kept with the program, stating the old structure, the new structure, and the reason for the change, helps future maintainers understand the schema&#x27;s history. It also makes the next change easier, because the history of past changes shows what has already been tried and what constraints the data must satisfy. Schema changes are therefore not just technical operations. They are part of the program&#x27;s maintenance story, and treating them with backup, testing, and documentation is what separates a careful developer from one who learns, through data loss, why those steps matter.</p>
+<pre><code>import sqlite3
+import shutil
+
+shutil.copyfile(&quot;app.db&quot;, &quot;app.db.backup&quot;)
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;ALTER TABLE tasks ADD COLUMN priority TEXT&quot;)
+connection.commit()
+connection.close()</code></pre>
+<p>Here the file is backed up before the change, and only then is a new column added. That order, backup first, change second, tested first, is the safe pattern for every schema change.</p>
+<p class="check"><strong>Check:</strong> Why should every schema change be backed up and tested on a copy before applying it to live data?</p>
+<h2>Section 28: Backing Up a Database</h2>
+<p>Backing up a database means making a copy of its data that can be used to restore it after a failure. Failures take many forms: a file is deleted by mistake, a program bug corrupts data, a disk fails, or a schema change goes wrong. Without a backup, any of those events can mean permanent loss. That difference is why backup is not an optional extra for important data. It is a core part of operating a program that stores anything users would miss if it disappeared.</p>
+<p>For SQLite, a backup is, at its simplest, a copy of the database file. Because the whole database lives in one file, copying that file copies every table, row, and table definition together. The copy must be made safely: while the program is not writing to the database, or using SQLite&#x27;s backup facilities, which handle copying a live database correctly. That is a dangerous kind of failure, because it is discovered only at the moment of crisis, when there is no time to make a better copy. The backup process must therefore be reliable, not just plausible.</p>
+<p>Backups must be stored separately from the original. A backup kept in the same directory, on the same disk, or on the same machine, protects against some failures, such as accidental deletion of the original file, but not against others, such as disk failure, theft, or a disaster affecting the whole machine. The exact separation needed depends on how important the data is, but the principle is universal: a backup that is lost in the same event as the original is not a backup at all. At minimum, important databases should have a copy that survives the loss of the machine holding the original.</p>
+<p>Backups must also be verified by test restores. A backup that has never been restored is an assumption, not a proven safeguard. Files can be truncated, copies can be incomplete, and backup scripts can silently fail for weeks, producing empty or corrupt files while reporting success. That test should be done regularly, not once, because backup processes degrade over time as disks fill, permissions change, or programs move. A routine test restore turns backup from a hope into a verified capability.</p>
+<p>Finally, backups should be made regularly, with a frequency that matches how quickly data changes and how much loss is acceptable. A database that changes daily needs at least daily backups. A database that changes hourly may need more frequent copies. The question to ask is: if the database were lost right now, how much work, since the last backup, would be lost, and is that acceptable. If the answer is no, backups must be more frequent. That calculation, combined with separate storage and verified restores, is what makes a database genuinely recoverable, rather than merely backed up in name.</p>
+<pre><code>import shutil
+
+shutil.copyfile(&quot;app.db&quot;, &quot;backups/app-2026-10-30.db&quot;)
+print(&quot;Backup copied. Verify it by opening the copy and checking its tables.&quot;)</code></pre>
+<p>This short copy is only a backup if the copy is complete, stored separately, and verified by a test restore. Those three conditions, not the copy command alone, are what make recovery possible.</p>
+<p class="check"><strong>Check:</strong> Why must backups be stored separately from the original and verified by test restores?</p>
+<h2>Section 29: Concurrency and Locking</h2>
+<p>Concurrency means more than one program, process, or thread trying to use the same database at the same time. Locking is how a database coordinates that shared use, so that concurrent operations do not corrupt each other&#x27;s work. Understanding that limitation is essential to choosing SQLite wisely, because using it for a program whose concurrency needs exceed its design will produce failures that no amount of careful querying can fix.</p>
+<p>SQLite allows many readers at once. Several programs can read the same database file simultaneously without interfering with each other, because reading does not change the data. Writing is different. Other writers must wait until the first writer finishes and releases the lock. That single-writer rule keeps the file consistent, because only one change is applied at a time, but it means that write throughput is limited by serialisation. If many writers queue up, later writers wait, and if they wait too long, they may time out with a locked-database error, rather than completing their work.</p>
+<p>That behaviour suits programs where writes are infrequent, or where one program is the main writer. A personal organiser, a desktop tool, a testing suite, or a small web application with modest traffic fits well, because writes rarely collide, and brief waits are harmless. For those programs, a server database, designed from the start for many concurrent writers, with finer-grained locking and connection management, is the appropriate choice. Trying to force SQLite into that role leads to lock errors, retries, and user-visible failures.</p>
+<p>Programmers can reduce lock contention in SQLite programs, but only within limits. Keeping transactions short, so that locks are held briefly, helps, because a writer that finishes quickly frees the lock for the next writer. Avoiding long-running transactions that hold a write lock while waiting for user input or network responses helps even more. Setting a sensible busy timeout, so that a waiting writer retries briefly rather than failing immediately, can smooth over brief collisions. Those techniques are good practice, and they extend SQLite&#x27;s useful range, but they do not change its fundamental single-writer design. They make a low-concurrency program more robust, not a high-concurrency program suitable.</p>
+<p>The decision, therefore, is about matching the tool to the program&#x27;s real concurrency pattern. Ask how many writers will use the database, how often they will write, and whether they run on the same machine or different machines. If the answers are few, infrequent, and same-machine, SQLite is likely a good fit, and its simplicity is a genuine advantage. If the answers are many, frequent, or multi-machine, choose a server database, and accept its setup cost as the price of the concurrency it provides. That honest assessment, made early, prevents a painful migration later, when lock errors reveal that the initial choice was wrong.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;, timeout=10)
+cursor = connection.cursor()
+cursor.execute(&quot;INSERT INTO logs (message) VALUES (?)&quot;, (&quot;Started&quot;,))
+connection.commit()
+connection.close()</code></pre>
+<p>The timeout here lets a writer wait briefly for a lock, rather than failing at once. It softens brief contention, but it does not turn SQLite into a multi-writer server database.</p>
+<p class="check"><strong>Check:</strong> How does SQLite&#x27;s single-writer locking affect which programs it suits?</p>
+<h2>Section 30: Database Security Basics</h2>
+<p>Database security for SQLite begins with a fact that surprises some developers: SQLite itself provides very little built-in access control. A server database typically has user accounts, passwords, and permissions that limit who can read or change each table. Anyone who can read the database file can read all of its data, and anyone who can write to the file can change all of it. That means the security of a SQLite database depends heavily, and in practice almost entirely, on file permissions and on who can access the machine and directory where the file lives.</p>
+<p>File permissions are therefore the first line of defence. On a system with multiple users, the database file should be readable and writable only by the user account that runs the program, and not by other accounts. Setting restrictive permissions on both the file and its directory, and checking them as part of deployment, is a basic step that is easy to overlook, especially during development, when permissive settings feel convenient. That convenience should not carry into production, where other users, or other programs running as other users, must not be able to open the database file directly.</p>
+<p>A second implication is that a SQLite database file should never be placed where it can be downloaded. A web application that stores its database inside a publicly accessible web directory risks exposing the entire file to anyone who guesses its URL. Similarly, a database file should not be included in backups, archives, or code repositories that are shared more widely than the data itself should be. A file copied casually can travel far, and every copy carries the full data with it, without any password or permission check beyond the file system.</p>
+<p>Application-level controls still matter, even though SQLite has no user accounts. The program that uses the database should authenticate its users, authorise their actions, and enforce, in code, which records each user may see or change. Parameterised queries, input validation, and careful handling of user identifiers are all part of that layer. They offer no protection if an attacker gains direct file access, which is why file permissions and placement are not secondary details. They are the boundary that makes application-level controls meaningful, by ensuring that the only path to the data is through the program that enforces them.</p>
+<p>Finally, sensitive data in a SQLite database deserves extra thought. Passwords should never be stored in plain text, in any database, and other sensitive values, such as tokens or personal details, should be protected according to their sensitivity, with encryption where appropriate, and with minimisation where possible: do not store sensitive data you do not need. Those practices, combined with strict file permissions, safe placement, and application-level authorisation, form a coherent security posture for SQLite programs. It is a posture built on the file system, not on database accounts, and recognising that difference is the key to securing SQLite data.</p>
+<pre><code>import os
+
+os.chmod(&quot;app.db&quot;, 0o600)
+print(&quot;Database file is now readable and writable only by its owner.&quot;)</code></pre>
+<p>That single permission change is not the whole of security, but for SQLite, it is one of the most important steps, because file access is database access.</p>
+<p class="check"><strong>Check:</strong> Why does SQLite data protection depend heavily on file permissions?</p>
+<h2>Section 31: Validating Data Before Storage</h2>
+<p>Database constraints protect stored data, but they are not a substitute for application validation. Application validation happens before data reaches the database, and it can give users clear, immediate feedback in plain language. A constraint violation, by contrast, often produces a technical error message that users cannot act on. For example, a user who enters an invalid date should be told which field is wrong, and what a valid date looks like, at the moment they enter it, rather than after a database error that says only that a constraint failed. That immediacy improves user experience, and it reduces wasted database operations on data that was never valid.</p>
+<p>Validation should also check things constraints cannot easily express. A constraint can require a value to be present, or unique, but it cannot easily check that a due date is in the future, or that a task title is sensible, or that two fields are consistent with each other, such as a start date before an end date. Those business rules belong in application code, where they can be expressed clearly, tested directly, and explained to users in helpful messages. Business validation, combined with database constraints, gives two layers of protection: application validation for user experience and business logic, and database constraints for integrity, as a final gate, even if application validation is bypassed or buggy.</p>
+<p>Validation must be tested, like other code. Test it with valid data, with missing data, with wrong types, and with edge cases, such as empty strings, very long titles, or dates far in the past. Each test should assert on the validation result, and on the message given, so that users receive guidance, not just rejection. Testing validation early catches gaps, such as a rule that was intended but never implemented, or a rule that rejects legitimate data, such as a title length limit that is too short for real titles. Those gaps, found in tests, are cheap to fix, compared with gaps found by users, after release, when they cause frustration and lost data.</p>
+<p>Finally, validation should be consistent wherever data enters the program. If data can be added through a command line, through a file import, and through an API, all three paths should apply the same validation, rather than each implementing its own version, which will inevitably diverge, allowing invalid data through one path, while blocking it through another. Centralising validation in one place, such as a function that checks a record before storage, and calling it from every entry path, ensures consistency, and makes rules easy to update, because they live in one place, not scattered across entry points. That centralisation, like other centralisations in this book, improves reliability, and makes validation a dependable gate, rather than a patchwork of partial checks.</p>
+<p class="check"><strong>Check:</strong> Why do you need both application validation and database constraints, rather than just one?</p>
+<h2>Section 32: Foreign Keys</h2>
+<p>A foreign key is a column in one table that refers to the primary key of another table. It creates a link between records, such as a task&#x27;s owner column referring to a user&#x27;s identifier, or an item&#x27;s category column referring to a category&#x27;s identifier. That link lets the database understand relationships, rather than merely storing numbers that happen to match, in unrelated tables. Understanding, as a database feature, enables the database to enforce referential integrity, which means it can prevent orphaned records, such as a task pointing to a user who does not exist, by rejecting inserts or updates that reference non-existent keys, and by controlling what happens when a referenced record is deleted, such as preventing deletion, or cascading it, depending on the rule chosen. Referential integrity is valuable because orphaned records cause confusion. A task whose owner no longer exists cannot be displayed properly, because its owner&#x27;s name cannot be found. A program that encounters such a task must decide how to handle it, often with special-case code, for a situation that should never have arisen, if foreign keys had prevented it, in the first place. Preventing orphans, through foreign keys, removes that whole class of special cases, by ensuring that every reference points to a real record, at all times, so that application code can rely on references being valid, without checking each one, before use, a reliance that simplifies code, and improves reliability, because it removes a source of unexpected failures, where a reference turns out to be dangling, at the worst possible moment, during display, or during a calculation, that assumes the referenced record exists, an assumption that foreign keys make safe, by guaranteeing, through the database, that referenced records exist, for every foreign key, in every row, at all times, a guarantee that application code alone, without foreign keys, cannot provide, reliably, because it would need to check, on every insert, and on every delete, whether references remain valid, checks that are easy to forget, in some code paths, leading to orphans, through paths that were not checked, a forgetting that foreign key enforcement, by the database, prevents, by checking, automatically, for every operation, regardless of code path, a automaticness that makes foreign keys, a powerful integrity tool, for relational data, generally, where relationships, must remain valid, over time, as records, are added, updated, and deleted, through many code paths, all of which, foreign keys, guard, equally, without requiring, each path, to implement, its own checks, correctly, a guarding that, this section, encourages, as a habit, for all relational tables, you design, from now on, where foreign keys, should be defined, for every relationship, between tables, as part of schema design, not as an afterthought, after orphans, have already appeared, in data, that must then be cleaned up, manually, with difficulty, and with risk, of deleting, or altering, records, incorrectly, during cleanup, a difficulty that foreign keys, prevent, by preventing orphans, from occurring, in the first place, through database enforcement, for every relationship,.</p>
+<p class="check"><strong>Check:</strong> What is referential integrity, and why should deletion behaviour for a foreign key be chosen deliberately?</p>
+<h2>Section 33: Normalisation in Brief</h2>
+<p>Normalisation is a set of guidelines for organising data so that each fact is stored once, in one place. The name can sound formal, but the idea is practical. If a customer&#x27;s address is stored in three different tables, or in three rows of the same table, then changing that address requires changing all three copies. Normalisation prevents that problem by insisting that each fact has a single home. Change it there, and every query that uses it sees the updated value, because every query reads from that one place.</p>
+<p>Storing each fact once prevents inconsistent data in a direct way. Inconsistency arises when the same fact is duplicated and the copies diverge, through an incomplete update, a partial import, or a bug in one part of the program that writes one copy but not another. When there is only one copy, divergence is impossible, because there is nothing to diverge from. There is no list of places to update, no risk of missing one, and no need for a later reconciliation step to find and fix copies that fell out of sync. That simplicity is a major reason why normalised designs are easier to maintain over time.</p>
+<p>Normalisation is achieved mainly by splitting data into tables that each describe one kind of thing, and linking those tables with keys, as earlier sections explain. Customer details live in a customers table, order details in an orders table, and each order points to its customer by identifier, rather than repeating the customer&#x27;s name and address in every order row. Product details live in a products table, and order lines point to products by identifier, rather than repeating product descriptions. Columns that describe something else belong in that something&#x27;s table, and are reached by joining, not by copying. That discipline, applied consistently, produces a schema where each fact has exactly one home.</p>
+<p>There are costs to normalisation, and they are worth naming honestly. Queries that need facts from several tables must join those tables, which can be more complex to write than reading a single, wide table that already contains everything. For small programs, that complexity is modest and well worth the consistency benefit. But denormalisation should start from a normalised design, so that the duplicated facts are a deliberate, documented exception, not an accidental mess. Starting normalised gives a clear baseline: each fact once, unless a measured reason justifies copying it.</p>
+<p>For most programs, and certainly for the small programs in this chapter, normalisation is the right default. It keeps data consistent, updates simple, and schemas understandable. If the answer is that it already lives elsewhere, use a key. That single question, asked for every column, is the practical heart of normalisation, and it prevents a large share of the data-quality problems that plague programs whose schemas grew without it.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;shop.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    SELECT orders.id, customers.name
+    FROM orders
+    JOIN customers ON orders.customer_id = customers.id
+&#x27;&#x27;&#x27;)
+for order_id, name in cursor:
+    print(order_id, name)
+connection.close()</code></pre>
+<p>Here the customer&#x27;s name is stored once, in the customers table, and each order reaches it by joining on the customer key. No order row repeats the name, so no order can disagree with another about who the customer is.</p>
+<p class="check"><strong>Check:</strong> How does storing each fact once prevent inconsistent data?</p>
+<h2>Section 34: When Denormalisation Helps</h2>
+<p>Denormalisation is the deliberate duplication of data, or the deliberate merging of tables, to improve performance or simplify a specific query, at the cost of some of the consistency benefits of normalisation. A common example is storing a customer&#x27;s name alongside each order, even though the name already lives in the customers table, so that listing orders does not require a join. In both cases, the duplicated fact can be read quickly, without joining or calculating, which can make a frequently run query noticeably faster, or a frequently displayed view simpler to produce.</p>
+<p>Denormalisation should start from a normalised schema, not replace it from the beginning. The normalised design is the baseline that defines where each fact truly lives. Duplication is then added as a measured exception, for a specific query or view that has been shown to be slow or cumbersome, with a clear understanding of which copy is authoritative and how the copies will be kept in sync. The result is not a performance optimisation. It is a schema where no one trusts the data, because no one can say which copy is correct when copies disagree.</p>
+<p>Justification for denormalisation should be based on measured performance, not on a guess that a join might be slow. Measure the query with realistic data, at realistic size, and confirm that it is actually too slow, and that denormalisation actually fixes it. Fixing those problems is usually cheaper and safer than duplicating data. Only when measurement shows that the join or calculation itself is the bottleneck, and that duplication removes it, is denormalisation justified as a performance step.</p>
+<p>Keeping duplicated data in sync is the ongoing cost that must be planned for. Whenever the authoritative value changes, every duplicate must change too, in the same transaction, so that copies never diverge, even briefly, in a way that readers can observe. That synchronisation code must be tested, including failure cases where an update to one copy succeeds and an update to another fails. If synchronisation cannot be made reliable, denormalisation is too risky, and the normalised design should be kept, even at some performance cost. A fast query that returns wrong data is worse than a slower query that returns right data, because wrong data undermines trust in the whole program.</p>
+<p>Denormalisation is therefore a trade, not a default. It trades consistency risk and maintenance cost for speed or simplicity in a specific, measured case. For most small programs, that trade is not needed, and the normalised design should stand unchanged. When it is needed, it should be documented: which facts are duplicated, why, which copy is authoritative, and how synchronisation works. That documentation lets future maintainers understand the exception, maintain its synchronisation, and revisit the decision if usage changes. Without it, a deliberate optimisation decays, over time, into an unexplained inconsistency.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;shop.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;SELECT customer_name, total FROM orders WHERE id = ?&quot;, (1,))
+print(cursor.fetchone())
+connection.close()</code></pre>
+<p>If customer_name here is a duplicated copy, it must be updated whenever the customer&#x27;s real name changes, in the same transaction. That synchronisation burden is the price of the faster, join-free read.</p>
+<p class="check"><strong>Check:</strong> Why should denormalisation start from a normalised schema and be justified by measured performance?</p>
+<h2>Section 35: Understanding Query Performance</h2>
+<p>Understanding query performance means knowing why a query is fast or slow, rather than guessing. A query that returns quickly on a small learning table may become slow as the table grows, and a change that seems like an optimisation may make no difference, or may even make things worse, if it does not address the real bottleneck. Only then should you change indexes, query structure, or schema, and after each change, measure again to confirm the change actually helped.</p>
+<p>Guessing is tempting because performance intuitions are often wrong. A developer might assume a join is slow, when the real problem is a missing index on the join key. Or they might assume an index will help, when the query actually returns most of the table anyway, so scanning is already the efficient approach. Measurement replaces those guesses with evidence. It shows which queries are actually slow, how slow they are, and where the database spends its time, so that effort goes to the changes that matter, rather than to plausible-sounding changes that do not.</p>
+<p>Realistic data is essential to useful measurement. A table with twenty rows will answer almost any query instantly, regardless of indexes or query shape, because the database can scan twenty rows in negligible time. Test data should therefore resemble real data in size, in the distribution of values, and in the patterns of queries the program will actually run. That includes edge cases, such as values that match many rows, or values that match none, because those cases often expose performance problems that average cases hide.</p>
+<p>SQLite provides a way to inspect query execution, commonly through an explain command, which shows whether the database plans to scan a table, use an index, or perform other steps. Learning to read that output, even at a basic level, is a valuable skill. It turns performance from a mystery into a traceable process: this query scans, that query uses an index, this join order is chosen. Combined with timing, that inspection lets you test hypotheses directly. If you add an index and the plan changes from scan to index lookup, and the time falls, the index helped. If the plan does not change, the index did not address the bottleneck, and further index additions are unlikely to help.</p>
+<p>Performance habits from earlier sections also matter, and they should be checked before exotic optimisations. Precise SELECT lists, filtering in WHERE, sorting and limiting in the query, and indexes on frequently filtered columns together solve most performance problems in small programs. Only after those habits are in place, and measurement still shows a problem, should schema changes, denormalisation, or more advanced techniques be considered, each justified by measurement. That order, habits first, measurement second, targeted change third, keeps performance work proportionate, evidence-based, and safe.</p>
+<pre><code>import sqlite3
+import time
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+start = time.perf_counter()
+cursor.execute(&quot;SELECT title FROM tasks WHERE status = ?&quot;, (&quot;pending&quot;,))
+rows = cursor.fetchall()
+print(f&quot;Found {len(rows)} rows in {time.perf_counter() - start:.4f} seconds&quot;)
+connection.close()</code></pre>
+<p>Timing a query on realistic data, before and after a change, is the simplest form of measurement, and it is enough to prevent most guess-based optimisations from wasting time or harming performance.</p>
+<p class="check"><strong>Check:</strong> Why should query optimisation be based on measurement with realistic data rather than guessing?</p>
+<h2>Section 36: Handling Large Data in SQLite</h2>
+<p>Handling large data in SQLite begins with a mindset: design queries for large tables even while tables are still small. A program that works beautifully on a few hundred rows can become unusable on a hundred thousand, not because the code changed, but because the data grew and the queries did not scale. On large data, they dominate response time and memory use, and they are painful to fix after the program depends on them.</p>
+<p>Designing for large data means, first, keeping queries precise at every stage. Filter with WHERE, so the database returns only matching rows. Select only needed columns, so large text or binary columns are not dragged into memory for no reason. Calculate counts, sums, and averages in the database, so summaries return single numbers rather than full datasets. Each of those habits reduces the work in proportion to the data size, and together they keep a program responsive as tables grow from hundreds to hundreds of thousands of rows. They are cheap to adopt early, and expensive to retrofit later, which is why they should be standard from the first query a program writes.</p>
+<p>Indexes become increasingly important as data grows, but they should still be chosen by measurement and usage, not by adding every possible index. A large table with indexes on its frequently filtered and joined columns can answer precise queries quickly, while a large table without those indexes must scan, row by row, for every query. The balance, read speed against write cost, should be revisited as data and usage grow, because a choice that was right for a small table may not be right for a large one. Periodic review, driven by timing real queries, keeps that balance honest.</p>
+<p>Large data also changes how a program should fetch results. Fetching all rows at once, into a list, holds the entire result in memory, which may be acceptable for a hundred rows and impossible for a million. For very large operations, such as exports or bulk processing, working in batches, processing a limited number of rows, committing, and then continuing with the next batch, keeps both memory and transaction size manageable. Those fetching patterns are part of handling large data, not an afterthought, because a precise query can still overwhelm a program if its result is fetched all at once.</p>
+<p>Finally, large data rewards thinking about what the program actually needs to keep and show. Not every historical row must be loaded for every task, and not every detail must be displayed at once. SQLite can hold large tables well, within its design limits, but it rewards programs that ask precise questions, fetch results thoughtfully, and respect the difference between stored data and displayed data. Those habits, formed while tables are small, are what allow a SQLite program to keep working well as it succeeds and its data grows.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;SELECT title FROM tasks WHERE status = ? ORDER BY created DESC LIMIT 20&quot;, (&quot;pending&quot;,))
+for (title,) in cursor:
+    print(title)
+connection.close()</code></pre>
+<p>This query filters, orders, and limits in the database, and iterates one row at a time. It returns the same twenty titles whether the table holds a hundred rows or a hundred thousand.</p>
+<p class="check"><strong>Check:</strong> Why should queries be designed for large data even while tables are still small?</p>
+<h2>Section 37: Importing and Exporting Data</h2>
+<p>Importing and exporting data means moving rows between a database and an external format, such as a CSV file, a JSON file, or another system. Importing brings external data into a table. Exporting writes table data out, for backup, for sharing, or for use in another program. A file may contain missing values, wrong types, duplicate keys, or values that violate constraints. Handling those problems well is the difference between a robust import and one that silently damages data.</p>
+<p>Imports should validate each record before storing it, and should report failures per record, rather than failing entirely or storing bad data silently. Failing entirely means that one bad row in a thousand prevents the other nine hundred and ninety-nine good rows from being imported, which is frustrating and wasteful, especially when the bad row could simply be reported and fixed. Per-record handling avoids both extremes: valid rows are stored, invalid rows are skipped, and each skipped row is reported with a clear reason, such as a missing required field, a duplicate key, or a value of the wrong type, so that the source data can be corrected and re-imported.</p>
+<p>Transactions need careful thought during imports. Storing a whole import in a single transaction gives all-or-nothing safety, but it conflicts with per-record reporting, because a single bad row would roll back all good rows. That structure keeps good data safe, keeps bad data out, and gives a clear report of what was imported and what was not. The exact batch size and error handling depend on the program, but the principle is constant: an import should leave the database in a known, consistent state, with a report that accounts for every input row.</p>
+<p>Exports deserve similar care, though their risks are different. An export should state its format clearly, handle special characters correctly, and represent missing values honestly, rather than as empty strings that will be misread on re-import as real values. Dates, numbers, and text should be written in a standard, documented form, so that another program can parse them without guessing. An export that is meant to be re-imported should be tested by actually re-importing it into a fresh database and comparing the result with the original, because that round-trip test reveals encoding, quoting, and type problems that are invisible when the export file is merely inspected by eye.</p>
+<p>Finally, imports and exports should respect security and privacy. Imported data may contain malicious or sensitive values, and should be treated with the same parameterisation and validation as any other input. Exported data may contain personal information, and should only be shared with appropriate recipients, through appropriate channels. Those considerations, combined with per-record validation and reporting, turn importing and exporting from risky, ad-hoc operations into reliable, auditable parts of a database program.</p>
+<pre><code>import csv
+import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+with open(&quot;tasks.csv&quot;, newline=&quot;&quot;, encoding=&quot;utf-8&quot;) as f:
+    for number, row in enumerate(csv.DictReader(f), start=1):
+        title = (row.get(&quot;title&quot;) or &quot;&quot;).strip()
+        if not title:
+            print(f&quot;Row {number}: skipped, missing title&quot;)
+            continue
+        cursor.execute(&quot;INSERT INTO tasks (title, status) VALUES (?, ?)&quot;, (title, row.get(&quot;status&quot;, &quot;pending&quot;)))
+connection.commit()
+connection.close()</code></pre>
+<p>Each row here is validated before insertion, and bad rows are reported by number, not stored silently and not allowed to abort the whole import.</p>
+<p class="check"><strong>Check:</strong> Why should imports validate and report failures per record instead of failing entirely or storing bad data silently?</p>
+<h2>Section 38: Testing Database Code</h2>
+<p>Testing database code means checking that programs which read and write a database behave correctly, not only in the happy case where everything works, but also when data is missing, duplicated, or invalid. Database code is easy to test superficially and easy to get wrong in practice, because a test that runs against a shared, pre-existing database can pass for the wrong reasons: leftover data from a previous test, a row created by manual testing, or a constraint that happens to be satisfied by coincidence. Reliable tests avoid those traps by using isolated, fresh test databases, and by covering error cases as well as successes.</p>
+<p>Isolation means each test, or each test run, starts with a known, empty database, created fresh for that test. In SQLite, that is easy: a test can create a temporary database file, or an in-memory database, create the required tables, run the code under test, and then discard the database. Tests become repeatable: running them twice gives the same result, and running them in a different order does not change the outcome. That repeatability is essential, because a test that passes only when run in a certain order, or only on a certain machine, is not a reliable check.</p>
+<p>Fresh databases also make error cases easy to test. A success case might insert a valid task and confirm it can be listed. An error case might attempt to insert a duplicate value where uniqueness is required, and confirm that the program reports the error cleanly rather than crashing or storing a duplicate. A third might update a record that does not exist, and confirm that the program reports zero rows affected, rather than pretending the update succeeded. Those error cases are where database bugs most often hide, because success paths are usually exercised during development, while error paths are only exercised when real users encounter them, at which point a failure is visible and costly.</p>
+<p>Test databases should also cover the operations the program actually performs, in combination. A test that inserts, updates, and then deletes the same record checks that those operations work together, and that identifiers remain consistent across them. Those combined tests catch interaction bugs that single-operation tests miss, and they are especially valuable for database code, where operations are rarely independent: an insert affects later queries, an update affects later deletes, and a transaction affects everything within it.</p>
+<p>Finally, tests should be runnable quickly and automatically, as part of the program&#x27;s normal development routine, not as a manual chore performed occasionally. A small suite of database tests, using fresh temporary databases, can run in seconds, and can be run before every change is committed. Testing is therefore not just a quality step. It is what makes database code maintainable over time.</p>
+<pre><code>import sqlite3
+
+def test_insert_and_list():
+    connection = sqlite3.connect(&quot;:memory:&quot;)
+    cursor = connection.cursor()
+    cursor.execute(&quot;CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL)&quot;)
+    cursor.execute(&quot;INSERT INTO tasks (title) VALUES (?)&quot;, (&quot;Test task&quot;,))
+    connection.commit()
+    cursor.execute(&quot;SELECT COUNT(*) FROM tasks&quot;)
+    assert cursor.fetchone()[0] == 1
+    connection.close()
+
+test_insert_and_list()
+print(&quot;Test passed&quot;)</code></pre>
+<p>This test uses a fresh in-memory database, so its result depends only on the code it exercises, not on any leftover data from other runs.</p>
+<p class="check"><strong>Check:</strong> Why should database tests use isolated fresh test databases and cover error cases, not just successes?</p>
+<h2>Section 39: Handling Database Errors</h2>
+<p>Handling database errors well means responding differently to different kinds of failure, rather than treating every error as the same generic problem. Database operations can fail for many distinct reasons: a unique constraint is violated by a duplicate value, a required value is missing, a referenced row does not exist, the database file is locked by another writer, the file cannot be found or opened, or a statement contains a syntax error. Treating them all as one vague database error hides that information, and makes both fixing and recovering much harder.</p>
+<p>Distinguishing error types starts with understanding what the database reports. Python&#x27;s sqlite3 module raises different exception types, and provides error codes and messages that describe the failure. A program can catch those exceptions specifically, rather than catching every exception in one broad handler, and can respond appropriately to each. A missing-value error means a required field was left blank, and the response is to highlight that field. A locked-database error means another writer is busy, and the response may be to retry briefly, or to ask the user to try again in a moment. Each response is helpful precisely because it matches the specific failure.</p>
+<p>Broad error handling, by contrast, produces unhelpful behaviour. A program that catches all database errors and shows the same message, such as something went wrong, leaves the user guessing: was the value duplicated, was a field missing, or is the system temporarily busy. A program that catches all errors and crashes, without saving context or rolling back a transaction, turns a recoverable problem into a disruptive failure. All three failures share the same root cause: the program did not distinguish what went wrong, and therefore could not respond sensibly.</p>
+<p>Error handling should also protect data consistency. When an error occurs inside a transaction, the transaction should be rolled back, so that partial changes do not remain. Logging the detailed error, for developers, while showing a clear, non-technical message to users, balances two needs: users need to understand what to do next, and developers need enough detail to diagnose the problem. Raw database messages, which may contain internal details or sensitive values, should not be shown directly to users, but they should be recorded where developers can find them.</p>
+<p>Finally, error handling should be tested, as the previous section explains. A program&#x27;s error paths are code too, and they contain bugs as often as success paths do. Testing duplicate, missing, locked, and not-found cases confirms that each produces the intended response, rather than a crash or a misleading success message. That testing, combined with specific exception handling, transaction rollback on failure, and clear user messages, turns database errors from a source of confusion into a normal, manageable part of program behaviour.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+try:
+    cursor.execute(&quot;INSERT INTO tasks (title, status) VALUES (?, ?)&quot;, (&quot;Task&quot;, &quot;pending&quot;))
+    connection.commit()
+except sqlite3.IntegrityError as error:
+    connection.rollback()
+    print(&quot;Could not save: a value conflicts with an existing record.&quot;, error)
+finally:
+    connection.close()</code></pre>
+<p>Here a constraint failure is caught specifically, rolled back, and reported in a way that points to the actual problem, rather than hiding it behind a generic error.</p>
+<p class="check"><strong>Check:</strong> Why should database error handling distinguish error types instead of treating all errors the same?</p>
+<h2>Section 40: A Schema for Tasks and Notes</h2>
+<p>A schema for tasks and notes is a good concrete example of the design principles in this chapter, because it is small enough to understand fully, yet rich enough to show relationships, constraints, and justified choices. The example here uses two related tables: tasks and notes. Designing those two tables well requires deciding, for each table, what columns it needs, what types those columns should have, which columns are required, which values must be unique, and how the tables relate. Each decision should be justified, not copied blindly from another program.</p>
+<p>A minimal tasks table needs, first, a primary key. An automatically assigned integer identifier gives each task a stable identity, used for updates, deletes, and links from notes. It may need a due date, as text in a sortable format, optional, because many tasks have no deadline, and forcing a fake date would be worse than recording no date. It may need a creation timestamp, optional or automatically set, because sorting by recency is a common view, and recording creation time makes that view possible without guessing from identifiers.</p>
+<p>A notes table needs a similar foundation: its own primary key, a title or heading, and a body for the note&#x27;s content, both as text, with the body required if a note without content is meaningless for the program, or optional if empty notes are allowed as placeholders. If notes can be attached to tasks, the notes table needs a task identifier column, as a foreign key pointing to the tasks table, allowing each note to belong to one task, while a task can have many notes. That single choice, required versus optional foreign key, expresses a real product decision: are standalone notes allowed, or must every note belong to a task.</p>
+<p>Constraints should be applied with the same restraint as columns. Title and status are required, because the program cannot function sensibly without them. Applying uniqueness where it is not required blocks legitimate data and frustrates users, while omitting it where it is required allows duplicates that corrupt the program&#x27;s logic. Each constraint, like each column, should therefore be justified by a rule the program actually enforces.</p>
+<p>Testing this schema with examples confirms its adequacy. Can a task be created with only a title and status? If those operations work cleanly, the schema is sufficient for its purpose, and additional columns should be added only when a new feature genuinely needs them. That minimal, justified schema is the model to carry into larger programs, where the same questions, asked for every table, prevent the sprawling, unjustified schemas that are hardest to maintain.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;manager.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL,
+        due TEXT
+    )
+&#x27;&#x27;&#x27;)
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        task_id INTEGER,
+        FOREIGN KEY (task_id) REFERENCES tasks (id)
+    )
+&#x27;&#x27;&#x27;)
+connection.commit()
+connection.close()</code></pre>
+<p>This pair of tables shows the principles together: stable keys, required facts, optional dates and links, and a foreign key on the many side, each justified by how the program will actually use the data.</p>
+<p class="check"><strong>Check:</strong> What columns would a minimal tasks table need, and why should each column be justified?</p>
+<h2>Section 41: Timestamps and Dates in Tables</h2>
+<p>Timestamps record when a row was created, and when it was last changed. Those two fields, created date and updated date, are useful in almost every table, because they let you answer questions like when a task was added, or whether a record has changed recently. Without timestamps, those questions cannot be answered from the database alone, and must be guessed from other evidence, which is unreliable. Adding timestamps, as standard columns, for new tables, is therefore a good habit, even when their use is not immediately obvious, because their value grows over time, as records age, and as questions about age and change arise, during debugging, reporting, or user support, where timestamps provide evidence, that would otherwise be missing, and that cannot be reconstructed, after the fact, if it was never recorded, in the first place, a loss that timestamp columns, from the start, prevent, by recording, time, automatically, for every row, as it is created, and as it is updated, through application logic, or through database defaults, that set timestamps, without requiring, manual entry, for each row, a automation that, though it requires, setting up, timestamp handling, in code, or in schema defaults, pays off, in reliable time data, for every row, in every table, that includes timestamps, as standard columns, from the start, for all your tables, from now on, as a habit, that though it adds two columns, to each table, provides, time evidence, that is, invaluable, for debugging, and for reporting, over a program&#x27;s life, where time questions, arise, frequently, and where, timestamps, answer them, directly, from the database, without, needing, external logs, or, user memory, both of which, are, less reliable, than, database timestamps, recorded, at the time, of, each change, as it happened, in the program, itself, a recording that, makes timestamps, authoritative, for time questions, about records, in a way, that external evidence, cannot match, for accuracy, or for completeness, across all records, in a table, where, every row, has, timestamps, that, can be, queried, sorted, and, filtered, by time, for reports, and for debugging, that, depend on, time, as a dimension, of, data, analysis, generally, where, time, matters, for, understanding, how data, changes, over time, and for, identifying, patterns, in, data creation, and, modification, over time, that, timestamps, reveal, through, queries, grouped, by, time periods, such as, tasks created, per week, or, notes updated, per month, insights that, timestamped data, provides, and that, untimestamped data, cannot, provide, because, it, lacks, time information, altogether, a lacking that, timestamp columns, from the start, prevent, by, ensuring, time data, exists, for, every row, in, every table, that, includes them, as, standard columns, from, the beginning, of, a program&#x27;s, database design, for, all your tables, from now on. Storing timestamps requires a consistent format, as discussed for dates generally. Use a standard, sortable format, such as year-month-day with time, in universal time, for storage, and convert to local time, only for display, to users, in their timezone, a convention that, though it requires, conversion, for.</p>
+<p class="check"><strong>Check:</strong> Why should timestamps be stored in universal time and converted only for display?</p>
+<h2>Section 42: Soft Deletes</h2>
+<p>A soft delete is a way of removing a record from normal use without actually deleting its row from the database. Instead of a DELETE statement, the program marks the record as deleted, typically by setting a flag column, or by recording a deletion timestamp, while leaving the row itself in the table. That reversibility is the main advantage of soft deletion, and it is why it is widely used for user-facing data.</p>
+<p>Soft deletion should be used when deletion is likely to be accidental, when restoration is valuable, or when history matters. A user who deletes a task, a note, or a document by mistake should be able to undo that action, ideally immediately, without contacting support or restoring from a backup. In both cases, soft deletion turns a permanent, risky action into a reversible, forgiving one, which matches how users actually behave: they delete tentatively, change their minds, and expect an undo.</p>
+<p>Hard deletion, permanent removal of the row, must still be used when it is required. Privacy rules may require that personal data be truly erased on request, not merely hidden, and in those cases a soft delete that retains the data would violate the rule and the user&#x27;s trust. In those situations, hard deletion is not a failure of caution. It is the correct, compliant action, and it should be performed deliberately, with a backup where appropriate, and with confirmation, as earlier sections explain.</p>
+<p>The choice between soft and hard deletion is therefore not a universal rule, but a per-record, per-program decision. Ask whether the record contains personal data subject to erasure requests, whether users are likely to need undo, whether history or auditing requires retention, and how long retention is useful. A task in a personal organiser is a good soft-delete candidate, because undo is valuable and retention cost is low. A program may use both approaches for different tables, or for the same table at different stages: soft delete immediately, for undo, followed by hard delete after a retention period, for compliance and cleanup. That staged approach combines the benefits of both, when it is designed deliberately.</p>
+<p>Implementing soft deletes requires discipline in queries. Every query that lists active records must filter out soft-deleted rows, or deleted items will reappear unexpectedly. The deleted flag or timestamp should also be indexed if the table is large, so that filtering it does not require scanning all rows. Those implementation details are manageable, but they must be planned, because a soft-delete design that leaks deleted rows into active views fails at its primary purpose: making deleted records invisible in normal use, while keeping them recoverable behind the scenes.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;UPDATE tasks SET deleted = 1 WHERE id = ?&quot;, (3,))
+connection.commit()
+cursor.execute(&quot;SELECT title FROM tasks WHERE deleted = 0&quot;)
+print(&quot;Active tasks:&quot;, cursor.fetchall())
+connection.close()</code></pre>
+<p>Here the task is marked deleted, not removed, and active listings exclude it. Restoring it would simply clear the flag, while a later hard delete, when justified, would remove the row for good.</p>
+<p class="check"><strong>Check:</strong> When should deletion be soft, and when must it be hard and permanent?</p>
+<h2>Section 43: Auditing and History</h2>
+<p>Auditing and history mean recording how data changes over time, not just what the data looks like now. An audit record notes who changed a record, when the change happened, what kind of change it was, and what the old and new values were. Those questions arise constantly in real programs, even when the current data looks correct.</p>
+<p>Recording change history is valuable even when current data looks correct, because correctness now does not explain how the data got there, or whether it was ever wrong. A record that looks correct today may have been incorrect yesterday, and corrected without any trace, leaving no way to know whether reports based on yesterday&#x27;s data were wrong, or whether the same mistake might recur. It also supports accountability: when several people or several parts of a program can change the same data, an audit trail shows which change came from where, which is essential for resolving disputes, for debugging, and for demonstrating compliance with rules that require changes to be traceable. Without history, those tasks rely on memory and guesswork, which are unreliable.</p>
+<p>History also enables recovery. If a record is accidentally overwritten with wrong values, a history table lets the program, or an administrator, restore the previous version, without restoring the whole database from a backup and losing other, legitimate changes made since. That fine-grained recovery is more precise than a full backup restore, and it is faster, because it affects only the record in question. For programs where individual records matter, and where mistakes are inevitable, that precision is a significant safety benefit, and it is a reason to design history in from the start, rather than adding it after a costly incident.</p>
+<p>Designing audit and history requires choices about what to record, and for how long. Recording every change to every column, for every table, can produce a large audit store, and can itself raise privacy concerns, because it retains old values that may include personal data. A proportionate approach records changes to important tables and important columns, with enough detail to answer likely questions, and with a retention policy that deletes old audit records after they are no longer needed. An audit trail that is never reviewed, or that grows without limit, is not a well-designed feature. It is an unplanned liability.</p>
+<p>Implementation can be simple for small programs. A history table, mirroring the main table with extra columns for change time, change type, and actor, can be written to whenever the main table is inserted, updated, or deleted, ideally in the same transaction, so that a change and its audit record succeed or fail together. Keeping them together, in one transaction, makes the history reliable enough to depend on when it is needed.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS task_history (
+        task_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL,
+        changed_at TEXT NOT NULL,
+        change_type TEXT NOT NULL
+    )
+&#x27;&#x27;&#x27;)
+connection.commit()
+connection.close()</code></pre>
+<p>This history table stores past versions of tasks, with when and how each version arose. It does not replace current data, but it preserves the story of how that data came to be.</p>
+<p class="check"><strong>Check:</strong> Why is recording change history valuable even when current data looks correct?</p>
+<h2>Section 44: Privacy in Database Design</h2>
+<p>Privacy in database design means thinking, at the design stage, about what personal data a program collects, why it needs it, how long it keeps it, and who can access it. Personal data includes names, email addresses, locations, and any other information that identifies a person, directly or when combined with other data. Those obligations are far easier to meet when they are considered during schema design, than when they are discovered after data has already been collected, copied, and spread through backups, logs, and exports.</p>
+<p>Considering privacy during design starts with minimisation: collect only the personal data the program genuinely needs, for a current, stated purpose. A tasks program that needs to identify users does not necessarily need their full addresses, phone numbers, or dates of birth, and collecting those extra fields creates risk without benefit. If it is merely convenient, it should not be collected. That restraint reduces the impact of a breach, simplifies compliance, and respects users, who rightly expect programs to ask only for what they need.</p>
+<p>Schema choices also affect how privacy obligations can be met later. If personal data is spread across many tables, duplicated in denormalised copies, and embedded in free-text notes, then finding and deleting one person&#x27;s data on request becomes a difficult, error-prone search. Similarly, if sensitive values are stored in plain text where they are not needed, or retained indefinitely in history tables, then privacy risks persist long after the original purpose has passed. Designing with deletion and correction in mind, from the start, therefore includes decisions about where personal data lives, how long history retains it, and how backups handle erasure requests.</p>
+<p>Access control, in the SQLite context, is largely about file permissions and application-level authorisation, as an earlier section explains. During design, that means deciding which parts of the program, and which users, may read which personal columns, and ensuring that queries respect those boundaries, rather than returning all columns to every caller. Those details are easy to overlook during design, and hard to clean up afterwards, when logs and backups already contain the data.</p>
+<p>Finally, privacy design should include a retention policy, stated plainly: how long each kind of personal data is kept, and when it is deleted. A program that keeps personal data forever, by default, will eventually hold data it no longer needs, for people who no longer use it, increasing risk for no benefit. A program with a clear retention rule, implemented as periodic deletion or anonymisation, keeps its data store proportionate to its purpose. That policy, decided during design and implemented in code, is what turns privacy from a vague aspiration into a concrete, testable part of the program.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;app.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE
+    )
+&#x27;&#x27;&#x27;)
+connection.commit()
+connection.close()</code></pre>
+<p>This users table collects only a name and an email address, because those are what the program needs. Adding further personal columns would require a fresh justification, not just a guess that they might be useful one day.</p>
+<p class="check"><strong>Check:</strong> Why should privacy be considered during schema design, not after data is already collected?</p>
+<h2>Section 45: SQLite or a Server Database</h2>
+<p>Choosing between SQLite and a server database is a decision that should be revisited as a program grows, because the right choice for a small, single-user program may not be the right choice for a larger, shared program, and vice versa. SQLite suits programs where one application, on one machine, is the main user of the data, where writes are infrequent or come from a single writer, and where deployment simplicity matters. Each fits a different pattern of use.</p>
+<p>As a program grows, its pattern of use can change in ways that invalidate the original choice. A personal tool that gains web access may suddenly serve many simultaneous users. A desktop application that gains synchronisation may need several machines to share one dataset. Revisiting does not automatically mean migrating: SQLite can handle more growth than many developers assume, especially with good queries, indexes, and short transactions. But the question should be asked explicitly, with evidence about concurrency, data size, and access patterns, rather than assumed away because the program started with SQLite.</p>
+<p>Centralised data access helps migration enormously, and it is a design habit worth adopting from the start, regardless of which database is chosen. Centralised access means that all database operations go through a small set of functions or a single module, rather than being scattered as raw SQL throughout the program. When migration becomes necessary, the changes are concentrated in that one module: its functions are rewritten for the new database, while the rest of the program, which depends only on the functions&#x27; behaviour, remains largely unchanged. Without centralisation, migration requires hunting through the whole codebase for every query, and changing each one, a task so large that it often delays a needed migration until failures force it.</p>
+<p>Centralisation also helps in smaller ways, even without migration. It makes testing easier, because database functions can be tested in isolation. It makes security easier, because parameterisation and authorisation checks live in one place. Those benefits accrue from the first day, and they compound as the program grows, which is why centralised access is recommended even for programs that will never migrate. It is good design on its own, and it keeps the migration option open as a practical possibility, rather than a theoretical one.</p>
+<p>When migration is eventually undertaken, it should be planned like any schema change: backed up, tested on a copy, and performed in stages, with data exported, transformed where needed, and imported into the new system, followed by verification that counts, samples, and key queries match. That careful process, combined with centralised access, turns a potentially disruptive change into a manageable project. The lesson is not to avoid SQLite for fear of outgrowing it, nor to cling to it after it has been outgrown, but to choose deliberately at each stage, and to structure code so that a future change of mind remains feasible.</p>
+<pre><code>def add_task(connection, title, status):
+    cursor = connection.cursor()
+    cursor.execute(&quot;INSERT INTO tasks (title, status) VALUES (?, ?)&quot;, (title, status))
+    connection.commit()
+    return cursor.lastrowid</code></pre>
+<p>The rest of a program would call add_task, not write its own insert. If the database behind add_task changes, only this function needs to change, which is exactly the freedom centralised access provides.</p>
+<p class="check"><strong>Check:</strong> Why should database choice be revisited as a program grows, and how does centralised data access help migration?</p>
+<h2>Section 46: Common Database Pitfalls</h2>
+<p>Common database pitfalls are not exotic failures. They are ordinary mistakes, repeated across many programs, that together account for most database-related bugs, data loss, and security problems. The practices in this chapter, taken together, form a checklist that prevents the most common problems, and that checklist is worth reviewing before any database program is considered finished.</p>
+<p>The first pitfall is building SQL by pasting values into statement text, which invites injection and breaks on special characters. The safe practice, used everywhere, is parameterised queries, with values always passed separately from the statement. The second pitfall is updating or deleting without a precise WHERE clause, which can change or remove every row in a table. The third pitfall is forgetting to commit, which makes changes disappear on the next run, or forgetting to close connections, which leaves files locked. The safe practices are explicit commit on success, rollback on failure, and reliable closing on every path, using a context manager or a finally block.</p>
+<p>Further pitfalls concern design and maintenance. Storing the same fact in several places, without a synchronisation plan, leads to inconsistent data, prevented by normalisation and by justifying every column and constraint. Using meaningful values, such as titles or email addresses, as primary keys leads to broken references when those values change, prevented by stable, meaningless identifiers. Neglecting backups, or keeping backups that have never been test-restored, leads to unrecoverable loss, prevented by regular, separate, verified backups. Each of these pairs, pitfall and practice, is simple on its own, but together they cover the majority of real database failures.</p>
+<p>Performance pitfalls belong on the same checklist. Retrieving all rows and filtering locally, returning every column when only a few are needed, and sorting locally, all work on small data and fail on large data, prevented by precise queries that filter, select, sort, and limit in the database. Adding indexes indiscriminately slows writes without helping reads, prevented by indexing only frequently filtered or joined columns, chosen by measurement. Ignoring concurrency, and using a single-file database for a high-concurrency, multi-writer program, leads to lock errors, prevented by matching the database choice to the program&#x27;s actual concurrency pattern, and revisiting that choice as the program grows.</p>
+<p>Finally, error handling and testing pitfalls complete the list. Treating all database errors the same produces unhelpful messages and silent failures, prevented by distinguishing error types and responding specifically. Testing only success cases, against a shared database, produces tests that pass for the wrong reasons, prevented by isolated, fresh test databases covering error cases as well. Reviewing a program against this combined checklist, before release and after significant changes, is a short exercise with a high return. It catches the mistakes that are most likely to occur, in the places where they are most likely to cause harm, and it turns the lessons of this chapter into a routine habit.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&quot;UPDATE tasks SET status = ? WHERE id = ?&quot;, (&quot;done&quot;, 1))
+connection.commit()
+connection.close()</code></pre>
+<p>This short example embodies several safe practices at once: a parameterised value, a primary-key scope, an explicit commit, and a closed connection. Habits like these, repeated consistently, are what prevent common pitfalls.</p>
+<p class="check"><strong>Check:</strong> Which safe practices together prevent the most common database pitfalls?</p>
+<h2>Section 47: Backup and Restore Practice</h2>
+<p>Backup and restore practice means treating backup not as a one-time setup, but as a routine that is performed regularly, verified regularly, and ready to use when a failure occurs. A backup made once, at the start of a program, and never updated, quickly becomes useless, because it contains only the data as it was at that moment, not the data as it is now. Routine practice prevents both failures, by making backup and restore a normal, repeated part of operating a program, rather than a task remembered only after data is lost.</p>
+<p>Routine backup begins with a schedule matched to how quickly data changes. A database that changes daily needs daily backups at least. A database that changes hourly, or that holds data users would miss after an hour&#x27;s loss, needs more frequent backups. Automation, combined with a log or notification that confirms each backup succeeded, turns backup from a good intention into a reliable process. That log should be checked, not just generated, because an automated process that fails silently is no better than a manual process that is forgotten.</p>
+<p>Restore practice is the other half of the routine, and it is the half most often neglected. A backup that has never been restored is an assumption. Restoring regularly, into a test location, and confirming that the program can open the restored database, that its tables and rows are present, and that sample queries return expected results, proves that the backup works. It should also be performed after any significant change to the program, the database schema, or the backup location, because those changes can break restore even when backup appears to succeed. A restore test that is part of routine operations catches those breaks while there is still time to fix them.</p>
+<p>Restore practice also includes knowing the steps, before they are needed. In a crisis, with users waiting and data missing, there is no time to discover where backups live, which backup is the most recent complete one, or how to restore it without overwriting good data. A short, tested restore procedure, kept with the program&#x27;s documentation, is therefore part of backup practice, not an extra. It turns a stressful, error-prone recovery into a calm, repeatable operation.</p>
+<p>Finally, routine practice includes retention and separation. Old backups should be kept long enough to recover from problems discovered late, but not forever, because indefinite retention wastes storage and may retain personal data beyond its allowed period. Backups should be stored separately from the original, so that a failure affecting the original does not also destroy the backup. Those decisions, schedule, verification, documented restore steps, retention, and separation, together form a backup practice that can be trusted, because it is exercised regularly, not merely set up once and hoped for.</p>
+<pre><code>import shutil
+import os
+
+os.makedirs(&quot;backups&quot;, exist_ok=True)
+shutil.copyfile(&quot;app.db&quot;, &quot;backups/app-latest.db&quot;)
+print(&quot;Backup updated. Next, restore the copy in a test folder and check its tables.&quot;)</code></pre>
+<p>That copy is only part of the practice. The routine is completed by verifying the copy, storing it separately, and rehearsing the restore, on a regular schedule.</p>
+<p class="check"><strong>Check:</strong> Why must backup and restore be a routine practice, not a one-time setup?</p>
+<h2>Section 48: Performance Habits for Databases</h2>
+<p>Performance habits for databases are the small, consistent choices that keep a program fast as its data grows, without requiring heroic optimisation later. They are habits, not one-time fixes, because performance is determined less by a single clever query than by the pattern of queries a program issues, day after day, across all of its features. Carrying these habits into every database project is therefore a matter of discipline, applied from the first query.</p>
+<p>The first habit is precision in queries. Ask the database for only the columns needed, filter with WHERE, sort and limit in the query, and calculate summaries with aggregates and grouping in the database, rather than retrieving broad results and processing them locally. Each of those choices reduces the data the database must read, the data it must return, and the data the program must hold. They also make code clearer, because a precise query states its intent directly, whereas broad retrieval followed by local processing hides intent in loops and conditions. Precision is therefore both a performance habit and a readability habit.</p>
+<p>The second habit is thoughtful indexing, guided by measurement. Index columns that are frequently used to filter, sort, or join large tables, and avoid indexing every column, which slows writes without helping reads. Revisit indexes as usage changes, because a query pattern that was rare may become common, and an index that was valuable may become a burden. That measured, revisited approach keeps the balance between read speed and write cost in the right place, over the program&#x27;s life, rather than at a single moment.</p>
+<p>The third habit is designing for scale from the start, even while tables are small. Fetch large results by iterating, rather than loading everything at once. Work in batches for bulk operations, so that transactions and memory stay manageable. Keep transactions short, so that locks are held briefly and other writers are not blocked. Match the database choice to the program&#x27;s concurrency pattern, and revisit that choice as the program grows. Those habits cost little when tables are small, and they prevent the painful retrofits that occur when a program that worked on test data fails on real data. They are, in effect, insurance paid in small, regular instalments, rather than a large, urgent payment later.</p>
+<p>Finally, performance habits include restraint. Do not optimise by guessing, do not denormalise without measurement, and do not add complexity for a performance problem that has not been demonstrated. Measure first, change one thing, measure again, and keep the change only if it helps. That cycle, applied consistently, produces programs that are fast for the right reasons, and that remain understandable, because each optimisation is justified by evidence and documented by its measurement. Carry that cycle, with precision, indexing, and scale-aware design, into every database project, and performance will usually take care of itself.</p>
+<pre><code>import sqlite3
+
+connection = sqlite3.connect(&quot;tasks.db&quot;)
+cursor = connection.cursor()
+cursor.execute(&#x27;&#x27;&#x27;
+    SELECT title FROM tasks
+    WHERE status = ?
+    ORDER BY created DESC
+    LIMIT 20
+&#x27;&#x27;&#x27;, (&quot;pending&quot;,))
+for (title,) in cursor:
+    print(title)
+connection.close()</code></pre>
+<p>This query embodies the habits together: precise columns, database filtering, ordering, limiting, and row-by-row fetching. Repeated across a program, those habits are what keep it fast.</p>
+<p class="check"><strong>Check:</strong> What performance habits from this chapter should you carry into every database project?</p>
+<h2>Section 49: Planning a Small Database Project</h2>
+<p>Planning a small database project begins with a clear, one-sentence purpose. That sentence states, in plain language, what the program is for, who it serves, and what problem it solves. It defines the scope, it excludes features that do not serve the purpose, and it gives every later decision a test: does this table, column, or feature help achieve the stated purpose, or does it distract from it. Projects without such a sentence tend to drift, adding features that seemed interesting, until the program is too large to finish, or too complex to maintain.</p>
+<p>A clear purpose helps a project finish successfully because it makes scope decisions easy and early. When a new feature is proposed, the purpose sentence provides the criterion for accepting or deferring it. A feature that serves the purpose is in scope. A one-sentence purpose does not prevent ambition. It channels ambition into finishing one useful thing well, before starting the next.</p>
+<p>Purpose also guides schema design. Once the purpose is stated, the record kinds follow naturally: a tasks-and-notes program needs tasks and notes, because those are the things its purpose mentions. Columns that no task in the purpose requires are, by definition, unnecessary for this project, and can be omitted without regret. That derivation, from purpose to records to columns, keeps the schema minimal and justified, as earlier sections recommend, and it makes the schema easy to explain to another person: each table and column exists because the purpose requires it.</p>
+<p>Planning should also include the practical steps that turn a purpose into a finished program. List the main operations the program must support, such as adding, listing, updating, and deleting records, and confirm that the schema supports each one. Those decisions, made early and briefly, prevent late surprises, where a program is nearly finished but cannot be backed up safely, or cannot handle a common error gracefully. A short plan, covering purpose, records, operations, backup, and testing, is sufficient for a small project, and it is far more useful than a long plan that is never followed.</p>
+<p>Finally, a clear purpose helps after the program is finished, because it defines what success looks like. A program that fulfils its one sentence, reliably and simply, is a success, even if it lacks features that other programs have. A program that does many things poorly, because it never defined what it was for, is not a success, even if it contains impressive features. It is about delivering the stated purpose, well, and then stopping, or starting a new, separately planned project. That discipline, beginning with one sentence, is what turns small database projects from ambitious starts into finished, useful tools.</p>
+<pre><code># Purpose: help one person track personal tasks and notes,
+# with filtering by status and sorting by date.
+# Records: tasks (title, status, due) and notes (title, body, task link).
+# Operations: add, list filtered and sorted, update by id, soft-delete.</code></pre>
+<p>That comment block is a complete, if tiny, plan. It states the purpose, derives the records, and lists the operations, giving the project a clear finish line to aim for.</p>
+<p class="check"><strong>Check:</strong> Why does a clear one-sentence purpose help a small database project finish successfully?</p>
+<h2>Section 50: Habits for Working with Databases</h2>
+<p>Habits for working with databases summarise this chapter into practices to carry forward into every database project you undertake, from now on. They are not a list of advanced techniques to memorise, but a set of ordinary disciplines that, practised consistently, prevent most database problems and make database work reliable, safe, and efficient. That design step, brief as it may be for a small program, prevents the sprawling, inconsistent schemas that are hardest to fix later, when data already depends on them.</p>
+<p>The second habit is to write safe statements, every time. Parameterise all values, never paste them into SQL text. Scope every update and delete with a precise WHERE clause, normally on a primary key for single records. Those three practices, parameterisation, scoping, and precision, together prevent injection, mass-update accidents, and wasteful queries, which are among the most common and most costly database mistakes. They should be automatic, not decisions made afresh for each statement, because automatic habits do not depend on remembering to be careful in a moment of pressure or haste.</p>
+<p>The third habit is to manage transactions and connections reliably. Wrap multi-step changes in transactions, commit on success, roll back on failure, and close connections on every path, even when errors occur. Combined with the second habit, reliable transaction handling makes database code predictable: changes either happen completely and permanently, or they do not happen at all, and the program&#x27;s state after any operation is always known.</p>
+<p>The fourth habit is to protect and verify data over time. Back up regularly, store backups separately, and verify them by test restores, on a routine schedule, not as a one-time setup. Validate data in the program before storage, and let database constraints enforce rules as a second layer, so that invalid data is caught in both places. Measure query performance with realistic data before optimising, and revisit indexes and database choice as programs grow. Those practices keep data trustworthy, recoverable, and performant, not just at launch, but throughout the program&#x27;s life.</p>
+<p>Finally, carry a habit of review. Before finishing a database project, check it against the pitfalls and practices in this chapter: safe statements, scoped changes, reliable transactions, justified schema, verified backups, tested errors, and measured performance. That review takes little time, and it catches the mistakes that are most likely to have slipped through during development. More broadly, treat database work as a craft of care: data outlives code, and the care taken in designing, writing, backing up, and testing database operations is repaid every time the program is used, and every time a failure is recovered from gracefully. Those habits, practised in every project, are what distinguish a developer who uses databases from one who uses them well.</p>
+<pre><code>import sqlite3
+
+with sqlite3.connect(&quot;tasks.db&quot;) as connection:
+    cursor = connection.cursor()
+    cursor.execute(&quot;SELECT title FROM tasks WHERE status = ?&quot;, (&quot;pending&quot;,))
+    for (title,) in cursor:
+        print(title)</code></pre>
+<p>This short program embodies the habits together: a managed connection, a parameterised, precise query, and a clear result. It is a fitting final example, because good database work is rarely dramatic. It is consistent, careful, and repeatable, in every project, from now on.</p>
+<p class="check"><strong>Check:</strong> What workflow habits from this chapter should you carry into every database project?</p>
+<h2>Practical Task</h2>
+<p>Build a small SQLite database program in Python, using only the standard library, for a tasks-and-notes manager of your own design (do not change any existing program&#x27;s storage design; this is a separate practice database). Design a schema with at least two related tables, with primary keys, foreign keys, and appropriate NOT NULL and UNIQUE constraints. Implement adding, listing with filtering and sorting, updating one record by its identifier, and soft-deleting a record, all with parameterised queries and with a WHERE clause on every update and delete. Wrap a two-step change in a transaction with commit on success and rollback on failure, back up the database file before a schema change, and test your program with a fresh test database covering a success case, a duplicate-value error, and a missing-value error. Write a short note explaining your schema choices and your backup method.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Why must all values in database statements be parameterised, even when the data seems trusted?</li>
+<li>How do transactions, foreign keys, and constraints work together to keep data consistent?</li>
+<li>When should you use an index, and what trade-off does indexing involve for write-heavy tables?</li>
+<li>Why is a normalised schema the starting point, and when is denormalisation justified?</li>
+<li>What backup and restore practices make a database recoverable after a real failure?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-26.html">← Chapter 26</a> <a href="index.html">All chapters</a> <a href="chapter-28.html">Chapter 28 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/python-developer/chapter-27.html'; this.page.identifier = 'book-python-developer-chapter-27'; this.page.title = 'Chapter 27 — Databases with SQLite'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

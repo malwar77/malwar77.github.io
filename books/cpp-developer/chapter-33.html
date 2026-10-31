@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 33 — Synchronisation and Safe Sharing — C++ Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 33 of the C++ Developer teaching book: Synchronisation and Safe Sharing.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:860px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:860px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.25;font-size:2rem}
+h2{color:#22d3ee;margin-top:2.2em;line-height:1.35}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+ul.chapter-list{list-style:none;padding:0}
+ul.chapter-list li{margin:.55em 0}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:700;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← C++ Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 33: Synchronisation and Safe Sharing</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-33.svg" alt="Design for Chapter 33" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1</h2>
+<p>This section is about why synchronisation is needed, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand why synchronisation is needed, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about why synchronisation is needed is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use why synchronisation is needed in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Why synchronisation is needed
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is why synchronisation is needed, and when would you use it?</p>
+<h2>Section 2</h2>
+<p>This section is about a mutex in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand a mutex in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about a mutex in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use a mutex in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// A mutex in plain words
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is a mutex in plain words, and when would you use it?</p>
+<h2>Section 3</h2>
+<p>This section is about lock_guard and automatic unlocking, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand lock_guard and automatic unlocking, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about lock_guard and automatic unlocking is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use lock_guard and automatic unlocking in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// lock_guard and automatic unlocking
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is lock_guard and automatic unlocking, and when would you use it?</p>
+<h2>Section 4</h2>
+<p>This section is about unique_lock and flexible locking, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand unique_lock and flexible locking, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about unique_lock and flexible locking is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use unique_lock and flexible locking in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// unique_lock and flexible locking
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is unique_lock and flexible locking, and when would you use it?</p>
+<h2>Section 5</h2>
+<p>This section is about locking several mutexes with scoped_lock, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand locking several mutexes with scoped_lock, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about locking several mutexes with scoped_lock is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use locking several mutexes with scoped_lock in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Locking several mutexes with scoped_lock
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is locking several mutexes with scoped_lock, and when would you use it?</p>
+<h2>Section 6</h2>
+<p>This section is about deadlock explained clearly, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand deadlock explained clearly, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about deadlock explained clearly is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use deadlock explained clearly in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Deadlock explained clearly
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is deadlock explained clearly, and when would you use it?</p>
+<h2>Section 7</h2>
+<p>This section is about lock ordering as a deadlock cure, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand lock ordering as a deadlock cure, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about lock ordering as a deadlock cure is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use lock ordering as a deadlock cure in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Lock ordering as a deadlock cure
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is lock ordering as a deadlock cure, and when would you use it?</p>
+<h2>Section 8</h2>
+<p>This section is about try_lock and not waiting forever, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand try_lock and not waiting forever, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about try_lock and not waiting forever is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use try_lock and not waiting forever in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// try_lock and not waiting forever
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is try_lock and not waiting forever, and when would you use it?</p>
+<h2>Section 9</h2>
+<p>This section is about recursive mutexes and why to be careful, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand recursive mutexes and why to be careful, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about recursive mutexes and why to be careful is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use recursive mutexes and why to be careful in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Recursive mutexes and why to be careful
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is recursive mutexes and why to be careful, and when would you use it?</p>
+<h2>Section 10</h2>
+<p>This section is about condition variables in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand condition variables in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about condition variables in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use condition variables in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Condition variables in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is condition variables in plain words, and when would you use it?</p>
+<h2>Section 11</h2>
+<p>This section is about waiting with a predicate, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand waiting with a predicate, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about waiting with a predicate is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use waiting with a predicate in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Waiting with a predicate
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is waiting with a predicate, and when would you use it?</p>
+<h2>Section 12</h2>
+<p>This section is about notify_one versus notify_all, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand notify_one versus notify_all, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about notify_one versus notify_all is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use notify_one versus notify_all in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// notify_one versus notify_all
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is notify_one versus notify_all, and when would you use it?</p>
+<h2>Section 13</h2>
+<p>This section is about producer and consumer with a condition variable, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand producer and consumer with a condition variable, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about producer and consumer with a condition variable is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use producer and consumer with a condition variable in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Producer and consumer with a condition variable
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is producer and consumer with a condition variable, and when would you use it?</p>
+<h2>Section 14</h2>
+<p>This section is about atomic variables in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand atomic variables in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about atomic variables in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use atomic variables in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Atomic variables in plain words
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is atomic variables in plain words, and when would you use it?</p>
+<h2>Section 15</h2>
+<p>This section is about an atomic counter, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand an atomic counter, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about an atomic counter is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use an atomic counter in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// An atomic counter
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is an atomic counter, and when would you use it?</p>
+<h2>Section 16</h2>
+<p>This section is about memory ordering in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand memory ordering in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about memory ordering in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use memory ordering in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Memory ordering in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is memory ordering in plain words, and when would you use it?</p>
+<h2>Section 17</h2>
+<p>This section is about atomic flags, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand atomic flags, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about atomic flags is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use atomic flags in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Atomic flags
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is atomic flags, and when would you use it?</p>
+<h2>Section 18</h2>
+<p>This section is about shared mutexes for readers and writers, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand shared mutexes for readers and writers, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about shared mutexes for readers and writers is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use shared mutexes for readers and writers in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Shared mutexes for readers and writers
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is shared mutexes for readers and writers, and when would you use it?</p>
+<h2>Section 19</h2>
+<p>This section is about shared locks for reading, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand shared locks for reading, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about shared locks for reading is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use shared locks for reading in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Shared locks for reading
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is shared locks for reading, and when would you use it?</p>
+<h2>Section 20</h2>
+<p>This section is about call_once and one-time initialisation, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand call_once and one-time initialisation, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about call_once and one-time initialisation is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use call_once and one-time initialisation in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// call_once and one-time initialisation
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is call_once and one-time initialisation, and when would you use it?</p>
+<h2>Section 21</h2>
+<p>This section is about semaphores in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand semaphores in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about semaphores in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use semaphores in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Semaphores in concept
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is semaphores in concept, and when would you use it?</p>
+<h2>Section 22</h2>
+<p>This section is about barriers in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand barriers in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about barriers in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use barriers in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Barriers in concept
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is barriers in concept, and when would you use it?</p>
+<h2>Section 23</h2>
+<p>This section is about latches in concept, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand latches in concept, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about latches in concept is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use latches in concept in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Latches in concept
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is latches in concept, and when would you use it?</p>
+<h2>Section 24</h2>
+<p>This section is about designing a thread-safe queue, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand designing a thread-safe queue, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about designing a thread-safe queue is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use designing a thread-safe queue in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Designing a thread-safe queue
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is designing a thread-safe queue, and when would you use it?</p>
+<h2>Section 25</h2>
+<p>This section is about designing a thread-safe stack, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand designing a thread-safe stack, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about designing a thread-safe stack is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use designing a thread-safe stack in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Designing a thread-safe stack
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is designing a thread-safe stack, and when would you use it?</p>
+<h2>Section 26</h2>
+<p>This section is about double-checked locking and its trap, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand double-checked locking and its trap, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about double-checked locking and its trap is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use double-checked locking and its trap in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Double-checked locking and its trap
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is double-checked locking and its trap, and when would you use it?</p>
+<h2>Section 27</h2>
+<p>This section is about protecting an invariant with a lock, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand protecting an invariant with a lock, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about protecting an invariant with a lock is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use protecting an invariant with a lock in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Protecting an invariant with a lock
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is protecting an invariant with a lock, and when would you use it?</p>
+<h2>Section 28</h2>
+<p>This section is about fine-grained versus coarse-grained locking, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand fine-grained versus coarse-grained locking, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about fine-grained versus coarse-grained locking is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use fine-grained versus coarse-grained locking in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Fine-grained versus coarse-grained locking
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is fine-grained versus coarse-grained locking, and when would you use it?</p>
+<h2>Section 29</h2>
+<p>This section is about lock-free programming in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand lock-free programming in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about lock-free programming in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use lock-free programming in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Lock-free programming in plain words
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is lock-free programming in plain words, and when would you use it?</p>
+<h2>Section 30</h2>
+<p>This section is about a checklist for avoiding data races, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand a checklist for avoiding data races, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about a checklist for avoiding data races is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use a checklist for avoiding data races in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// A checklist for avoiding data races
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is a checklist for avoiding data races, and when would you use it?</p>
+<h2>Section 31</h2>
+<p>This section is about thinking like a race detector, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand thinking like a race detector, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about thinking like a race detector is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use thinking like a race detector in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Thinking like a race detector
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is thinking like a race detector, and when would you use it?</p>
+<h2>Section 32</h2>
+<p>This section is about synchronising output to the screen, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand synchronising output to the screen, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about synchronising output to the screen is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use synchronising output to the screen in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Synchronising output to the screen
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is synchronising output to the screen, and when would you use it?</p>
+<h2>Section 33</h2>
+<p>This section is about ownership of shared data, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand ownership of shared data, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about ownership of shared data is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use ownership of shared data in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Ownership of shared data
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is ownership of shared data, and when would you use it?</p>
+<h2>Section 34</h2>
+<p>This section is about immutable snapshots for safe reading, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand immutable snapshots for safe reading, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about immutable snapshots for safe reading is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use immutable snapshots for safe reading in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Immutable snapshots for safe reading
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is immutable snapshots for safe reading, and when would you use it?</p>
+<h2>Section 35</h2>
+<p>This section is about copying data under a lock, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand copying data under a lock, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about copying data under a lock is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use copying data under a lock in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Copying data under a lock
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is copying data under a lock, and when would you use it?</p>
+<h2>Section 36</h2>
+<p>This section is about keeping lock scope small, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand keeping lock scope small, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about keeping lock scope small is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use keeping lock scope small in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Keeping lock scope small
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is keeping lock scope small, and when would you use it?</p>
+<h2>Section 37</h2>
+<p>This section is about not calling unknown code while holding a lock, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand not calling unknown code while holding a lock, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about not calling unknown code while holding a lock is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use not calling unknown code while holding a lock in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Not calling unknown code while holding a lock
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is not calling unknown code while holding a lock, and when would you use it?</p>
+<h2>Section 38</h2>
+<p>This section is about deadlock avoidance strategies, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand deadlock avoidance strategies, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about deadlock avoidance strategies is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use deadlock avoidance strategies in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Deadlock avoidance strategies
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is deadlock avoidance strategies, and when would you use it?</p>
+<h2>Section 39</h2>
+<p>This section is about livelock and starvation in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand livelock and starvation in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about livelock and starvation in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use livelock and starvation in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Livelock and starvation in plain words
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is livelock and starvation in plain words, and when would you use it?</p>
+<h2>Section 40</h2>
+<p>This section is about priority inversion in plain words, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand priority inversion in plain words, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about priority inversion in plain words is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use priority inversion in plain words in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Priority inversion in plain words
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is priority inversion in plain words, and when would you use it?</p>
+<h2>Section 41</h2>
+<p>This section is about encapsulating a mutex inside a class, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand encapsulating a mutex inside a class, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about encapsulating a mutex inside a class is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use encapsulating a mutex inside a class in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Encapsulating a mutex inside a class
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is encapsulating a mutex inside a class, and when would you use it?</p>
+<h2>Section 42</h2>
+<p>This section is about a thread-safe singleton in outline, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand a thread-safe singleton in outline, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about a thread-safe singleton in outline is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use a thread-safe singleton in outline in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// A thread-safe singleton in outline
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is a thread-safe singleton in outline, and when would you use it?</p>
+<h2>Section 43</h2>
+<p>This section is about spurious wakeups and why predicates matter, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand spurious wakeups and why predicates matter, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about spurious wakeups and why predicates matter is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use spurious wakeups and why predicates matter in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Spurious wakeups and why predicates matter
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is spurious wakeups and why predicates matter, and when would you use it?</p>
+<h2>Section 44</h2>
+<p>This section is about timed locks with try_lock_for, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand timed locks with try_lock_for, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about timed locks with try_lock_for is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>When you design a class for shared use, put the lock inside the class, so callers cannot forget it and cannot lock in the wrong order. Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use timed locks with try_lock_for in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Timed locks with try_lock_for
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is timed locks with try_lock_for, and when would you use it?</p>
+<h2>Section 45</h2>
+<p>This section is about exceptions, locks and raii, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand exceptions, locks and raii, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about exceptions, locks and raii is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Deadlock is rarely dramatic: two threads simply wait forever, each holding what the other needs, and the program quietly stops making progress. Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use exceptions, locks and raii in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Exceptions, locks and RAII
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is exceptions, locks and raii, and when would you use it?</p>
+<h2>Section 46</h2>
+<p>This section is about testing synchronised code, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand testing synchronised code, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about testing synchronised code is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Condition variables look confusing until you see the pattern: wait in a loop on a predicate, change the shared state under the lock, and then notify. Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use testing synchronised code in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Testing synchronised code
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+#include &lt;condition_variable&gt;
+std::mutex m;
+std::condition_variable cv;
+bool ready = false;
+int main() {
+    std::thread worker([] {
+        std::lock_guard&lt;std::mutex&gt; lock(m);
+        ready = true;
+        cv.notify_one();
+    });
+    std::unique_lock&lt;std::mutex&gt; lock(m);
+    cv.wait(lock, [] { return ready; });
+    worker.join();
+    std::cout &lt;&lt; &quot;ready\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is testing synchronised code, and when would you use it?</p>
+<h2>Section 47</h2>
+<p>This section is about the performance cost of locking, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand the performance cost of locking, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about the performance cost of locking is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Atomics solve a narrower problem than many beginners expect: they protect a single value, not a whole invariant spread across several variables. The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use the performance cost of locking in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// The performance cost of locking
+#include &lt;iostream&gt;
+#include &lt;atomic&gt;
+#include &lt;thread&gt;
+int main() {
+    std::atomic&lt;int&gt; count{0};
+    std::thread a([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    std::thread b([&amp;] { for (int i = 0; i &lt; 1000; ++i) ++count; });
+    a.join(); b.join();
+    std::cout &lt;&lt; count &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is the performance cost of locking, and when would you use it?</p>
+<h2>Section 48</h2>
+<p>This section is about choosing the right synchronisation tool, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand choosing the right synchronisation tool, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about choosing the right synchronisation tool is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Before reaching for an exotic tool, ask whether a plain mutex and a clear invariant would do the job, because simplicity is itself a safety feature. A lock is not a decoration on shared data; it is a promise that every access to that data follows the same locking rule, without exceptions. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use choosing the right synchronisation tool in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Choosing the right synchronisation tool
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;shared_mutex&gt;
+std::shared_mutex rw;
+int value = 7;
+int main() {
+    std::shared_lock&lt;std::shared_mutex&gt; lock(rw);
+    std::cout &lt;&lt; value &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is choosing the right synchronisation tool, and when would you use it?</p>
+<h2>Section 49</h2>
+<p>This section is about common synchronisation mistakes reviewed, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand common synchronisation mistakes reviewed, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about common synchronisation mistakes reviewed is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>Test synchronised code under load and with repeated runs, since races and deadlocks often hide when the program is lightly loaded. The safest lock is usually the shortest one: take it, do the small protected job, and release it, preferably automatically through RAII. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use common synchronisation mistakes reviewed in your own code, start with the simplest correct version and add complexity only when you have a reason. Check the obvious cases first, then the empty case, then the large case, and then the case where something goes wrong.</p>
+<pre><code>// Common synchronisation mistakes reviewed
+#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+std::mutex first, second;
+int main() {
+    std::scoped_lock lock(first, second);
+    std::cout &lt;&lt; &quot;both locked safely\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is common synchronisation mistakes reviewed, and when would you use it?</p>
+<h2>Section 50</h2>
+<p>This section is about a safe sharing design from start to finish, and it matters because it is one of the building blocks you will return to again and again as your programs grow. At first the idea may look small or even obvious, yet it changes how you write code once you understand what it guarantees and what it does not. Learning it properly now saves you from a whole class of confusing bugs later, because you will recognise the pattern when it appears in library code, in other people&#x27;s programs, and in your own work. Take your time with the details here, try the example, and do not rush on to the next section until you can explain the idea in your own words to someone who has never seen it.</p>
+<p>To understand a safe sharing design from start to finish, start with the situation it was designed for. Programs constantly create values, pass them around, store them, and discard them, and each of those steps has a cost and a risk if it is done carelessly. The topic of this section gives you a controlled way to handle that step, with rules that are the same every time you use it. That consistency is the real gift: once you learn the rule, you can apply it in many places without rethinking the whole problem. The rest of this section explains the rule, shows it in code, and points out the mistakes that beginners most often make when they first meet it.</p>
+<p>A useful way to think about a safe sharing design from start to finish is to compare it with the alternative you already know. The alternative usually works, but it is either slower, less safe, or harder to reason about when a program grows. The new approach trades a little learning effort now for clearer, safer, and often faster code later. Notice what stays the same as well as what changes: the surrounding program still needs good names, clear functions, and sensible tests. No single feature rescues a badly structured program, and this topic works best inside code that is already organised in a straightforward way.</p>
+<p>The guiding rule is simple to state and hard to practise: shared data is either protected, immutable, or owned by exactly one thread at a time. Most synchronisation bugs come not from the lock itself but from one forgotten path, one early return, or one access that somebody assumed was safe. Keep this in mind while you read the example below, because the code is deliberately small so that the idea, rather than the surrounding detail, stays in focus. Run it mentally line by line, predict what each line does, and then, when you can, compile and run a version of your own with your own values and your own prints added.</p>
+<p>When you use a safe sharing design from start to finish in your own code, start with the simplest correct version and add complexity only when you have a reason.</p>
+<pre><code>// A safe sharing design from start to finish
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+std::mutex m;
+int counter = 0;
+void bump() { for (int i = 0; i &lt; 1000; ++i) { std::lock_guard&lt;std::mutex&gt; lock(m); ++counter; } }
+int main() {
+    std::thread a(bump), b(bump);
+    a.join(); b.join();
+    std::cout &lt;&lt; counter &lt;&lt; &quot;\n&quot;;
+    return 0;
+}</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what is a safe sharing design from start to finish, and when would you use it?</p>
+<h2>Practical Task</h2>
+<p>Build a thread-safe counter class with its mutex inside the class, run ten threads that each increment it 1,000 times, and prove the final total is exactly 10,000 on repeated runs.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>Why is a lock_guard safer than locking and unlocking a mutex by hand?</li>
+<li>What is deadlock, and how does a fixed lock order help prevent it?</li>
+<li>Why does a condition variable wait need a predicate?</li>
+<li>When is an atomic variable enough, and when do you need a mutex instead?</li>
+<li>Why should you keep the work done while holding a lock as small as possible?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-32.html">← Chapter 32</a> <a href="index.html">All chapters</a> <a href="chapter-34.html">Chapter 34 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/cpp-developer/chapter-33.html'; this.page.identifier = 'book-cpp-developer-chapter-33'; this.page.title = 'Chapter 33: Synchronisation and Safe Sharing'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>

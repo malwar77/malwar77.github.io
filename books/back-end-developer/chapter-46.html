@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 46 — Building a Real API: Planning and Structure — Back-End Developer | Kelick Tech Hub</title>
+<meta name="description" content="Chapter 46 of the Back-End Developer teaching book: Building a Real API: Planning and Structure.">
+<style>
+body{background:#06080e;color:#e8e9ec;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.7;margin:0;padding:0}
+a{color:#22d3ee}
+header.top,footer{max-width:960px;margin:0 auto;padding:18px 20px}
+header.top a{color:#ffd21f;text-decoration:none;font-weight:700}
+main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+h1{color:#ffd21f;line-height:1.05;font-size:clamp(34px,7vw,54px);font-weight:800;letter-spacing:-0.02em;margin:12px 0 12px}
+h2{color:#e8e9ec;margin-top:2em;line-height:1.15;font-size:28px;font-weight:800;letter-spacing:-0.015em}
+p{margin:1em 0}
+p.check{border-left:4px solid #ffd21f;background:#141a26;padding:12px 16px}
+pre{background:#0d1220;border:1px solid #2a3350;border-radius:8px;padding:14px;overflow-x:auto}
+code{color:#ffd21f}
+pre code{color:#e8e9ec}
+nav.chapter-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2.5em 0 0;padding-top:1.2em;border-top:1px solid #2a3350}
+nav.chapter-nav a{color:#ffd21f;text-decoration:none;font-weight:700}
+.book-card{border:1px solid #2a3350;border-radius:18px;background:linear-gradient(180deg,rgba(255,210,31,0.07),rgba(34,211,238,0.04)),#141a26;padding:22px 24px;margin:0 0 22px;box-shadow:0 24px 60px -30px rgba(34,211,238,0.5),0 18px 44px -26px rgba(255,210,31,0.5)}
+.book-card p{margin:0 0 1em}.book-card p:last-child{margin-bottom:0}
+ul.chapter-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){ul.chapter-list{grid-template-columns:1fr}}
+ul.chapter-list li{margin:0;border:1px solid #2a3350;border-radius:12px;background:#141a26;padding:12px 14px}
+ul.chapter-list a{color:#e8e9ec;text-decoration:none}
+ul.chapter-list a:hover{color:#ffd21f}
+.chapter-num{color:#ffd21f;font-weight:800;margin-right:.5em}
+</style>
+</head>
+<body>
+<header class="top"><a href="index.html">← Back-End Developer — all chapters</a> &nbsp;·&nbsp; <a href="https://malwar77.github.io/">Kelick Tech Hub</a></header>
+<main>
+<h1>Chapter 46: Building a Real API: Planning and Structure</h1>
+<figure class="chapter-art" style="margin:0 0 18px"><img src="images/chapter-46.svg" alt="Design for Chapter 46" loading="lazy" style="width:100%;border-radius:12px;display:block"></figure>
+<h2>Section 1: What BackEndDay Will Do</h2>
+<p>This section is about what backendday will do, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan what backendday will do carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, what backendday will do means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how what backendday will do works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with what backendday will do is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>from urllib.parse import urlparse, parse_qs
+
+
+def parse_path(raw_path):
+    parsed = urlparse(raw_path)
+    return parsed.path, parse_qs(parsed.query)
+
+
+path, query = parse_path(&quot;/tasks?status=open&quot;)
+print(path, query)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what backendday will do mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 2: Turning an Idea Into a Clear Plan</h2>
+<p>This section is about turning an idea into a clear plan, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan turning an idea into a clear plan carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, turning an idea into a clear plan means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how turning an idea into a clear plan works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with turning an idea into a clear plan is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps({&quot;app&quot;: &quot;BackEndDay&quot;, &quot;status&quot;: &quot;running&quot;}).encode()
+        self.send_response(200)
+        self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+HTTPServer((&quot;localhost&quot;, 8000), Handler).serve_forever()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does turning an idea into a clear plan mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 3: What the API Will and Will Not Do</h2>
+<p>This section is about what the api will and will not do, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan what the api will and will not do carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, what the api will and will not do means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how what the api will and will not do works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with what the api will and will not do is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def connect():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)&quot;)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, task_id INTEGER, text TEXT NOT NULL)&quot;)
+    db.commit()
+    db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what the api will and will not do mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 4: Listing the Resources: Tasks and Notes</h2>
+<p>This section is about listing the resources: tasks and notes, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan listing the resources: tasks and notes carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, listing the resources: tasks and notes means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how listing the resources: tasks and notes works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with listing the resources: tasks and notes is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def add_task(title):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO tasks (title, done) VALUES (?, 0)&quot;, (title,))
+    db.commit()
+    task_id = cursor.lastrowid
+    db.close()
+    return task_id
+
+
+print(add_task(&quot;Plan the BackEndDay report&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does listing the resources: tasks and notes mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 5: Naming Endpoints Clearly</h2>
+<p>This section is about naming endpoints clearly, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan naming endpoints clearly carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, naming endpoints clearly means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how naming endpoints clearly works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with naming endpoints clearly is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def list_tasks():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    rows = db.execute(&quot;SELECT id, title, done FROM tasks ORDER BY id&quot;).fetchall()
+    db.close()
+    return [dict(row) for row in rows]
+
+
+for task in list_tasks():
+    print(task[&quot;id&quot;], task[&quot;title&quot;], &quot;done&quot; if task[&quot;done&quot;] else &quot;open&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does naming endpoints clearly mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 6: Sketching Routes Before Coding</h2>
+<p>This section is about sketching routes before coding, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan sketching routes before coding carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, sketching routes before coding means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how sketching routes before coding works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with sketching routes before coding is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def get_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    row = db.execute(&quot;SELECT id, title, done FROM tasks WHERE id = ?&quot;, (task_id,)).fetchone()
+    db.close()
+    if row is None:
+        return None
+    return dict(row)
+
+
+print(get_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does sketching routes before coding mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 7: The Shape of a Task</h2>
+<p>This section is about the shape of a task, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan the shape of a task carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, the shape of a task means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how the shape of a task works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with the shape of a task is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def update_task(task_id, title, done):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;UPDATE tasks SET title = ?, done = ? WHERE id = ?&quot;, (title, done, task_id))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(update_task(1, &quot;Plan the BackEndDay report&quot;, 1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the shape of a task mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 8: The Shape of a Note</h2>
+<p>This section is about the shape of a note, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan the shape of a note carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, the shape of a note means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how the shape of a note works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with the shape of a note is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def delete_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;DELETE FROM tasks WHERE id = ?&quot;, (task_id,))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(delete_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the shape of a note mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 9: What a Good JSON Response Looks Like</h2>
+<p>This section is about what a good json response looks like, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan what a good json response looks like carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, what a good json response looks like means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how what a good json response looks like works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with what a good json response looks like is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def add_note(task_id, text):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO notes (task_id, text) VALUES (?, ?)&quot;, (task_id, text))
+    db.commit()
+    note_id = cursor.lastrowid
+    db.close()
+    return note_id
+
+
+print(add_note(1, &quot;Remember to check the report before bed.&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what a good json response looks like mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 10: Status Codes You Will Use Daily</h2>
+<p>This section is about status codes you will use daily, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan status codes you will use daily carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, status codes you will use daily means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how status codes you will use daily works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with status codes you will use daily is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import json
+
+
+def send_json(handler, status, data):
+    body = json.dumps(data).encode()
+    handler.send_response(status)
+    handler.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+    handler.send_header(&quot;Content-Length&quot;, str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does status codes you will use daily mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 11: Error Responses That Help the Caller</h2>
+<p>This section is about error responses that help the caller, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan error responses that help the caller carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, error responses that help the caller means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how error responses that help the caller works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with error responses that help the caller is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def build_report():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    total = db.execute(&quot;SELECT COUNT(*) FROM tasks&quot;).fetchone()[0]
+    done = db.execute(&quot;SELECT COUNT(*) FROM tasks WHERE done = 1&quot;).fetchone()[0]
+    db.close()
+    lines = [&quot;BackEndDay Daily Report&quot;, &quot;-----------------------&quot;]
+    lines.append(&quot;Tasks in total: &quot; + str(total))
+    lines.append(&quot;Tasks finished: &quot; + str(done))
+    lines.append(&quot;Tasks still open: &quot; + str(total - done))
+    return &quot;\n&quot;.join(lines) + &quot;\n&quot;
+
+
+print(build_report())</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does error responses that help the caller mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 12: Planning the Project File Layout</h2>
+<p>This section is about planning the project file layout, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan planning the project file layout carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, planning the project file layout means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how planning the project file layout works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with planning the project file layout is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import json
+
+
+def read_json(handler):
+    length = int(handler.headers.get(&quot;Content-Length&quot;, 0))
+    raw = handler.rfile.read(length).decode()
+    if not raw.strip():
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return False</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does planning the project file layout mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 13: One File First: Starting Simple</h2>
+<p>This section is about one file first: starting simple, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan one file first: starting simple carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, one file first: starting simple means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how one file first: starting simple works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with one file first: starting simple is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from urllib.parse import urlparse, parse_qs
+
+
+def parse_path(raw_path):
+    parsed = urlparse(raw_path)
+    return parsed.path, parse_qs(parsed.query)
+
+
+path, query = parse_path(&quot;/tasks?status=open&quot;)
+print(path, query)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does one file first: starting simple mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 14: The Request Handler in Plain Words</h2>
+<p>This section is about the request handler in plain words, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan the request handler in plain words carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, the request handler in plain words means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how the request handler in plain words works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with the request handler in plain words is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps({&quot;app&quot;: &quot;BackEndDay&quot;, &quot;status&quot;: &quot;running&quot;}).encode()
+        self.send_response(200)
+        self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+HTTPServer((&quot;localhost&quot;, 8000), Handler).serve_forever()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does the request handler in plain words mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 15: Reading the Path and the Method</h2>
+<p>This section is about reading the path and the method, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan reading the path and the method carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, reading the path and the method means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how reading the path and the method works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with reading the path and the method is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def connect():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)&quot;)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, task_id INTEGER, text TEXT NOT NULL)&quot;)
+    db.commit()
+    db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reading the path and the method mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 16: Sending JSON Back to the Caller</h2>
+<p>This section is about sending json back to the caller, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan sending json back to the caller carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, sending json back to the caller means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how sending json back to the caller works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with sending json back to the caller is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def add_task(title):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO tasks (title, done) VALUES (?, 0)&quot;, (title,))
+    db.commit()
+    task_id = cursor.lastrowid
+    db.close()
+    return task_id
+
+
+print(add_task(&quot;Plan the BackEndDay report&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does sending json back to the caller mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 17: Planning for Data That Changes</h2>
+<p>This section is about planning for data that changes, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan planning for data that changes carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, planning for data that changes means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how planning for data that changes works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with planning for data that changes is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def list_tasks():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    rows = db.execute(&quot;SELECT id, title, done FROM tasks ORDER BY id&quot;).fetchall()
+    db.close()
+    return [dict(row) for row in rows]
+
+
+for task in list_tasks():
+    print(task[&quot;id&quot;], task[&quot;title&quot;], &quot;done&quot; if task[&quot;done&quot;] else &quot;open&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does planning for data that changes mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 18: Keeping Settings Out of the Code</h2>
+<p>This section is about keeping settings out of the code, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan keeping settings out of the code carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, keeping settings out of the code means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how keeping settings out of the code works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with keeping settings out of the code is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def get_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    row = db.execute(&quot;SELECT id, title, done FROM tasks WHERE id = ?&quot;, (task_id,)).fetchone()
+    db.close()
+    if row is None:
+        return None
+    return dict(row)
+
+
+print(get_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does keeping settings out of the code mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 19: A Checklist Before You Write Code</h2>
+<p>This section is about a checklist before you write code, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan a checklist before you write code carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, a checklist before you write code means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how a checklist before you write code works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with a checklist before you write code is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def update_task(task_id, title, done):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;UPDATE tasks SET title = ?, done = ? WHERE id = ?&quot;, (title, done, task_id))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(update_task(1, &quot;Plan the BackEndDay report&quot;, 1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does a checklist before you write code mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 20: What Done Looks Like</h2>
+<p>This section is about what done looks like, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan what done looks like carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, what done looks like means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how what done looks like works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with what done looks like is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def delete_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;DELETE FROM tasks WHERE id = ?&quot;, (task_id,))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(delete_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what done looks like mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 21: How a Client Will Use Your API</h2>
+<p>This section is about how a client will use your api, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan how a client will use your api carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, how a client will use your api means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how how a client will use your api works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with how a client will use your api is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def add_note(task_id, text):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO notes (task_id, text) VALUES (?, ?)&quot;, (task_id, text))
+    db.commit()
+    note_id = cursor.lastrowid
+    db.close()
+    return note_id
+
+
+print(add_note(1, &quot;Remember to check the report before bed.&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does how a client will use your api mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 22: Writing the API Contract in Plain Words</h2>
+<p>This section is about writing the api contract in plain words, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan writing the api contract in plain words carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, writing the api contract in plain words means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how writing the api contract in plain words works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with writing the api contract in plain words is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import json
+
+
+def send_json(handler, status, data):
+    body = json.dumps(data).encode()
+    handler.send_response(status)
+    handler.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+    handler.send_header(&quot;Content-Length&quot;, str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does writing the api contract in plain words mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 23: Deciding Which Fields Are Required</h2>
+<p>This section is about deciding which fields are required, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan deciding which fields are required carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, deciding which fields are required means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how deciding which fields are required works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with deciding which fields are required is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def build_report():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    total = db.execute(&quot;SELECT COUNT(*) FROM tasks&quot;).fetchone()[0]
+    done = db.execute(&quot;SELECT COUNT(*) FROM tasks WHERE done = 1&quot;).fetchone()[0]
+    db.close()
+    lines = [&quot;BackEndDay Daily Report&quot;, &quot;-----------------------&quot;]
+    lines.append(&quot;Tasks in total: &quot; + str(total))
+    lines.append(&quot;Tasks finished: &quot; + str(done))
+    lines.append(&quot;Tasks still open: &quot; + str(total - done))
+    return &quot;\n&quot;.join(lines) + &quot;\n&quot;
+
+
+print(build_report())</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does deciding which fields are required mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 24: Deciding Which Fields Are Optional</h2>
+<p>This section is about deciding which fields are optional, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan deciding which fields are optional carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, deciding which fields are optional means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how deciding which fields are optional works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with deciding which fields are optional is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import json
+
+
+def read_json(handler):
+    length = int(handler.headers.get(&quot;Content-Length&quot;, 0))
+    raw = handler.rfile.read(length).decode()
+    if not raw.strip():
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return False</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does deciding which fields are optional mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 25: IDs for Every Task and Note</h2>
+<p>This section is about ids for every task and note, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan ids for every task and note carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, ids for every task and note means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how ids for every task and note works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with ids for every task and note is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from urllib.parse import urlparse, parse_qs
+
+
+def parse_path(raw_path):
+    parsed = urlparse(raw_path)
+    return parsed.path, parse_qs(parsed.query)
+
+
+path, query = parse_path(&quot;/tasks?status=open&quot;)
+print(path, query)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does ids for every task and note mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 26: Dates and Times in a Simple Format</h2>
+<p>This section is about dates and times in a simple format, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan dates and times in a simple format carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, dates and times in a simple format means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how dates and times in a simple format works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with dates and times in a simple format is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps({&quot;app&quot;: &quot;BackEndDay&quot;, &quot;status&quot;: &quot;running&quot;}).encode()
+        self.send_response(200)
+        self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+HTTPServer((&quot;localhost&quot;, 8000), Handler).serve_forever()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does dates and times in a simple format mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 27: Sorting: What Comes First</h2>
+<p>This section is about sorting: what comes first, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan sorting: what comes first carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, sorting: what comes first means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how sorting: what comes first works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with sorting: what comes first is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def connect():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)&quot;)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, task_id INTEGER, text TEXT NOT NULL)&quot;)
+    db.commit()
+    db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does sorting: what comes first mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 28: Filtering: Showing Only What Was Asked</h2>
+<p>This section is about filtering: showing only what was asked, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan filtering: showing only what was asked carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, filtering: showing only what was asked means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how filtering: showing only what was asked works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with filtering: showing only what was asked is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def add_task(title):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO tasks (title, done) VALUES (?, 0)&quot;, (title,))
+    db.commit()
+    task_id = cursor.lastrowid
+    db.close()
+    return task_id
+
+
+print(add_task(&quot;Plan the BackEndDay report&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does filtering: showing only what was asked mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 29: Paging Through Long Lists</h2>
+<p>This section is about paging through long lists, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan paging through long lists carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, paging through long lists means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how paging through long lists works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with paging through long lists is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def list_tasks():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    rows = db.execute(&quot;SELECT id, title, done FROM tasks ORDER BY id&quot;).fetchall()
+    db.close()
+    return [dict(row) for row in rows]
+
+
+for task in list_tasks():
+    print(task[&quot;id&quot;], task[&quot;title&quot;], &quot;done&quot; if task[&quot;done&quot;] else &quot;open&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does paging through long lists mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 30: Validation Rules Decided Up Front</h2>
+<p>This section is about validation rules decided up front, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan validation rules decided up front carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, validation rules decided up front means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how validation rules decided up front works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with validation rules decided up front is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def get_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    row = db.execute(&quot;SELECT id, title, done FROM tasks WHERE id = ?&quot;, (task_id,)).fetchone()
+    db.close()
+    if row is None:
+        return None
+    return dict(row)
+
+
+print(get_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does validation rules decided up front mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 31: Handling Broken Requests Gracefully</h2>
+<p>This section is about handling broken requests gracefully, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan handling broken requests gracefully carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, handling broken requests gracefully means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how handling broken requests gracefully works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with handling broken requests gracefully is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def update_task(task_id, title, done):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;UPDATE tasks SET title = ?, done = ? WHERE id = ?&quot;, (title, done, task_id))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(update_task(1, &quot;Plan the BackEndDay report&quot;, 1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does handling broken requests gracefully mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 32: Planning the Report Endpoint</h2>
+<p>This section is about planning the report endpoint, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan planning the report endpoint carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, planning the report endpoint means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how planning the report endpoint works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with planning the report endpoint is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def delete_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;DELETE FROM tasks WHERE id = ?&quot;, (task_id,))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(delete_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does planning the report endpoint mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 33: Plain Text Reports: What They Contain</h2>
+<p>This section is about plain text reports: what they contain, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan plain text reports: what they contain carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, plain text reports: what they contain means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how plain text reports: what they contain works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with plain text reports: what they contain is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def add_note(task_id, text):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO notes (task_id, text) VALUES (?, ?)&quot;, (task_id, text))
+    db.commit()
+    note_id = cursor.lastrowid
+    db.close()
+    return note_id
+
+
+print(add_note(1, &quot;Remember to check the report before bed.&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does plain text reports: what they contain mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 34: Thinking About Who May Use the API</h2>
+<p>This section is about thinking about who may use the api, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan thinking about who may use the api carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, thinking about who may use the api means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how thinking about who may use the api works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with thinking about who may use the api is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import json
+
+
+def send_json(handler, status, data):
+    body = json.dumps(data).encode()
+    handler.send_response(status)
+    handler.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+    handler.send_header(&quot;Content-Length&quot;, str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does thinking about who may use the api mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 35: Keeping the API Honest</h2>
+<p>This section is about keeping the api honest, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan keeping the api honest carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, keeping the api honest means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how keeping the api honest works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with keeping the api honest is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def build_report():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    total = db.execute(&quot;SELECT COUNT(*) FROM tasks&quot;).fetchone()[0]
+    done = db.execute(&quot;SELECT COUNT(*) FROM tasks WHERE done = 1&quot;).fetchone()[0]
+    db.close()
+    lines = [&quot;BackEndDay Daily Report&quot;, &quot;-----------------------&quot;]
+    lines.append(&quot;Tasks in total: &quot; + str(total))
+    lines.append(&quot;Tasks finished: &quot; + str(done))
+    lines.append(&quot;Tasks still open: &quot; + str(total - done))
+    return &quot;\n&quot;.join(lines) + &quot;\n&quot;
+
+
+print(build_report())</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does keeping the api honest mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 36: Testing Ideas Before Building</h2>
+<p>This section is about testing ideas before building, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan testing ideas before building carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, testing ideas before building means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how testing ideas before building works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with testing ideas before building is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import json
+
+
+def read_json(handler):
+    length = int(handler.headers.get(&quot;Content-Length&quot;, 0))
+    raw = handler.rfile.read(length).decode()
+    if not raw.strip():
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return False</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does testing ideas before building mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 37: Writing Example Requests to Try Later</h2>
+<p>This section is about writing example requests to try later, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan writing example requests to try later carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, writing example requests to try later means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how writing example requests to try later works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with writing example requests to try later is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from urllib.parse import urlparse, parse_qs
+
+
+def parse_path(raw_path):
+    parsed = urlparse(raw_path)
+    return parsed.path, parse_qs(parsed.query)
+
+
+path, query = parse_path(&quot;/tasks?status=open&quot;)
+print(path, query)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does writing example requests to try later mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 38: Writing Example Responses to Compare</h2>
+<p>This section is about writing example responses to compare, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan writing example responses to compare carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, writing example responses to compare means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how writing example responses to compare works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with writing example responses to compare is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps({&quot;app&quot;: &quot;BackEndDay&quot;, &quot;status&quot;: &quot;running&quot;}).encode()
+        self.send_response(200)
+        self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+HTTPServer((&quot;localhost&quot;, 8000), Handler).serve_forever()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does writing example responses to compare mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 39: Breaking the Build Into Small Steps</h2>
+<p>This section is about breaking the build into small steps, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan breaking the build into small steps carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, breaking the build into small steps means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how breaking the build into small steps works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with breaking the build into small steps is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def connect():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def setup():
+    db = connect()
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)&quot;)
+    db.execute(&quot;CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, task_id INTEGER, text TEXT NOT NULL)&quot;)
+    db.commit()
+    db.close()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does breaking the build into small steps mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 40: Ordering the Work Sensibly</h2>
+<p>This section is about ordering the work sensibly, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan ordering the work sensibly carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, ordering the work sensibly means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how ordering the work sensibly works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with ordering the work sensibly is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def add_task(title):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO tasks (title, done) VALUES (?, 0)&quot;, (title,))
+    db.commit()
+    task_id = cursor.lastrowid
+    db.close()
+    return task_id
+
+
+print(add_task(&quot;Plan the BackEndDay report&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does ordering the work sensibly mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 41: What to Do When a Plan Changes</h2>
+<p>This section is about what to do when a plan changes, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan what to do when a plan changes carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, what to do when a plan changes means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how what to do when a plan changes works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with what to do when a plan changes is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def list_tasks():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    rows = db.execute(&quot;SELECT id, title, done FROM tasks ORDER BY id&quot;).fetchall()
+    db.close()
+    return [dict(row) for row in rows]
+
+
+for task in list_tasks():
+    print(task[&quot;id&quot;], task[&quot;title&quot;], &quot;done&quot; if task[&quot;done&quot;] else &quot;open&quot;)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does what to do when a plan changes mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 42: Keeping Notes as You Plan</h2>
+<p>This section is about keeping notes as you plan, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan keeping notes as you plan carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, keeping notes as you plan means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how keeping notes as you plan works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with keeping notes as you plan is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def get_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.row_factory = sqlite3.Row
+    row = db.execute(&quot;SELECT id, title, done FROM tasks WHERE id = ?&quot;, (task_id,)).fetchone()
+    db.close()
+    if row is None:
+        return None
+    return dict(row)
+
+
+print(get_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does keeping notes as you plan mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 43: Reviewing Your Plan With Fresh Eyes</h2>
+<p>This section is about reviewing your plan with fresh eyes, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan reviewing your plan with fresh eyes carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, reviewing your plan with fresh eyes means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how reviewing your plan with fresh eyes works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with reviewing your plan with fresh eyes is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def update_task(task_id, title, done):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;UPDATE tasks SET title = ?, done = ? WHERE id = ?&quot;, (title, done, task_id))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(update_task(1, &quot;Plan the BackEndDay report&quot;, 1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does reviewing your plan with fresh eyes mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 44: A Small Diagram of Requests and Responses</h2>
+<p>This section is about a small diagram of requests and responses, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan a small diagram of requests and responses carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, a small diagram of requests and responses means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how a small diagram of requests and responses works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with a small diagram of requests and responses is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def delete_task(task_id):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    db.execute(&quot;DELETE FROM tasks WHERE id = ?&quot;, (task_id,))
+    db.commit()
+    changed = db.total_changes
+    db.close()
+    return changed &gt; 0
+
+
+print(delete_task(1))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does a small diagram of requests and responses mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 45: Preparing Your Folder and Tools</h2>
+<p>This section is about preparing your folder and tools, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan preparing your folder and tools carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, preparing your folder and tools means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how preparing your folder and tools works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with preparing your folder and tools is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import sqlite3
+
+
+def add_note(task_id, text):
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    cursor = db.execute(&quot;INSERT INTO notes (task_id, text) VALUES (?, ?)&quot;, (task_id, text))
+    db.commit()
+    note_id = cursor.lastrowid
+    db.close()
+    return note_id
+
+
+print(add_note(1, &quot;Remember to check the report before bed.&quot;))</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does preparing your folder and tools mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 46: Starting the Server Skeleton</h2>
+<p>This section is about starting the server skeleton, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan starting the server skeleton carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, starting the server skeleton means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how starting the server skeleton works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with starting the server skeleton is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import json
+
+
+def send_json(handler, status, data):
+    body = json.dumps(data).encode()
+    handler.send_response(status)
+    handler.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+    handler.send_header(&quot;Content-Length&quot;, str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does starting the server skeleton mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 47: A First Hello Response</h2>
+<p>This section is about a first hello response, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan a first hello response carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, a first hello response means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how a first hello response works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with a first hello response is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time. A third mistake is copying a pattern that worked somewhere else without checking whether it fits tasks, notes, and a plain-text report in this project.</p>
+<pre><code>import sqlite3
+
+
+def build_report():
+    db = sqlite3.connect(&quot;backendday.db&quot;)
+    total = db.execute(&quot;SELECT COUNT(*) FROM tasks&quot;).fetchone()[0]
+    done = db.execute(&quot;SELECT COUNT(*) FROM tasks WHERE done = 1&quot;).fetchone()[0]
+    db.close()
+    lines = [&quot;BackEndDay Daily Report&quot;, &quot;-----------------------&quot;]
+    lines.append(&quot;Tasks in total: &quot; + str(total))
+    lines.append(&quot;Tasks finished: &quot; + str(done))
+    lines.append(&quot;Tasks still open: &quot; + str(total - done))
+    return &quot;\n&quot;.join(lines) + &quot;\n&quot;
+
+
+print(build_report())</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does a first hello response mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 48: Checking the Skeleton With a Request</h2>
+<p>This section is about checking the skeleton with a request, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan checking the skeleton with a request carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, checking the skeleton with a request means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how checking the skeleton with a request works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with checking the skeleton with a request is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>import json
+
+
+def read_json(handler):
+    length = int(handler.headers.get(&quot;Content-Length&quot;, 0))
+    raw = handler.rfile.read(length).decode()
+    if not raw.strip():
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return False</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does checking the skeleton with a request mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 49: Fixing the First Mistakes Calmly</h2>
+<p>This section is about fixing the first mistakes calmly, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan fixing the first mistakes calmly carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, fixing the first mistakes calmly means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how fixing the first mistakes calmly works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with fixing the first mistakes calmly is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from urllib.parse import urlparse, parse_qs
+
+
+def parse_path(raw_path):
+    parsed = urlparse(raw_path)
+    return parsed.path, parse_qs(parsed.query)
+
+
+path, query = parse_path(&quot;/tasks?status=open&quot;)
+print(path, query)</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does fixing the first mistakes calmly mean for BackEndDay, and how would you check that it works?</p>
+<h2>Section 50: Your Plan, Ready to Build On</h2>
+<p>This section is about your plan, ready to build on, and it matters because BackEndDay only feels simple when each part has a clear job. When you plan your plan, ready to build on carefully, you avoid guessing in the middle of building, and you give yourself something to check your work against later. Think of it like packing a bag before a journey: you decide what you need, you leave out what you do not need, and you can see at a glance if something is missing. A back-end project works the same way, because every endpoint, every table, and every response should exist for a reason you can explain in plain words.</p>
+<p>In plain words, your plan, ready to build on means making a choice you can defend and then writing that choice down so future you can follow it. Beginners sometimes rush past this step because coding feels like real progress and planning feels like waiting, but planning is what keeps the coding fast. For BackEndDay, which stores tasks and notes in a local SQLite file and serves them as JSON through http.server, a clear plan stops small decisions from turning into tangled code. You do not need fancy tools for this, only a notebook, a list, and the honesty to say when an idea is still vague.</p>
+<p>Here is how your plan, ready to build on works in practice for BackEndDay, step by step. First, you state the goal in one sentence, such as what the user should be able to do when this part is finished. Second, you list the inputs, the outputs, and the cases where something might go wrong, including empty input, missing records, and broken data. Third, you decide how success and failure will look to the caller, so a person using the API is never left guessing. Fourth, you build the smallest version that proves the idea, test it by hand, and only then add polish, because a proven small piece beats a large untested one every time.</p>
+<p>Look at the code example in this section and read it slowly, line by line, before you run it. Notice how it uses only the Python standard library, which means you can run it without installing anything extra. Notice the names too: they describe what each thing does, rather than using short codes that only make sense for a day. Try changing one small thing, such as a message or a value, and run the code again to see what changes, because that kind of safe experiment builds real understanding. If the result surprises you, that surprise is useful, since it shows you exactly where your mental picture and the code disagree.</p>
+<p>A common mistake with your plan, ready to build on is trying to do everything at once, which makes errors hard to find and fixes hard to trust. Another common mistake is leaving an important decision unwritten, so two parts of the project quietly assume different things and then disagree at run time.</p>
+<pre><code>from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps({&quot;app&quot;: &quot;BackEndDay&quot;, &quot;status&quot;: &quot;running&quot;}).encode()
+        self.send_response(200)
+        self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+HTTPServer((&quot;localhost&quot;, 8000), Handler).serve_forever()</code></pre>
+<p class="check"><strong>Check:</strong> In your own words, what does your plan, ready to build on mean for BackEndDay, and how would you check that it works?</p>
+<h2>Practical Task</h2>
+<p>Build the BackEndDay plan on paper and as a server skeleton: write down the tasks and notes resources, their fields, every endpoint with its method and status codes, and the report contents, then create backendday.py with a running http.server skeleton that returns a JSON hello response. Test the skeleton by hand and compare each planned endpoint with what the skeleton can already do, noting what is still missing.</p>
+<h2>Chapter Questions</h2>
+<ol>
+<li>What resources does BackEndDay expose, and why are tasks and notes kept separate?</li>
+<li>How do clear endpoint names help someone using your API for the first time?</li>
+<li>What should a good error response contain, and what should it leave out?</li>
+<li>Why is it useful to write example requests and responses before coding?</li>
+<li>What does done look like at the end of the planning stage, before the API is built?</li>
+</ol>
+<nav class="chapter-nav"><a href="chapter-45.html">← Chapter 45</a> <a href="index.html">All chapters</a> <a href="chapter-47.html">Chapter 47 →</a></nav>
+<div class="comments"><h2>Comments</h2><div id="disqus_thread"></div><script>var disqus_config = function () { this.page.url = 'https://malwar77.github.io/books/back-end-developer/chapter-46.html'; this.page.identifier = 'book-back-end-developer-chapter-46'; this.page.title = 'Chapter 46: Building a Real API: Planning and Structure'; };(function() { var d = document, s = d.createElement('script'); s.src = 'https://malwar77-github-io.disqus.com/embed.js'; s.setAttribute('data-timestamp', +new Date()); (d.head || d.body).appendChild(s); })();</script></div>
+</main>
+<footer><a href="index.html">← Back to all chapters</a></footer>
+</body>
+</html>
